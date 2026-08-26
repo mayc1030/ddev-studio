@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DDEV Studio
+Comment=Gestor Visual de Proyectos DDEV para Linux
+Exec=ddev-gui
+Icon=ddev
+Terminal=false
+Categories=Development;IDE;GTK;
+StartupNotify=true
