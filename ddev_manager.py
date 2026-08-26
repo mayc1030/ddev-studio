@@ -1325,6 +1325,11 @@ class DDEVManagerWindow(Gtk.Window):
         self.btn_base_stop.connect("clicked", lambda b: self.execute_base_ddev_action("stop"))
         base_ctrl_box.pack_start(self.btn_base_stop, False, False, 0)
         
+        btn_base_composer = Gtk.Button(label="📦 Composer Install")
+        btn_base_composer.set_tooltip_text("Instalar o actualizar dependencias de Composer (Drupal Core y Drush)")
+        btn_base_composer.connect("clicked", lambda b: self.execute_base_composer_install())
+        base_ctrl_box.pack_start(btn_base_composer, False, False, 0)
+        
         btn_base_folder = Gtk.Button()
         btn_base_folder.add(Gtk.Image.new_from_icon_name("folder-symbolic", Gtk.IconSize.BUTTON))
         btn_base_folder.set_tooltip_text("Abrir carpeta del proyecto base")
@@ -1733,6 +1738,26 @@ class DDEVManagerWindow(Gtk.Window):
             
         threading.Thread(target=task, daemon=True).start()
 
+    def execute_base_composer_install(self):
+        base_dir = self.entry_multisite_path.get_text().strip()
+        if not os.path.exists(base_dir):
+            msg = Gtk.MessageDialog(transient_for=self, flags=0, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text=f"El directorio '{base_dir}' no existe")
+            msg.run()
+            msg.destroy()
+            return
+            
+        base_name = os.path.basename(base_dir)
+        dialog = ProgressDialog(self, title=f"Composer Install: {base_name}")
+        dialog.set_status(f"Ejecutando ddev composer install en {base_name}...")
+        
+        def task():
+            cmd = ["ddev", "composer", "install"]
+            self.run_subproc(cmd, base_dir, dialog)
+            GLib.idle_add(dialog.finish, True, "Composer install completado", "", base_dir)
+            GLib.idle_add(self.refresh_multisite_subsites)
+            
+        threading.Thread(target=task, daemon=True).start()
+
     def execute_subsite_drush_action(self, action_key, subsite_name, subsite_url, base_dir):
         if action_key == "ssh":
             self.open_terminal(base_dir, f"ddev drush --uri={subsite_url} status; ddev ssh")
@@ -1883,8 +1908,9 @@ class DDEVManagerWindow(Gtk.Window):
 
                 # 4. Create database in MariaDB/MySQL
                 set_st(f"Creando base de datos '{slug}' en MariaDB...")
-                self.run_subproc(["ddev", "mysql", "-uroot", "-proot", "-hdb", "-e", f"CREATE DATABASE IF NOT EXISTS `{slug}`;"], base_dir, dialog)
-                log(f"✓ Base de datos '{slug}' creada en MariaDB.")
+                db_sql = f"CREATE DATABASE IF NOT EXISTS `{slug}`; GRANT ALL PRIVILEGES ON `{slug}`.* TO 'db'@'%'; GRANT ALL PRIVILEGES ON *.* TO 'db'@'%'; FLUSH PRIVILEGES;"
+                self.run_subproc(["ddev", "mysql", "-uroot", "-proot", "-hdb", "-e", db_sql], base_dir, dialog)
+                log(f"✓ Base de datos '{slug}' creada en MariaDB con permisos totales.")
 
                 # 5. Create folder structure docroot/sites/<slug>/files
                 docroot_dir = "docroot" if os.path.exists(os.path.join(base_dir, "docroot")) else ("web" if os.path.exists(os.path.join(base_dir, "web")) else ".")
@@ -1973,10 +1999,18 @@ if (!file_exists('/var/acquia')) {
 
                 # 10. Auto-install if selected
                 if auto_install and profile != "none":
+                    vendor_drush = os.path.join(base_dir, "vendor", "bin", "drush")
+                    if not os.path.exists(vendor_drush):
+                        set_st("Instalando dependencias de Composer (Drupal Core y Drush)...")
+                        log("📦 'drush' no detectado en vendor. Ejecutando 'ddev composer install'...")
+                        self.run_subproc(["ddev", "composer", "install"], base_dir, dialog)
+                        log("✓ Dependencias de Composer instaladas.")
+
                     set_st(f"Instalando perfil '{profile}' en {slug} con Drush...")
                     inst_cmd = [
                         "ddev", "drush", f"--uri={subsite_url}",
                         "site:install", profile,
+                        f"--db-url=mysql://root:root@db:3306/{slug}",
                         f"--site-name={slug.capitalize()}",
                         "--account-name=admin",
                         "--account-pass=admin",
