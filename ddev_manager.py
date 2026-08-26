@@ -103,6 +103,42 @@ CUSTOM_CSS = b"""
     border-color: rgba(128, 128, 128, 0.4);
     background: alpha(@theme_base_color, 0.8);
 }
+.btn-drupal {
+    background-color: alpha(#0678be, 0.15);
+    color: @theme_text_color;
+    border: 1px solid alpha(#0678be, 0.4);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-weight: 500;
+}
+.btn-drupal:hover {
+    background-color: alpha(#0678be, 0.3);
+    border-color: #0678be;
+}
+.btn-quick {
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: bold;
+}
+.btn-quick-cache {
+    background-color: alpha(#10b981, 0.15);
+    color: @theme_text_color;
+    border: 1px solid alpha(#10b981, 0.4);
+}
+.btn-quick-cache:hover {
+    background-color: alpha(#10b981, 0.3);
+    border-color: #10b981;
+}
+.btn-quick-login {
+    background-color: alpha(#f59e0b, 0.15);
+    color: @theme_text_color;
+    border: 1px solid alpha(#f59e0b, 0.4);
+}
+.btn-quick-login:hover {
+    background-color: alpha(#f59e0b, 0.3);
+    border-color: #f59e0b;
+}
 """
 
 FRAMEWORKS = [
@@ -787,6 +823,64 @@ class DDEVManagerWindow(Gtk.Window):
             btn_web.connect("clicked", lambda b, url=primary_url: webbrowser.open(url))
             actions_box.pack_start(btn_web, False, False, 0)
             
+        # Controles y herramientas especializadas de Drupal (Drush)
+        if "drupal" in ptype:
+            # 1. Botón rápido Reconstruir/Limpiar Caché (cr / cc all)
+            btn_quick_cr = Gtk.Button(label="⚡ Caché")
+            btn_quick_cr.get_style_context().add_class("btn-quick")
+            btn_quick_cr.get_style_context().add_class("btn-quick-cache")
+            btn_quick_cr.set_tooltip_text("Reconstruir caché de Drupal (ddev drush cr)")
+            btn_quick_cr.connect("clicked", lambda b, p=proj: self.execute_drush_action("cr", p))
+            actions_box.pack_start(btn_quick_cr, False, False, 0)
+            
+            # 2. Botón rápido One-Time Login (drush uli)
+            btn_quick_uli = Gtk.Button(label="🔑 Login")
+            btn_quick_uli.get_style_context().add_class("btn-quick")
+            btn_quick_uli.get_style_context().add_class("btn-quick-login")
+            btn_quick_uli.set_tooltip_text("Iniciar sesión como Administrador (ddev drush uli)")
+            btn_quick_uli.connect("clicked", lambda b, p=proj: self.execute_drush_action("uli", p))
+            actions_box.pack_start(btn_quick_uli, False, False, 0)
+            
+            # 3. Menú desplegable completo de herramientas Drush
+            menu_btn_drush = Gtk.MenuButton()
+            menu_btn_drush.set_tooltip_text("Menú de comandos de Drupal / Drush")
+            menu_btn_drush.get_style_context().add_class("btn-drupal")
+            
+            lbl_drush_menu = Gtk.Label(label="💧 Drush ▾")
+            menu_btn_drush.add(lbl_drush_menu)
+            
+            drush_menu = Gtk.Menu()
+            
+            def add_menu_item(menu, label, action_key, p):
+                item = Gtk.MenuItem(label=label)
+                item.connect("activate", lambda w, ak=action_key, pr=p: self.execute_drush_action(ak, pr))
+                menu.append(item)
+                return item
+                
+            add_menu_item(drush_menu, "🔑 Iniciar Sesión Admin (drush uli)", "uli", proj)
+            add_menu_item(drush_menu, "⚡ Limpiar / Reconstruir Caché (drush cr)", "cr", proj)
+            add_menu_item(drush_menu, "🔄 Actualizar Base de Datos (drush updb)", "updb", proj)
+            
+            drush_menu.append(Gtk.SeparatorMenuItem())
+            
+            if "drupal7" not in ptype:
+                add_menu_item(drush_menu, "📤 Exportar Configuración (drush cex)", "cex", proj)
+                add_menu_item(drush_menu, "📥 Importar Configuración (drush cim)", "cim", proj)
+                drush_menu.append(Gtk.SeparatorMenuItem())
+                
+            add_menu_item(drush_menu, "⏰ Ejecutar Cron (drush cron)", "cron", proj)
+            add_menu_item(drush_menu, "📊 Estado del Sitio (drush status)", "status", proj)
+            add_menu_item(drush_menu, "📋 Ver Logs Recientes (drush watchdog)", "watchdog", proj)
+            add_menu_item(drush_menu, "🧩 Módulos Habilitados (drush pm:list)", "pm_list", proj)
+            
+            drush_menu.append(Gtk.SeparatorMenuItem())
+            add_menu_item(drush_menu, "💻 Abrir SSH en Contenedor (ddev ssh)", "ssh", proj)
+            add_menu_item(drush_menu, "🚀 Instalar Drush si falta (composer require)", "install_drush", proj)
+            
+            drush_menu.show_all()
+            menu_btn_drush.set_popup(drush_menu)
+            actions_box.pack_start(menu_btn_drush, False, False, 0)
+
         if approot and os.path.exists(approot):
             btn_folder = Gtk.Button()
             btn_folder.add(Gtk.Image.new_from_icon_name("folder-symbolic", Gtk.IconSize.BUTTON))
@@ -810,13 +904,19 @@ class DDEVManagerWindow(Gtk.Window):
         card.pack_start(actions_box, False, False, 0)
         return card
 
-    def open_terminal(self, path):
+    def open_terminal(self, path, command=""):
         for term in ["mate-terminal", "gnome-terminal", "x-terminal-emulator", "xterm"]:
             if shutil.which(term):
                 if term in ["mate-terminal", "gnome-terminal"]:
-                    subprocess.Popen([term, f"--working-directory={path}"])
+                    if command:
+                        subprocess.Popen([term, f"--working-directory={path}", "-e", f"bash -c '{command}; exec bash'"])
+                    else:
+                        subprocess.Popen([term, f"--working-directory={path}"])
                 else:
-                    subprocess.Popen([term], cwd=path)
+                    if command:
+                        subprocess.Popen([term, "-e", f"bash -c '{command}; exec bash'"], cwd=path)
+                    else:
+                        subprocess.Popen([term], cwd=path)
                 return
 
     def on_search_changed(self, entry):
@@ -829,6 +929,179 @@ class DDEVManagerWindow(Gtk.Window):
                 url = p.get("primary_url", "").lower()
                 match = (query in name) or (query in ptype) or (query in url)
                 child.set_visible(match)
+
+    def execute_drush_action(self, action_key, proj):
+        approot = proj.get("approot", "")
+        pname = proj.get("name", "")
+        ptype = proj.get("type", "").lower()
+        primary_url = proj.get("primary_url") or proj.get("httpsurl") or proj.get("httpurl") or ""
+        status = proj.get("status", "").lower()
+        is_running = "running" in status or "ok" in status
+        is_drupal7 = "drupal7" in ptype
+        
+        drush_configs = {
+            "cr": {
+                "title": "Limpiar Caché",
+                "cmd": ["ddev", "drush", "cc", "all"] if is_drupal7 else ["ddev", "drush", "cr"],
+                "desc": "ddev drush cc all" if is_drupal7 else "ddev drush cr",
+                "success_msg": "Caché de Drupal reconstruida correctamente"
+            },
+            "uli": {
+                "title": "Login Administrador",
+                "cmd": ["ddev", "drush", "uli"],
+                "desc": "ddev drush uli",
+                "success_msg": "Enlace de inicio de sesión generado con éxito"
+            },
+            "updb": {
+                "title": "Actualizar Base de Datos",
+                "cmd": ["ddev", "drush", "updatedb", "-y"],
+                "desc": "ddev drush updatedb -y",
+                "success_msg": "Actualizaciones de base de datos completadas con éxito"
+            },
+            "cex": {
+                "title": "Exportar Configuración",
+                "cmd": ["ddev", "drush", "config:export", "-y"],
+                "desc": "ddev drush config:export -y",
+                "success_msg": "Configuración activa exportada a directorio de sincronización"
+            },
+            "cim": {
+                "title": "Importar Configuración",
+                "cmd": ["ddev", "drush", "config:import", "-y"],
+                "desc": "ddev drush config:import -y",
+                "success_msg": "Configuración importada exitosamente"
+            },
+            "cron": {
+                "title": "Ejecutar Cron",
+                "cmd": ["ddev", "drush", "cron"],
+                "desc": "ddev drush cron",
+                "success_msg": "Cron de Drupal ejecutado con éxito"
+            },
+            "status": {
+                "title": "Estado de Drupal",
+                "cmd": ["ddev", "drush", "status"],
+                "desc": "ddev drush status",
+                "success_msg": "Estado de Drupal consultado exitosamente"
+            },
+            "watchdog": {
+                "title": "Logs Recientes (Watchdog)",
+                "cmd": ["ddev", "drush", "watchdog:show", "--count=30"],
+                "desc": "ddev drush watchdog:show --count=30",
+                "success_msg": "Logs recientes obtenidos exitosamente"
+            },
+            "pm_list": {
+                "title": "Módulos Habilitados",
+                "cmd": ["ddev", "drush", "pm:list", "--status=enabled"],
+                "desc": "ddev drush pm:list --status=enabled",
+                "success_msg": "Lista de módulos obtenida exitosamente"
+            },
+            "install_drush": {
+                "title": "Instalar Drush",
+                "cmd": ["ddev", "composer", "require", "drush/drush:^10" if "drupal8" in ptype else "drush/drush"],
+                "desc": "ddev composer require drush/drush",
+                "success_msg": "Drush instalado en el proyecto"
+            }
+        }
+        
+        if action_key == "ssh":
+            self.open_terminal(approot, "ddev ssh")
+            return
+            
+        cfg = drush_configs.get(action_key)
+        if not cfg:
+            return
+            
+        cmd = cfg["cmd"]
+        cmd_desc = cfg["desc"]
+        action_title = cfg["title"]
+        success_default_msg = cfg["success_msg"]
+
+        if not is_running:
+            confirm = Gtk.MessageDialog(
+                transient_for=self,
+                flags=0,
+                message_type=Gtk.MessageType.QUESTION,
+                buttons=Gtk.ButtonsType.OK_CANCEL,
+                text=f"El proyecto '{pname}' está detenido."
+            )
+            confirm.format_secondary_text(
+                f"Para ejecutar '{cmd_desc}', es necesario iniciar el entorno DDEV.\n\n¿Deseas iniciar el proyecto ahora y ejecutar la acción?"
+            )
+            res = confirm.run()
+            confirm.destroy()
+            if res != Gtk.ResponseType.OK:
+                return
+
+        dialog = ProgressDialog(self, title=f"Drush: {action_title} ({pname})")
+        dialog.set_status(f"Ejecutando {cmd_desc} en {pname}...")
+
+        def task():
+            try:
+                if not is_running:
+                    GLib.idle_add(dialog.append_log, f"Iniciando proyecto '{pname}'...\n$ ddev start -y\n")
+                    p_start = subprocess.run(["ddev", "start", "-y"], cwd=approot, capture_output=True, text=True)
+                    GLib.idle_add(dialog.append_log, p_start.stdout + p_start.stderr + "\n")
+                    if p_start.returncode != 0:
+                        GLib.idle_add(dialog.finish, False, "No se pudo iniciar el proyecto DDEV", "", approot)
+                        return
+
+                GLib.idle_add(dialog.append_log, f"$ {' '.join(cmd)}\n")
+                process = subprocess.Popen(
+                    cmd,
+                    cwd=approot,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+                
+                output_lines = []
+                for line in iter(process.stdout.readline, ''):
+                    if line:
+                        output_lines.append(line)
+                        GLib.idle_add(dialog.append_log, line)
+                process.stdout.close()
+                process.wait()
+                
+                success = (process.returncode == 0)
+                full_output = "".join(output_lines)
+                
+                detected_url = ""
+                if action_key == "uli" and success:
+                    # Limpiar caracteres ANSI si existen
+                    clean_output = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', full_output)
+                    match = re.search(r'(https?://[^\s]+(?:/user/reset/[^\s]+|/login[^\s]*))', clean_output)
+                    if not match:
+                        match = re.search(r'(https?://[^\s]+)', clean_output)
+                    if match:
+                        raw_url = match.group(1).strip().rstrip('.,;)')
+                        if primary_url:
+                            parsed_primary = primary_url.rstrip('/')
+                            fixed_url = re.sub(r'^https?://(default|127\.0\.0\.1|localhost)(:\d+)?', parsed_primary, raw_url)
+                        else:
+                            fixed_url = raw_url
+                        detected_url = fixed_url
+                        # Abrir la URL exactamente 1 sola vez en el navegador
+                        try:
+                            webbrowser.open(detected_url)
+                        except Exception:
+                            pass
+                
+                if success:
+                    msg = success_default_msg
+                else:
+                    if "drush is not available" in full_output or "drush: command not found" in full_output:
+                        msg = "Drush no está instalado en el proyecto. Usa la opción 'Instalar Drush'."
+                    else:
+                        msg = f"Error al ejecutar {action_title} ({cmd_desc})"
+                
+                finish_url = detected_url or (primary_url if not is_running else "")
+                GLib.idle_add(dialog.finish, success, msg, finish_url, approot)
+                GLib.idle_add(self.refresh_projects)
+            except Exception as ex:
+                GLib.idle_add(dialog.append_log, f"\nExcepción: {str(ex)}\n")
+                GLib.idle_add(dialog.finish, False, f"Error: {str(ex)}", "", approot)
+
+        threading.Thread(target=task, daemon=True).start()
 
     def execute_simple_action(self, action, proj):
         approot = proj.get("approot", "")

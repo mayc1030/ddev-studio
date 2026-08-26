@@ -24,6 +24,14 @@
 - 📊 **Panel Visual de Proyectos:**
   - Lista interactiva de todos tus proyectos DDEV con estados en tiempo real (**Running / Stopped / Paused**).
   - Botones de acción rápida: **Iniciar ▶**, **Detener ⏹**, **Abrir en Navegador 🌐**, **Abrir Carpeta 📁**, **Abrir Terminal 💻** y **Eliminar 🗑**.
+  - 💧 **Suite Drush Integrada para Drupal:**
+    - ⚡ **Limpieza de Caché Inmediata (`drush cr` / `drush cc all`)**: Reconstrucción de caché en 1 clic.
+    - 🔑 **Acceso Admin Instantáneo (`drush uli`)**: Genera enlace one-time login y lo abre automáticamente en tu navegador web.
+    - 🔄 **Actualizaciones de Base de Datos (`drush updb -y`)**.
+    - 📤 / 📥 **Sincronización de Configuración (`drush cex` / `drush cim`)**.
+    - ⏰ **Ejecución de Cron (`drush cron`)**.
+    - 📊 **Diagnóstico del Sitio (`drush status`)** y **Visor de Logs (`drush watchdog`)**.
+    - 🧩 **Gestión de Módulos (`drush pm:list`)** y **Terminal SSH integrada (`ddev ssh`)**.
   - Buscador dinámico de proyectos por nombre o tecnología.
 
 - ⚙️ **Opciones Avanzadas:**
