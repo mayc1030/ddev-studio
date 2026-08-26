@@ -61,7 +61,7 @@ Antes de instalar DDEV Studio, asegúrate de tener instalado:
 
 1. Clona este repositorio o descarga la carpeta:
    ```bash
-   git clone https://github.com/tu-usuario/ddev-studio.git
+   git clone https://github.com/mayc1030/ddev-studio.git
    cd ddev-studio
    ```
 
