@@ -3214,10 +3214,8 @@ DATABASES = {
     include /mnt/ddev_config/nginx/*.conf;
 }
 """)
-                    ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
-                    if os.path.exists(ddev_cfg_path):
-                        with open(ddev_cfg_path, "a") as cf:
-                            cf.write("""
+                    with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
+                        df.write("""#ddev-silent-no-warn
 web_extra_daemons:
   - name: django
     command: "/var/www/html/.venv/bin/python manage.py runserver 0.0.0.0:8000"
@@ -3321,10 +3319,8 @@ if __name__ == '__main__':
     include /mnt/ddev_config/nginx/*.conf;
 }
 """)
-                    ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
-                    if os.path.exists(ddev_cfg_path):
-                        with open(ddev_cfg_path, "a") as cf:
-                            cf.write("""
+                    with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
+                        df.write("""#ddev-silent-no-warn
 web_extra_daemons:
   - name: flask
     command: "/var/www/html/.venv/bin/python app.py"
@@ -3341,17 +3337,10 @@ web_extra_daemons:
                         f"--project-name={slug}",
                         "--project-type=generic",
                         "--docroot=dist",
-                        f"--nodejs-version={node_version}"
+                        f"--nodejs-version={node_version}",
+                        "--web-environment-add=NG_CLI_ANALYTICS=false"
                     ]
                     self.run_subproc(cfg_cmd, target_dir, dialog)
-                    
-                    ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
-                    if os.path.exists(ddev_cfg_path):
-                        with open(ddev_cfg_path, "a") as cf:
-                            cf.write("""
-web_environment:
-  - NG_CLI_ANALYTICS=false
-""")
 
                     set_st("Iniciando contenedores DDEV...")
                     self.run_subproc(["ddev", "start", "-y"], target_dir, dialog)
@@ -3393,9 +3382,8 @@ web_environment:
     include /mnt/ddev_config/nginx/*.conf;
 }
 """)
-                    if os.path.exists(ddev_cfg_path):
-                        with open(ddev_cfg_path, "a") as cf:
-                            cf.write("""
+                    with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
+                        df.write("""#ddev-silent-no-warn
 web_extra_daemons:
   - name: angular
     command: "npx ng serve --host 0.0.0.0 --port 4200 --allowed-hosts"
