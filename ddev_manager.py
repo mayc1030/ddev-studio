@@ -3116,21 +3116,22 @@ if (is_dir($sites_base)) {
                         f"--project-name={slug}",
                         "--project-type=generic",
                         "--docroot=.",
-                        f"--database={db_type}"
+                        f"--database={db_type}",
+                        "--webimage-extra-packages=python3-venv,python3-pip"
                     ]
                     self.run_subproc(cfg_cmd, target_dir, dialog)
                     
                     set_st("Iniciando contenedores DDEV...")
                     self.run_subproc(["ddev", "start", "-y"], target_dir, dialog)
                     
-                    set_st("Verificando soporte de Python y pip en el contenedor...")
-                    self.run_subproc(["ddev", "exec", "which pip3 || which pip || (sudo apt-get update && sudo apt-get install -y python3-pip python3-venv)"], target_dir, dialog)
+                    set_st("Creando entorno virtual Python (.venv)...")
+                    self.run_subproc(["ddev", "exec", "python3 -m venv /var/www/html/.venv"], target_dir, dialog)
                     
                     set_st("Instalando Django y conectores de base de datos...")
-                    self.run_subproc(["ddev", "exec", "python3 -m pip install --break-system-packages django PyMySQL cryptography psycopg2-binary"], target_dir, dialog)
+                    self.run_subproc(["ddev", "exec", "/var/www/html/.venv/bin/pip install django PyMySQL cryptography psycopg2-binary"], target_dir, dialog)
                     
                     set_st("Generando estructura inicial de Django...")
-                    self.run_subproc(["ddev", "exec", "django-admin startproject app ."], target_dir, dialog)
+                    self.run_subproc(["ddev", "exec", "/var/www/html/.venv/bin/django-admin startproject app ."], target_dir, dialog)
                     
                     set_st("Configurando base de datos y ALLOWED_HOSTS...")
                     settings_py_path = os.path.join(target_dir, "app", "settings.py")
@@ -3171,32 +3172,60 @@ DATABASES = {
                             log(f"Nota en settings.py: {ex}")
                             
                     set_st("Ejecutando migraciones de base de datos...")
-                    self.run_subproc(["ddev", "exec", "python3 manage.py migrate"], target_dir, dialog)
+                    self.run_subproc(["ddev", "exec", "/var/www/html/.venv/bin/python manage.py migrate"], target_dir, dialog)
                     
                     if auto_install:
                         set_st("Creando superusuario administrador (admin / admin)...")
                         superuser_script = "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').exists() or User.objects.create_superuser('admin', 'admin@example.com', 'admin')"
-                        self.run_subproc(["ddev", "exec", f'python3 manage.py shell -c "{superuser_script}"'], target_dir, dialog)
-                        log("\\n👑 Superusuario creado: admin / admin (Panel en /admin)")
+                        self.run_subproc(["ddev", "exec", f'/var/www/html/.venv/bin/python manage.py shell -c "{superuser_script}"'], target_dir, dialog)
+                        log("\n👑 Superusuario creado: admin / admin (Panel en /admin)")
                         
-                    set_st("Configurando servidor web en segundo plano (Daemon)...")
+                    set_st("Configurando Nginx Reverse Proxy y daemon de fondo...")
+                    nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
+                    os.makedirs(nginx_full_dir, exist_ok=True)
+                    with open(os.path.join(nginx_full_dir, "nginx-site.conf"), "w") as nf:
+                        nf.write("""server {
+    listen 80 default_server;
+    listen 443 ssl default_server;
+
+    root /var/www/html;
+
+    ssl_certificate /etc/ssl/certs/master.crt;
+    ssl_certificate_key /etc/ssl/certs/master.key;
+
+    include /etc/nginx/monitoring.conf;
+
+    error_log /dev/stdout info;
+    access_log /var/log/nginx/access.log;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 600s;
+    }
+
+    include /etc/nginx/common.d/*.conf;
+    include /mnt/ddev_config/nginx/*.conf;
+}
+""")
                     ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
                     if os.path.exists(ddev_cfg_path):
                         with open(ddev_cfg_path, "a") as cf:
                             cf.write("""
 web_extra_daemons:
   - name: django
-    command: "python3 manage.py runserver 0.0.0.0:8000"
+    command: "/var/www/html/.venv/bin/python manage.py runserver 0.0.0.0:8000"
     directory: /var/www/html
-web_extra_exposed_ports:
-  - name: django
-    container_port: 8000
-    http_port: 80
-    https_port: 443
 """)
                     set_st("Reiniciando servidor DDEV para activar Django...")
                     self.run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
-                    log("\\n🎉 Proyecto Django listo y corriendo!")
+                    log("\n🎉 Proyecto Django listo y corriendo!")
 
                 elif fw_id == "flask":
                     set_st("Configurando DDEV para Flask...")
@@ -3205,18 +3234,19 @@ web_extra_exposed_ports:
                         f"--project-name={slug}",
                         "--project-type=generic",
                         "--docroot=.",
-                        f"--database={db_type}"
+                        f"--database={db_type}",
+                        "--webimage-extra-packages=python3-venv,python3-pip"
                     ]
                     self.run_subproc(cfg_cmd, target_dir, dialog)
                     
                     set_st("Iniciando contenedores DDEV...")
                     self.run_subproc(["ddev", "start", "-y"], target_dir, dialog)
                     
-                    set_st("Verificando soporte de Python y pip en el contenedor...")
-                    self.run_subproc(["ddev", "exec", "which pip3 || which pip || (sudo apt-get update && sudo apt-get install -y python3-pip python3-venv)"], target_dir, dialog)
+                    set_st("Creando entorno virtual Python (.venv)...")
+                    self.run_subproc(["ddev", "exec", "python3 -m venv /var/www/html/.venv"], target_dir, dialog)
                     
                     set_st("Instalando Flask y conectores...")
-                    self.run_subproc(["ddev", "exec", "python3 -m pip install --break-system-packages flask pymysql psycopg2-binary cryptography python-dotenv"], target_dir, dialog)
+                    self.run_subproc(["ddev", "exec", "/var/www/html/.venv/bin/pip install flask pymysql psycopg2-binary cryptography python-dotenv"], target_dir, dialog)
                     
                     set_st("Creando aplicación inicial app.py...")
                     app_py_path = os.path.join(target_dir, "app.py")
@@ -3257,24 +3287,52 @@ if __name__ == '__main__':
                     with open(app_py_path, "w") as f:
                         f.write(flask_code)
 
-                    set_st("Configurando servidor web en segundo plano (Daemon)...")
+                    set_st("Configurando Nginx Reverse Proxy y daemon de fondo...")
+                    nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
+                    os.makedirs(nginx_full_dir, exist_ok=True)
+                    with open(os.path.join(nginx_full_dir, "nginx-site.conf"), "w") as nf:
+                        nf.write("""server {
+    listen 80 default_server;
+    listen 443 ssl default_server;
+
+    root /var/www/html;
+
+    ssl_certificate /etc/ssl/certs/master.crt;
+    ssl_certificate_key /etc/ssl/certs/master.key;
+
+    include /etc/nginx/monitoring.conf;
+
+    error_log /dev/stdout info;
+    access_log /var/log/nginx/access.log;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 600s;
+    }
+
+    include /etc/nginx/common.d/*.conf;
+    include /mnt/ddev_config/nginx/*.conf;
+}
+""")
                     ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
                     if os.path.exists(ddev_cfg_path):
                         with open(ddev_cfg_path, "a") as cf:
                             cf.write("""
 web_extra_daemons:
   - name: flask
-    command: "python3 app.py"
+    command: "/var/www/html/.venv/bin/python app.py"
     directory: /var/www/html
-web_extra_exposed_ports:
-  - name: flask
-    container_port: 5000
-    http_port: 80
-    https_port: 443
 """)
                     set_st("Reiniciando servidor DDEV para activar Flask...")
                     self.run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
-                    log("\\n🎉 Proyecto Flask listo y corriendo!")
+                    log("\n🎉 Proyecto Flask listo y corriendo!")
 
                 elif fw_id == "angular":
                     set_st("Configurando DDEV para Angular...")
@@ -3293,7 +3351,40 @@ web_extra_exposed_ports:
                     set_st("Creando proyecto Angular con @angular/cli...")
                     self.run_subproc(["ddev", "exec", "npx -y @angular/cli new app --directory=. --routing --style=css --skip-git --defaults"], target_dir, dialog)
                     
-                    set_st("Configurando Live Dev Server en segundo plano (Daemon)...")
+                    set_st("Configurando Nginx Reverse Proxy y Live Dev Server...")
+                    nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
+                    os.makedirs(nginx_full_dir, exist_ok=True)
+                    with open(os.path.join(nginx_full_dir, "nginx-site.conf"), "w") as nf:
+                        nf.write("""server {
+    listen 80 default_server;
+    listen 443 ssl default_server;
+
+    root /var/www/html;
+
+    ssl_certificate /etc/ssl/certs/master.crt;
+    ssl_certificate_key /etc/ssl/certs/master.key;
+
+    include /etc/nginx/monitoring.conf;
+
+    error_log /dev/stdout info;
+    access_log /var/log/nginx/access.log;
+
+    location / {
+        proxy_pass http://127.0.0.1:4200;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 600s;
+    }
+
+    include /etc/nginx/common.d/*.conf;
+    include /mnt/ddev_config/nginx/*.conf;
+}
+""")
                     ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
                     if os.path.exists(ddev_cfg_path):
                         with open(ddev_cfg_path, "a") as cf:
@@ -3302,15 +3393,10 @@ web_extra_daemons:
   - name: angular
     command: "npm start -- --host 0.0.0.0 --port 4200 --disable-host-check"
     directory: /var/www/html
-web_extra_exposed_ports:
-  - name: angular
-    container_port: 4200
-    http_port: 80
-    https_port: 443
 """)
                     set_st("Reiniciando DDEV para activar Angular Live Dev Server...")
                     self.run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
-                    log("\\n🎉 Proyecto Angular listo y corriendo!")
+                    log("\n🎉 Proyecto Angular listo y corriendo!")
 
                 elif fw_id == "symfony":
                     set_st("Configurando DDEV para Symfony...")
