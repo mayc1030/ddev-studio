@@ -396,7 +396,7 @@ class ProgressDialog(Gtk.Dialog):
 
 def detect_project_details(folder_path):
     """
-    Analyzes a directory and detects framework type, docroot, php version, and database.
+    Analyzes a directory and detects framework type, docroot, php/node version, and database.
     """
     if not folder_path or not os.path.exists(folder_path):
         return {
@@ -404,6 +404,7 @@ def detect_project_details(folder_path):
             "type": "drupal10",
             "docroot": "docroot",
             "php": "8.3",
+            "nodejs": "22",
             "db": "mariadb:10.11",
             "is_drupal": True,
             "is_multisite": True,
@@ -416,7 +417,7 @@ def detect_project_details(folder_path):
     
     # 1. Detect Docroot
     docroot = "."
-    for dr in ["docroot", "web", "public"]:
+    for dr in ["docroot", "web", "public", "dist"]:
         if os.path.isdir(os.path.join(folder_path, dr)):
             docroot = dr
             break
@@ -431,6 +432,8 @@ def detect_project_details(folder_path):
             m_type = re.search(r'^type:\s*([^\s]+)', content, re.MULTILINE)
             m_docroot = re.search(r'^docroot:\s*([^\s]+)', content, re.MULTILINE)
             m_php = re.search(r'^php_version:\s*([^\s]+)', content, re.MULTILINE)
+            m_node = re.search(r'^nodejs_version:\s*([^\s]+)', content, re.MULTILINE)
+            m_db = re.search(r'^database:\s*\n\s*type:\s*([^\s]+)', content, re.MULTILINE)
             
             p_type = m_type.group(1).strip().strip('"\'') if m_type else "drupal10"
             if m_name:
@@ -438,6 +441,10 @@ def detect_project_details(folder_path):
             if m_docroot:
                 docroot = m_docroot.group(1).strip().strip('"\'')
             php_v = m_php.group(1).strip().strip('"\'') if m_php else "8.3"
+            node_v = m_node.group(1).strip().strip('"\'') if m_node else "22"
+            db_v = m_db.group(1).strip().strip('"\'') if m_db else "mariadb:10.11"
+            if "omit_containers" in content and "db" in content:
+                db_v = "none"
             
             is_dr = "drupal" in p_type
             return {
@@ -445,7 +452,8 @@ def detect_project_details(folder_path):
                 "type": p_type,
                 "docroot": docroot,
                 "php": php_v,
-                "db": "mariadb:10.11",
+                "nodejs": node_v,
+                "db": db_v,
                 "is_drupal": is_dr,
                 "is_multisite": is_dr,
                 "summary": f"Configuración DDEV detectada ({p_type}, docroot: {docroot})",
@@ -467,43 +475,56 @@ def detect_project_details(folder_path):
             for k, v in all_req.items():
                 if "drupal/core" in k:
                     if "11" in str(v):
-                        return {"name": slug, "type": "drupal11", "docroot": docroot, "php": "8.3", "db": "mariadb:10.11", "is_drupal": True, "is_multisite": True, "summary": f"Drupal 11 detectado (docroot: {docroot})", "valid": True}
+                        return {"name": slug, "type": "drupal11", "docroot": docroot, "php": "8.3", "nodejs": "22", "db": "mariadb:10.11", "is_drupal": True, "is_multisite": True, "summary": f"Drupal 11 detectado (docroot: {docroot})", "valid": True}
                     elif "9" in str(v):
-                        return {"name": slug, "type": "drupal9", "docroot": docroot, "php": "8.1", "db": "mariadb:10.11", "is_drupal": True, "is_multisite": True, "summary": f"Drupal 9 detectado (docroot: {docroot})", "valid": True}
+                        return {"name": slug, "type": "drupal9", "docroot": docroot, "php": "8.1", "nodejs": "22", "db": "mariadb:10.11", "is_drupal": True, "is_multisite": True, "summary": f"Drupal 9 detectado (docroot: {docroot})", "valid": True}
                     elif "8" in str(v):
-                        return {"name": slug, "type": "drupal8", "docroot": docroot, "php": "7.4", "db": "mariadb:10.11", "is_drupal": True, "is_multisite": True, "summary": f"Drupal 8 detectado (docroot: {docroot})", "valid": True}
+                        return {"name": slug, "type": "drupal8", "docroot": docroot, "php": "7.4", "nodejs": "22", "db": "mariadb:10.11", "is_drupal": True, "is_multisite": True, "summary": f"Drupal 8 detectado (docroot: {docroot})", "valid": True}
                     else:
-                        return {"name": slug, "type": "drupal10", "docroot": docroot, "php": "8.3", "db": "mariadb:10.11", "is_drupal": True, "is_multisite": True, "summary": f"Drupal 10 detectado (docroot: {docroot})", "valid": True}
+                        return {"name": slug, "type": "drupal10", "docroot": docroot, "php": "8.3", "nodejs": "22", "db": "mariadb:10.11", "is_drupal": True, "is_multisite": True, "summary": f"Drupal 10 detectado (docroot: {docroot})", "valid": True}
                         
             if "laravel/framework" in all_req:
-                return {"name": slug, "type": "laravel", "docroot": "public" if os.path.exists(os.path.join(folder_path, "public")) else docroot, "php": "8.3", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Laravel detectado", "valid": True}
+                return {"name": slug, "type": "laravel", "docroot": "public" if os.path.exists(os.path.join(folder_path, "public")) else docroot, "php": "8.3", "nodejs": "22", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Laravel detectado", "valid": True}
+            if "symfony/" in str(all_req):
+                return {"name": slug, "type": "symfony", "docroot": "public" if os.path.exists(os.path.join(folder_path, "public")) else docroot, "php": "8.3", "nodejs": "22", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Symfony detectado", "valid": True}
             if "roots/bedrock" in all_req or "wordpress" in str(all_req):
-                return {"name": slug, "type": "wordpress", "docroot": docroot, "php": "8.2", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "WordPress detectado", "valid": True}
+                return {"name": slug, "type": "wordpress", "docroot": docroot, "php": "8.2", "nodejs": "22", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "WordPress (Composer) detectado", "valid": True}
         except Exception:
             pass
 
     # 4. Check filesystem structures
     if os.path.exists(os.path.join(folder_path, docroot, "sites")) or os.path.exists(os.path.join(folder_path, "sites", "default")):
-        return {"name": slug, "type": "drupal10", "docroot": docroot, "php": "8.3", "db": "mariadb:10.11", "is_drupal": True, "is_multisite": True, "summary": f"Estructura Drupal detectada (docroot: {docroot})", "valid": True}
+        return {"name": slug, "type": "drupal10", "docroot": docroot, "php": "8.3", "nodejs": "22", "db": "mariadb:10.11", "is_drupal": True, "is_multisite": True, "summary": f"Estructura Drupal detectada (docroot: {docroot})", "valid": True}
     if os.path.exists(os.path.join(folder_path, "wp-config.php")) or os.path.exists(os.path.join(folder_path, "wp-content")):
-        return {"name": slug, "type": "wordpress", "docroot": ".", "php": "8.2", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "WordPress detectado", "valid": True}
+        return {"name": slug, "type": "wordpress", "docroot": ".", "php": "8.2", "nodejs": "22", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "WordPress detectado", "valid": True}
     if os.path.exists(os.path.join(folder_path, "artisan")):
-        return {"name": slug, "type": "laravel", "docroot": "public", "php": "8.3", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Laravel detectado", "valid": True}
-    if os.path.exists(os.path.join(folder_path, "package.json")) and not os.path.exists(os.path.join(folder_path, "composer.json")):
-        return {"name": slug, "type": "generic", "docroot": ".", "php": "8.3", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Proyecto JS / Node detectado", "valid": True}
-
-    if os.path.exists(os.path.join(folder_path, "manage.py")):
-        return {"name": slug, "type": "generic", "docroot": ".", "php": "8.3", "db": "postgres:16", "is_drupal": False, "is_multisite": False, "summary": "Proyecto Django detectado (Python)", "valid": True}
-    if os.path.exists(os.path.join(folder_path, "app.py")) or os.path.exists(os.path.join(folder_path, "wsgi.py")):
-        return {"name": slug, "type": "generic", "docroot": ".", "php": "8.3", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Proyecto Flask detectado (Python)", "valid": True}
+        return {"name": slug, "type": "laravel", "docroot": "public", "php": "8.3", "nodejs": "22", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Laravel detectado", "valid": True}
     if os.path.exists(os.path.join(folder_path, "angular.json")):
-        return {"name": slug, "type": "generic", "docroot": "dist", "php": "8.2", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Proyecto Angular detectado (TypeScript/Node)", "valid": True}
+        return {"name": slug, "type": "angular", "docroot": "dist", "php": "8.2", "nodejs": "22", "db": "none", "is_drupal": False, "is_multisite": False, "summary": "Proyecto Angular detectado (Node.js/Vite)", "valid": True}
+    if os.path.exists(os.path.join(folder_path, "manage.py")):
+        return {"name": slug, "type": "django", "docroot": ".", "php": "8.3", "nodejs": "22", "db": "postgres:16", "is_drupal": False, "is_multisite": False, "summary": "Proyecto Django detectado (Python 3)", "valid": True}
+    if os.path.exists(os.path.join(folder_path, "app.py")) or os.path.exists(os.path.join(folder_path, "wsgi.py")):
+        return {"name": slug, "type": "flask", "docroot": ".", "php": "8.3", "nodejs": "22", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Proyecto Flask detectado (Python 3)", "valid": True}
+
+    if os.path.exists(os.path.join(folder_path, "package.json")) and not os.path.exists(os.path.join(folder_path, "composer.json")):
+        try:
+            with open(os.path.join(folder_path, "package.json"), "r") as pf:
+                pdata = json.load(pf)
+            all_deps = {**pdata.get("dependencies", {}), **pdata.get("devDependencies", {})}
+            if "react" in all_deps:
+                return {"name": slug, "type": "react", "docroot": ".", "php": "8.3", "nodejs": "22", "db": "none", "is_drupal": False, "is_multisite": False, "summary": "Proyecto React detectado (Vite/Node)", "valid": True}
+            if "vue" in all_deps:
+                return {"name": slug, "type": "vue", "docroot": ".", "php": "8.3", "nodejs": "22", "db": "none", "is_drupal": False, "is_multisite": False, "summary": "Proyecto Vue detectado (Vite/Node)", "valid": True}
+        except Exception:
+            pass
+        return {"name": slug, "type": "generic", "docroot": ".", "php": "8.3", "nodejs": "22", "db": "none", "is_drupal": False, "is_multisite": False, "summary": "Proyecto Node.js / Frontend detectado", "valid": True}
 
     return {
         "name": slug,
         "type": "php",
         "docroot": docroot,
         "php": "8.3",
+        "nodejs": "22",
         "db": "mariadb:10.11",
         "is_drupal": False,
         "is_multisite": False,
@@ -1763,8 +1784,14 @@ class DDEVManagerWindow(Gtk.Window):
             ("drupal7", "Drupal 7"),
             ("wordpress", "WordPress"),
             ("laravel", "Laravel"),
-            ("php", "PHP Estándar / Symfony"),
-            ("generic", "Generic / Node / React / Vue")
+            ("symfony", "Symfony"),
+            ("django", "Django (Python)"),
+            ("flask", "Flask (Python)"),
+            ("angular", "Angular (Node.js)"),
+            ("react", "React (Node.js)"),
+            ("vue", "Vue (Node.js)"),
+            ("php", "PHP Estándar"),
+            ("generic", "Generic / Node.js")
         ]:
             self.combo_import_type.append(t_id, t_lbl)
         self.combo_import_type.set_active_id("drupal10")
@@ -1773,23 +1800,39 @@ class DDEVManagerWindow(Gtk.Window):
         
         grid_cfg.attach(Gtk.Label(label="Directorio Web (Docroot):", halign=Gtk.Align.END), 0, 2, 1, 1)
         self.combo_import_docroot = Gtk.ComboBoxText()
-        for dr in ["docroot", "web", "public", "."]:
+        for dr in ["docroot", "web", "public", "dist", "."]:
             self.combo_import_docroot.append_text(dr)
         self.combo_import_docroot.set_active(0)
         grid_cfg.attach(self.combo_import_docroot, 1, 2, 1, 1)
         
-        grid_cfg.attach(Gtk.Label(label="Versión de PHP:", halign=Gtk.Align.END), 0, 3, 1, 1)
+        # Row 3 - PHP Runtime
+        self.lbl_import_php = Gtk.Label(label="Versión de PHP:", halign=Gtk.Align.END)
+        grid_cfg.attach(self.lbl_import_php, 0, 3, 1, 1)
         self.combo_import_php = Gtk.ComboBoxText()
         for v in ["8.3", "8.2", "8.1", "8.4", "8.0", "7.4"]:
             self.combo_import_php.append_text(v)
         self.combo_import_php.set_active(0)
         grid_cfg.attach(self.combo_import_php, 1, 3, 1, 1)
+
+        # Row 3 - Node.js Runtime
+        self.lbl_import_nodejs = Gtk.Label(label="Versión de Node.js:", halign=Gtk.Align.END)
+        grid_cfg.attach(self.lbl_import_nodejs, 0, 3, 1, 1)
+        self.combo_import_nodejs = Gtk.ComboBoxText()
+        for nv in ["22", "20", "18"]:
+            self.combo_import_nodejs.append(nv, f"Node.js v{nv}")
+        self.combo_import_nodejs.set_active_id("22")
+        grid_cfg.attach(self.combo_import_nodejs, 1, 3, 1, 1)
+
+        # Row 3 - Python Runtime
+        self.lbl_import_python = Gtk.Label(label="Entorno de Ejecución:", halign=Gtk.Align.END)
+        grid_cfg.attach(self.lbl_import_python, 0, 3, 1, 1)
+        self.lbl_import_python_info = Gtk.Label(halign=Gtk.Align.START)
+        self.lbl_import_python_info.set_markup("<span color='#38bdf8'><b>🐍 Python 3.x con entorno .venv aislado</b></span>")
+        grid_cfg.attach(self.lbl_import_python_info, 1, 3, 1, 1)
         
+        # Row 4 - Database
         grid_cfg.attach(Gtk.Label(label="Base de Datos:", halign=Gtk.Align.END), 0, 4, 1, 1)
         self.combo_import_db = Gtk.ComboBoxText()
-        for db in ["mariadb:10.11", "mysql:8.0", "postgres:16", "mariadb:10.5"]:
-            self.combo_import_db.append_text(db)
-        self.combo_import_db.set_active(0)
         grid_cfg.attach(self.combo_import_db, 1, 4, 1, 1)
         
         # Options box
@@ -2647,27 +2690,80 @@ class DDEVManagerWindow(Gtk.Window):
         self.combo_import_type.set_active_id(det["type"])
         
         # Set docroot combo
-        for idx, text in enumerate(["docroot", "web", "public", "."]):
+        for idx, text in enumerate(["docroot", "web", "public", "dist", "."]):
             if text == det["docroot"]:
                 self.combo_import_docroot.set_active(idx)
                 break
                 
         # Set php combo
         for idx, text in enumerate(["8.3", "8.2", "8.1", "8.4", "8.0", "7.4"]):
-            if text == det["php"]:
+            if text == det.get("php", "8.3"):
                 self.combo_import_php.set_active(idx)
                 break
                 
+        # Set nodejs combo
+        if hasattr(self, "combo_import_nodejs") and det.get("nodejs"):
+            self.combo_import_nodejs.set_active_id(det["nodejs"])
+            
         self.on_import_type_changed(self.combo_import_type)
+        
+        # Set db combo after on_import_type_changed populated it
+        if hasattr(self, "combo_import_db") and det.get("db"):
+            self.combo_import_db.set_active_id(det["db"])
 
     def on_import_type_changed(self, combo):
         t_id = combo.get_active_id() or ""
         is_dr = "drupal" in t_id
-        is_php = is_dr or t_id in ["laravel", "php", "symfony"]
+        is_php = is_dr or t_id in ["laravel", "php", "symfony", "wordpress"]
+        is_node = t_id in ["angular", "react", "vue", "generic"]
+        is_python = t_id in ["django", "flask"]
         
         if hasattr(self, "box_import_drupal_options"):
             self.box_import_drupal_options.set_visible(is_dr)
             
+        # Runtime visibility
+        if hasattr(self, "lbl_import_php") and hasattr(self, "combo_import_php"):
+            self.lbl_import_php.set_visible(is_php)
+            self.combo_import_php.set_visible(is_php)
+        if hasattr(self, "lbl_import_nodejs") and hasattr(self, "combo_import_nodejs"):
+            self.lbl_import_nodejs.set_visible(is_node)
+            self.combo_import_nodejs.set_visible(is_node)
+        if hasattr(self, "lbl_import_python") and hasattr(self, "lbl_import_python_info"):
+            self.lbl_import_python.set_visible(is_python)
+            self.lbl_import_python_info.set_visible(is_python)
+            
+        # Database options
+        if hasattr(self, "combo_import_db"):
+            curr_db = self.combo_import_db.get_active_id()
+            self.combo_import_db.remove_all()
+            if is_node:
+                self.combo_import_db.append("none", "🚫 Ninguna (Solo Frontend / Ahorro de RAM)")
+                self.combo_import_db.append("mariadb:10.11", "MariaDB 10.11")
+                self.combo_import_db.append("mysql:8.0", "MySQL 8.0")
+                self.combo_import_db.append("postgres:16", "PostgreSQL 16")
+                if curr_db in ["mariadb:10.11", "mysql:8.0", "postgres:16"]:
+                    self.combo_import_db.set_active_id(curr_db)
+                else:
+                    self.combo_import_db.set_active_id("none")
+            elif is_python:
+                self.combo_import_db.append("postgres:16", "PostgreSQL 16 (Recomendada)")
+                self.combo_import_db.append("mysql:8.0", "MySQL 8.0")
+                self.combo_import_db.append("mariadb:10.11", "MariaDB 10.11")
+                if curr_db in ["mysql:8.0", "mariadb:10.11"]:
+                    self.combo_import_db.set_active_id(curr_db)
+                else:
+                    self.combo_import_db.set_active_id("postgres:16")
+            else:
+                self.combo_import_db.append("mariadb:10.11", "MariaDB 10.11 (Recomendada)")
+                self.combo_import_db.append("mysql:8.0", "MySQL 8.0")
+                self.combo_import_db.append("postgres:16", "PostgreSQL 16")
+                self.combo_import_db.append("mariadb:10.5", "MariaDB 10.5")
+                if curr_db in ["mysql:8.0", "postgres:16", "mariadb:10.5"]:
+                    self.combo_import_db.set_active_id(curr_db)
+                else:
+                    self.combo_import_db.set_active_id("mariadb:10.11")
+                    
+        # Checkbox label
         if hasattr(self, "chk_import_composer"):
             if is_dr:
                 self.chk_import_composer.set_label("Ejecutar 'ddev composer install' si falta vendor/ (Drush y dependencias de Drupal)")
@@ -2675,9 +2771,9 @@ class DDEVManagerWindow(Gtk.Window):
                 self.chk_import_composer.set_label("Ejecutar 'ddev composer install' si el proyecto usa Composer (Bedrock)")
             elif is_php:
                 self.chk_import_composer.set_label("Ejecutar 'ddev composer install' si falta la carpeta vendor/")
-            elif t_id in ["generic", "react", "vue", "angular"]:
+            elif is_node:
                 self.chk_import_composer.set_label("Ejecutar 'ddev npm install' si falta la carpeta node_modules/")
-            elif t_id in ["django", "flask"]:
+            elif is_python:
                 self.chk_import_composer.set_label("Instalar dependencias de Python si falta el entorno .venv/")
             else:
                 self.chk_import_composer.set_label("Instalar dependencias automáticamente si faltan")
@@ -2704,9 +2800,14 @@ class DDEVManagerWindow(Gtk.Window):
         p_type = self.combo_import_type.get_active_id() or "drupal10"
         docroot = self.combo_import_docroot.get_active_text() or "docroot"
         php_ver = self.combo_import_php.get_active_text() or "8.3"
-        db_type = self.combo_import_db.get_active_text() or "mariadb:10.11"
+        node_ver = self.combo_import_nodejs.get_active_id() if hasattr(self, "combo_import_nodejs") else "22"
+        db_type = self.combo_import_db.get_active_id() or "mariadb:10.11"
         is_multisite = ("drupal" in p_type) and self.chk_import_multisite.get_active()
         do_composer = self.chk_import_composer.get_active()
+        
+        is_php = ("drupal" in p_type) or p_type in ["laravel", "php", "symfony", "wordpress"]
+        is_node = p_type in ["angular", "react", "vue", "generic"]
+        is_python = p_type in ["django", "flask"]
         
         dialog = ProgressDialog(self, title=f"Importando Proyecto: {slug}")
         dialog.set_status(f"Configurando DDEV en {target_dir}...")
@@ -2720,20 +2821,109 @@ class DDEVManagerWindow(Gtk.Window):
                     
                 log(f"📁 Directorio base: {target_dir}")
                 log(f"🚀 Tecnología: {p_type} | Docroot: {docroot}")
-                log(f"🐘 PHP: {php_ver} | BD: {db_type}")
+                if is_php:
+                    log(f"🐘 PHP: {php_ver} | BD: {db_type}")
+                elif is_node:
+                    log(f"🟢 Node.js: v{node_ver} | BD: {db_type}")
+                elif is_python:
+                    log(f"🐍 Python 3 + venv | BD: {db_type}")
                 log("="*50)
                 
                 # 1. ddev config
                 set_st("Configurando DDEV en el proyecto...")
+                ddev_type = p_type
+                if p_type in ["angular", "react", "vue", "django", "flask"]:
+                    ddev_type = "generic"
+                elif p_type == "symfony":
+                    ddev_type = "php"
+                    
                 cfg_cmd = [
                     "ddev", "config",
                     f"--project-name={slug}",
-                    f"--project-type={p_type}",
-                    f"--docroot={docroot}",
-                    f"--php-version={php_ver}",
-                    f"--database={db_type}"
+                    f"--project-type={ddev_type}",
+                    f"--docroot={docroot}"
                 ]
+                
+                if is_php:
+                    cfg_cmd.append(f"--php-version={php_ver}")
+                elif is_node:
+                    cfg_cmd.append(f"--nodejs-version={node_ver}")
+                    if p_type == "angular":
+                        cfg_cmd.append("--web-environment-add=NG_CLI_ANALYTICS=false")
+                elif is_python:
+                    cfg_cmd.append("--webimage-extra-packages=python3-venv,python3-pip")
+                    
+                if db_type == "none":
+                    cfg_cmd.append("--omit-containers=db")
+                else:
+                    cfg_cmd.append(f"--database={db_type}")
+                    
                 self.run_subproc(cfg_cmd, target_dir, dialog)
+                
+                # Daemon & Reverse Proxy for non-PHP stacks if needed
+                if p_type == "django":
+                    os.makedirs(os.path.join(target_dir, ".ddev", "nginx_full"), exist_ok=True)
+                    with open(os.path.join(target_dir, ".ddev", "nginx_full", "nginx-site.conf"), "w") as nf:
+                        nf.write("""location / {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+""")
+                    with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
+                        df.write("""#ddev-silent-no-warn
+web_extra_daemons:
+  - name: django-server
+    command: "/var/www/html/.venv/bin/python manage.py runserver 0.0.0.0:8000"
+    directory: /var/www/html
+""")
+                elif p_type == "flask":
+                    os.makedirs(os.path.join(target_dir, ".ddev", "nginx_full"), exist_ok=True)
+                    with open(os.path.join(target_dir, ".ddev", "nginx_full", "nginx-site.conf"), "w") as nf:
+                        nf.write("""location / {
+    proxy_pass http://127.0.0.1:5000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+""")
+                    with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
+                        df.write("""#ddev-silent-no-warn
+web_extra_daemons:
+  - name: flask-server
+    command: "/var/www/html/.venv/bin/python app.py"
+    directory: /var/www/html
+""")
+                elif p_type == "angular":
+                    os.makedirs(os.path.join(target_dir, ".ddev", "nginx_full"), exist_ok=True)
+                    with open(os.path.join(target_dir, ".ddev", "nginx_full", "nginx-site.conf"), "w") as nf:
+                        nf.write("""location / {
+    proxy_pass http://127.0.0.1:4200;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+""")
+                    with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
+                        df.write("""#ddev-silent-no-warn
+web_extra_daemons:
+  - name: angular-dev-server
+    command: "npx ng serve --host 0.0.0.0 --port 4200 --allowed-hosts"
+    directory: /var/www/html
+""")
                 
                 # 2. Dynamic sites.php if Drupal Multisite
                 if is_multisite:
