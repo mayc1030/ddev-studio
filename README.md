@@ -80,9 +80,14 @@
 
 ## 📦 Requisitos Previos
 
-Antes de instalar DDEV Studio, asegúrate de tener instalado:
+1. **Docker Engine / Docker Desktop:**
+   ```bash
+   # Instalación rápida oficial de Docker Engine:
+   curl -fsSL https://get.docker.com | sh
+   sudo usermod -aG docker $USER
+   ```
+   *(O mediante paquetes de Ubuntu/Debian: `sudo apt update && sudo apt install -y docker.io docker-compose-plugin && sudo usermod -aG docker $USER`)*
 
-1. **Docker / Docker Desktop / Docker Engine**
 2. **DDEV** (Versión 1.23 o superior):
    ```bash
    curl -fsSL https://ddev.com/install.sh | bash
