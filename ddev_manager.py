@@ -69,6 +69,16 @@ CUSTOM_CSS = b"""
     background-color: alpha(@theme_selected_bg_color, 0.25);
     color: @theme_text_color;
 }
+.badge-multisite {
+    background-color: #8b5cf6;
+    color: white;
+    font-weight: bold;
+}
+.badge-single-site {
+    background-color: #0284c7;
+    color: white;
+    font-weight: 500;
+}
 .option-highlight-box {
     border-radius: 10px;
     border: 1px solid alpha(@theme_selected_bg_color, 0.4);
@@ -796,20 +806,70 @@ class DDEVManagerWindow(Gtk.Window):
         lbl_type.get_style_context().add_class("badge-tech")
         title_row.pack_start(lbl_type, False, False, 0)
         
+        approot = proj.get("approot", "")
+        is_drupal = "drupal" in ptype or (approot and (os.path.exists(os.path.join(approot, "docroot", "sites")) or os.path.exists(os.path.join(approot, "web", "sites")) or os.path.exists(os.path.join(approot, "sites"))))
+        if is_drupal:
+            is_multisite = False
+            subsite_count = 0
+            
+            # Scan sites directory
+            for d in ["docroot", "web", "."]:
+                sites_dir = os.path.join(approot, d, "sites") if approot else ""
+                if sites_dir and os.path.isdir(sites_dir):
+                    try:
+                        entries = [e for e in os.listdir(sites_dir) if os.path.isdir(os.path.join(sites_dir, e)) and e not in ['default', 'all', 'g', 'settings']]
+                        if entries:
+                            is_multisite = True
+                            subsite_count = len(entries)
+                            break
+                        sites_php = os.path.join(sites_dir, "sites.php")
+                        if os.path.isfile(sites_php):
+                            is_multisite = True
+                            break
+                    except Exception:
+                        pass
+            
+            # Check additional_fqdns / additional_hostnames in .ddev/config.yaml
+            if not is_multisite and approot:
+                ddev_cfg = os.path.join(approot, ".ddev", "config.yaml")
+                if os.path.exists(ddev_cfg):
+                    try:
+                        with open(ddev_cfg, "r") as f:
+                            c = f.read()
+                        lines = [l for l in c.splitlines() if not l.strip().startswith("#")]
+                        if any("additional_fqdns:" in l and "[]" not in l for l in lines) or any("additional_hostnames:" in l and "[]" not in l for l in lines):
+                            is_multisite = True
+                    except Exception:
+                        pass
+                        
+            lbl_drupal_mode = Gtk.Label()
+            lbl_drupal_mode.get_style_context().add_class("badge")
+            if is_multisite:
+                lbl_drupal_mode.set_label(f"💧 MULTISITE ({subsite_count})" if subsite_count > 0 else "💧 MULTISITE")
+                lbl_drupal_mode.get_style_context().add_class("badge-multisite")
+                lbl_drupal_mode.set_tooltip_text(f"Drupal Multisite con {subsite_count} subsitio(s) configurado(s)")
+            else:
+                lbl_drupal_mode.set_label("💧 SITE")
+                lbl_drupal_mode.get_style_context().add_class("badge-single-site")
+                lbl_drupal_mode.set_tooltip_text("Drupal Single Site (Sitio estándar individual)")
+            title_row.pack_start(lbl_drupal_mode, False, False, 0)
+        
         info_box.pack_start(title_row, False, False, 0)
         
         primary_url = proj.get("primary_url") or proj.get("httpsurl") or proj.get("httpurl") or ""
         lbl_url = Gtk.Label()
         if primary_url:
-            lbl_url.set_markup(f"<a href='{primary_url}'>{primary_url}</a>")
+            lbl_url.set_markup(f"🌐 <a href='{primary_url}'><b>{primary_url}</b></a>")
         else:
-            lbl_url.set_text("Sin URL activa")
+            lbl_url.set_markup("<span color='#9ca3af'>🌐 Sin URL activa</span>")
         lbl_url.set_halign(Gtk.Align.START)
         info_box.pack_start(lbl_url, False, False, 0)
         
-        approot = proj.get("approot", "")
         lbl_path = Gtk.Label()
-        lbl_path.set_markup(f"<small><span opacity='0.7'>{approot}</span></small>")
+        if approot:
+            lbl_path.set_markup(f"<small><span color='#94a3b8'>📁 <b>Ubicación:</b> {approot}</span></small>")
+        else:
+            lbl_path.set_markup("<small><span color='#94a3b8'>📁 <i>Ubicación no disponible</i></span></small>")
         lbl_path.set_halign(Gtk.Align.START)
         info_box.pack_start(lbl_path, False, False, 0)
         
