@@ -3120,25 +3120,14 @@ if (is_dir($sites_base)) {
                     ]
                     self.run_subproc(cfg_cmd, target_dir, dialog)
                     
-                    ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
-                    if os.path.exists(ddev_cfg_path):
-                        with open(ddev_cfg_path, "a") as cf:
-                            cf.write('''
-web_extra_daemons:
-  - name: django
-    command: "python3 manage.py runserver 0.0.0.0:8000"
-    directory: /var/www/html
-web_extra_exposed_ports:
-  - name: django
-    container_port: 8000
-    http_port: 80
-    https_port: 443
-''')
                     set_st("Iniciando contenedores DDEV...")
                     self.run_subproc(["ddev", "start", "-y"], target_dir, dialog)
                     
-                    set_st("Instalando Django y librerías de base de datos...")
-                    self.run_subproc(["ddev", "exec", "pip install django PyMySQL psycopg2-binary cryptography"], target_dir, dialog)
+                    set_st("Verificando soporte de Python y pip en el contenedor...")
+                    self.run_subproc(["ddev", "exec", "which pip3 || which pip || (sudo apt-get update && sudo apt-get install -y python3-pip python3-venv)"], target_dir, dialog)
+                    
+                    set_st("Instalando Django y conectores de base de datos...")
+                    self.run_subproc(["ddev", "exec", "python3 -m pip install --break-system-packages django PyMySQL cryptography psycopg2-binary"], target_dir, dialog)
                     
                     set_st("Generando estructura inicial de Django...")
                     self.run_subproc(["ddev", "exec", "django-admin startproject app ."], target_dir, dialog)
@@ -3151,7 +3140,7 @@ web_extra_exposed_ports:
                                 s_code = sf.read()
                             s_code = s_code.replace("ALLOWED_HOSTS = []", "ALLOWED_HOSTS = ['*']")
                             if "postgres" in db_type:
-                                db_block = '''DATABASES = {
+                                db_block = """DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'db',
@@ -3160,9 +3149,9 @@ web_extra_exposed_ports:
         'HOST': 'db',
         'PORT': '5432',
     }
-}'''
+}"""
                             else:
-                                db_block = '''import pymysql
+                                db_block = """import pymysql
 pymysql.install_as_MySQLdb()
 
 DATABASES = {
@@ -3174,7 +3163,7 @@ DATABASES = {
         'HOST': 'db',
         'PORT': '3306',
     }
-}'''
+}"""
                             s_code = re.sub(r'DATABASES\s*=\s*\{.*?\n\}', db_block, s_code, flags=re.DOTALL)
                             with open(settings_py_path, "w") as sf:
                                 sf.write(s_code)
@@ -3188,11 +3177,26 @@ DATABASES = {
                         set_st("Creando superusuario administrador (admin / admin)...")
                         superuser_script = "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').exists() or User.objects.create_superuser('admin', 'admin@example.com', 'admin')"
                         self.run_subproc(["ddev", "exec", f'python3 manage.py shell -c "{superuser_script}"'], target_dir, dialog)
-                        log("\n👑 Superusuario creado: admin / admin (Panel en /admin)")
+                        log("\\n👑 Superusuario creado: admin / admin (Panel en /admin)")
                         
+                    set_st("Configurando servidor web en segundo plano (Daemon)...")
+                    ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
+                    if os.path.exists(ddev_cfg_path):
+                        with open(ddev_cfg_path, "a") as cf:
+                            cf.write("""
+web_extra_daemons:
+  - name: django
+    command: "python3 manage.py runserver 0.0.0.0:8000"
+    directory: /var/www/html
+web_extra_exposed_ports:
+  - name: django
+    container_port: 8000
+    http_port: 80
+    https_port: 443
+""")
                     set_st("Reiniciando servidor DDEV para activar Django...")
                     self.run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
-                    log("\n🎉 Proyecto Django listo y corriendo!")
+                    log("\\n🎉 Proyecto Django listo y corriendo!")
 
                 elif fw_id == "flask":
                     set_st("Configurando DDEV para Flask...")
@@ -3205,34 +3209,22 @@ DATABASES = {
                     ]
                     self.run_subproc(cfg_cmd, target_dir, dialog)
                     
-                    ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
-                    if os.path.exists(ddev_cfg_path):
-                        with open(ddev_cfg_path, "a") as cf:
-                            cf.write('''
-web_extra_daemons:
-  - name: flask
-    command: "python3 app.py"
-    directory: /var/www/html
-web_extra_exposed_ports:
-  - name: flask
-    container_port: 5000
-    http_port: 80
-    https_port: 443
-''')
                     set_st("Iniciando contenedores DDEV...")
                     self.run_subproc(["ddev", "start", "-y"], target_dir, dialog)
                     
+                    set_st("Verificando soporte de Python y pip en el contenedor...")
+                    self.run_subproc(["ddev", "exec", "which pip3 || which pip || (sudo apt-get update && sudo apt-get install -y python3-pip python3-venv)"], target_dir, dialog)
+                    
                     set_st("Instalando Flask y conectores...")
-                    self.run_subproc(["ddev", "exec", "pip install flask pymysql psycopg2-binary cryptography python-dotenv"], target_dir, dialog)
+                    self.run_subproc(["ddev", "exec", "python3 -m pip install --break-system-packages flask pymysql psycopg2-binary cryptography python-dotenv"], target_dir, dialog)
                     
                     set_st("Creando aplicación inicial app.py...")
                     app_py_path = os.path.join(target_dir, "app.py")
-                    with open(app_py_path, "w") as f:
-                        f.write(f'''from flask import Flask, render_template_string
+                    flask_code = f"""from flask import Flask, render_template_string
 
 app = Flask(__name__)
 
-HTML_TEMPLATE = """<!DOCTYPE html>
+HTML_TEMPLATE = \"\"\"<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -3253,7 +3245,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <span class="badge">Python 3 + Flask + DDEV</span>
     </div>
 </body>
-</html>"""
+</html>\"\"\"
 
 @app.route('/')
 def home():
@@ -3261,10 +3253,28 @@ def home():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-''')
+"""
+                    with open(app_py_path, "w") as f:
+                        f.write(flask_code)
+
+                    set_st("Configurando servidor web en segundo plano (Daemon)...")
+                    ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
+                    if os.path.exists(ddev_cfg_path):
+                        with open(ddev_cfg_path, "a") as cf:
+                            cf.write("""
+web_extra_daemons:
+  - name: flask
+    command: "python3 app.py"
+    directory: /var/www/html
+web_extra_exposed_ports:
+  - name: flask
+    container_port: 5000
+    http_port: 80
+    https_port: 443
+""")
                     set_st("Reiniciando servidor DDEV para activar Flask...")
                     self.run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
-                    log("\n🎉 Proyecto Flask listo y corriendo!")
+                    log("\\n🎉 Proyecto Flask listo y corriendo!")
 
                 elif fw_id == "angular":
                     set_st("Configurando DDEV para Angular...")
@@ -3277,10 +3287,17 @@ if __name__ == '__main__':
                     ]
                     self.run_subproc(cfg_cmd, target_dir, dialog)
                     
+                    set_st("Iniciando contenedores DDEV...")
+                    self.run_subproc(["ddev", "start", "-y"], target_dir, dialog)
+                    
+                    set_st("Creando proyecto Angular con @angular/cli...")
+                    self.run_subproc(["ddev", "exec", "npx -y @angular/cli new app --directory=. --routing --style=css --skip-git --defaults"], target_dir, dialog)
+                    
+                    set_st("Configurando Live Dev Server en segundo plano (Daemon)...")
                     ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
                     if os.path.exists(ddev_cfg_path):
                         with open(ddev_cfg_path, "a") as cf:
-                            cf.write('''
+                            cf.write("""
 web_extra_daemons:
   - name: angular
     command: "npm start -- --host 0.0.0.0 --port 4200 --disable-host-check"
@@ -3290,16 +3307,10 @@ web_extra_exposed_ports:
     container_port: 4200
     http_port: 80
     https_port: 443
-''')
-                    set_st("Iniciando contenedores DDEV...")
-                    self.run_subproc(["ddev", "start", "-y"], target_dir, dialog)
-                    
-                    set_st("Creando proyecto Angular con @angular/cli...")
-                    self.run_subproc(["ddev", "exec", "npx -y @angular/cli new app --directory=. --routing --style=css --skip-git --defaults"], target_dir, dialog)
-                    
+""")
                     set_st("Reiniciando DDEV para activar Angular Live Dev Server...")
                     self.run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
-                    log("\n🎉 Proyecto Angular listo y corriendo!")
+                    log("\\n🎉 Proyecto Angular listo y corriendo!")
 
                 elif fw_id == "symfony":
                     set_st("Configurando DDEV para Symfony...")
