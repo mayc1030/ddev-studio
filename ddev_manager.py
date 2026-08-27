@@ -1518,6 +1518,153 @@ if (!file_exists('/var/acquia')) {
             threading.Thread(target=task, daemon=True).start()
 
 
+class InstallDBClientDialog(Gtk.Dialog):
+    def __init__(self, parent, approot, proj_name, primary_url):
+        super().__init__(title="Gestor de Bases de Datos", transient_for=parent, modal=True)
+        self.set_default_size(520, 420)
+        self.approot = approot
+        self.proj_name = proj_name
+        self.primary_url = primary_url
+        self.parent_win = parent
+        
+        box = self.get_content_area()
+        box.set_spacing(14)
+        box.set_margin_start(20)
+        box.set_margin_end(20)
+        box.set_margin_top(16)
+        box.set_margin_bottom(16)
+        
+        lbl_title = Gtk.Label()
+        lbl_title.set_markup("<big><b>Clientes Visuales de Base de Datos</b></big>")
+        lbl_title.set_halign(Gtk.Align.START)
+        box.pack_start(lbl_title, False, False, 0)
+        
+        lbl_desc = Gtk.Label()
+        lbl_desc.set_markup(f"<small><span color='#94a3b8'>No se detectó ningún cliente gráfico de bases de datos instalado en tu sistema.\\nElige una de las siguientes opciones para conectarte a <b>{proj_name}</b>:</span></small>")
+        lbl_desc.set_halign(Gtk.Align.START)
+        lbl_desc.set_line_wrap(True)
+        box.pack_start(lbl_desc, False, False, 0)
+        
+        # Option 1: DBeaver CE
+        card_dbeaver = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        card_dbeaver.get_style_context().add_class("option-highlight-box")
+        
+        row_db1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        row_db1.pack_start(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        lbl_c1 = Gtk.Label(use_markup=True)
+        lbl_c1.set_markup("<b>🐬 DBeaver Community Edition</b> <span color='#10b981'><b>(Recomendado)</b></span>")
+        row_db1.pack_start(lbl_c1, False, False, 0)
+        card_dbeaver.pack_start(row_db1, False, False, 0)
+        
+        lbl_c1_desc = Gtk.Label()
+        lbl_c1_desc.set_markup("<small>Gestor de base de datos gratuito, open-source y universal (MariaDB, PostgreSQL, MySQL).</small>")
+        lbl_c1_desc.set_line_wrap(True)
+        lbl_c1_desc.set_halign(Gtk.Align.START)
+        card_dbeaver.pack_start(lbl_c1_desc, False, False, 0)
+        
+        btn_inst_dbeaver = Gtk.Button()
+        b_d = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_d.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_d.pack_start(Gtk.Label(label="Instalar DBeaver CE (APT / Snap)"), False, False, 0)
+        btn_inst_dbeaver.add(b_d)
+        btn_inst_dbeaver.get_style_context().add_class("btn-primary")
+        btn_inst_dbeaver.connect("clicked", self.on_install_dbeaver)
+        card_dbeaver.pack_start(btn_inst_dbeaver, False, False, 0)
+        box.pack_start(card_dbeaver, False, False, 0)
+        
+        # Option 2: phpMyAdmin in DDEV
+        card_pma = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        card_pma.get_style_context().add_class("project-card")
+        
+        row_pma1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        row_pma1.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        lbl_c2 = Gtk.Label(use_markup=True)
+        lbl_c2.set_markup("<b>🌐 phpMyAdmin en DDEV</b> <span color='#38bdf8'><b>(Web / Docker)</b></span>")
+        row_pma1.pack_start(lbl_c2, False, False, 0)
+        card_pma.pack_start(row_pma1, False, False, 0)
+        
+        lbl_c2_desc = Gtk.Label()
+        lbl_c2_desc.set_markup("<small>Sin instalar programas en tu equipo. Corre phpMyAdmin dentro de Docker en tu navegador.</small>")
+        lbl_c2_desc.set_line_wrap(True)
+        lbl_c2_desc.set_halign(Gtk.Align.START)
+        card_pma.pack_start(lbl_c2_desc, False, False, 0)
+        
+        btn_inst_pma = Gtk.Button()
+        b_p = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_p.pack_start(Gtk.Image.new_from_icon_name("list-add-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_p.pack_start(Gtk.Label(label="Habilitar phpMyAdmin en este proyecto"), False, False, 0)
+        btn_inst_pma.add(b_p)
+        btn_inst_pma.connect("clicked", self.on_install_phpmyadmin)
+        card_pma.pack_start(btn_inst_pma, False, False, 0)
+        box.pack_start(card_pma, False, False, 0)
+        
+        # Option 3: TablePlus & Beekeeper
+        card_other = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        card_other.set_margin_top(4)
+        
+        btn_tableplus = Gtk.Button()
+        b_tp = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_tp.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_tp.pack_start(Gtk.Label(label="Sitio de TablePlus"), False, False, 0)
+        btn_tableplus.add(b_tp)
+        btn_tableplus.connect("clicked", lambda b: webbrowser.open("https://tableplus.com/linux"))
+        card_other.pack_start(btn_tableplus, True, True, 0)
+        
+        btn_beekeeper = Gtk.Button()
+        b_bk = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_bk.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_bk.pack_start(Gtk.Label(label="Sitio de Beekeeper"), False, False, 0)
+        btn_beekeeper.add(b_bk)
+        btn_beekeeper.connect("clicked", lambda b: webbrowser.open("https://www.beekeeperstudio.io/"))
+        card_other.pack_start(btn_beekeeper, True, True, 0)
+        
+        box.pack_start(card_other, False, False, 0)
+        
+        # Close button
+        btn_close = Gtk.Button(label="Cerrar")
+        btn_close.connect("clicked", lambda b: self.destroy())
+        self.add_action_widget(btn_close, Gtk.ResponseType.CLOSE)
+        
+        self.show_all()
+
+    def on_install_dbeaver(self, widget):
+        self.destroy()
+        # Launch terminal with installation commands
+        inst_cmd = "echo '🚀 Instalando DBeaver Community Edition en Ubuntu...'; sudo snap install dbeaver-ce || (echo 'Descargando paquete deb...' && wget -O /tmp/dbeaver.deb https://dbeaver.io/files/dbeaver-ce_latest_amd64.deb && sudo apt update && sudo apt install -y /tmp/dbeaver.deb); echo '¡Instalación finalizada!'; read -p 'Presiona Enter para cerrar...'"
+        self.parent_win.main_app.open_terminal("/tmp", inst_cmd)
+
+    def on_install_phpmyadmin(self, widget):
+        self.destroy()
+        dialog = ProgressDialog(self.parent_win.main_app, title=f"Habilitando phpMyAdmin: {self.proj_name}")
+        dialog.set_status("Descargando complemento ddev/ddev-phpmyadmin...")
+        
+        def task():
+            try:
+                def log(t):
+                    GLib.idle_add(dialog.append_log, t)
+                
+                log("📦 Ejecutando 'ddev get ddev/ddev-phpmyadmin'...\n")
+                p = subprocess.Popen(["ddev", "get", "ddev/ddev-phpmyadmin"], cwd=self.approot, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in iter(p.stdout.readline, ''):
+                    log(line)
+                p.stdout.close()
+                p.wait()
+                
+                log("\n🔄 Reiniciando proyecto DDEV para activar el contenedor phpMyAdmin...\n")
+                p2 = subprocess.Popen(["ddev", "restart", "-y"], cwd=self.approot, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in iter(p2.stdout.readline, ''):
+                    log(line)
+                p2.stdout.close()
+                p2.wait()
+                
+                pma_url = f"{self.primary_url}:8037"
+                GLib.idle_add(dialog.finish, True, "phpMyAdmin habilitado con éxito", pma_url, self.approot)
+                GLib.idle_add(self.parent_win.refresh_details)
+            except Exception as ex:
+                GLib.idle_add(dialog.finish, False, f"Error: {ex}", "", self.approot)
+                
+        threading.Thread(target=task, daemon=True).start()
+
 class ProjectDetailsView(Gtk.Box):
     def __init__(self, main_app):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -1568,6 +1715,69 @@ class ProjectDetailsView(Gtk.Box):
         self.content_box.set_margin_top(4)
         self.content_box.set_margin_end(6)
         self.scrolled.add(self.content_box)
+
+    def get_installed_db_clients(self, approot=""):
+        clients = []
+        # DBeaver
+        for cand in ["dbeaver", "dbeaver-ce", "/snap/bin/dbeaver-ce"]:
+            if shutil.which(cand):
+                clients.append({"id": "dbeaver", "name": "DBeaver", "cmd": cand, "icon": "drive-harddisk-symbolic"})
+                break
+        # TablePlus
+        for cand in ["tableplus", "/snap/bin/tableplus"]:
+            if shutil.which(cand):
+                clients.append({"id": "tableplus", "name": "TablePlus", "cmd": cand, "icon": "drive-harddisk-symbolic"})
+                break
+        # Beekeeper
+        for cand in ["beekeeper-studio", "/snap/bin/beekeeper-studio"]:
+            if shutil.which(cand):
+                clients.append({"id": "beekeeper", "name": "Beekeeper Studio", "cmd": cand, "icon": "drive-harddisk-symbolic"})
+                break
+        # MySQL Workbench
+        for cand in ["mysql-workbench", "/snap/bin/mysql-workbench"]:
+            if shutil.which(cand):
+                clients.append({"id": "mysql-workbench", "name": "MySQL Workbench", "cmd": cand, "icon": "drive-harddisk-symbolic"})
+                break
+        # phpMyAdmin in DDEV
+        if approot and (os.path.exists(os.path.join(approot, ".ddev", "docker-compose.phpmyadmin.yaml")) or os.path.exists(os.path.join(approot, ".ddev", "addon-metadata", "phpmyadmin"))):
+            clients.append({"id": "phpmyadmin", "name": "phpMyAdmin (Web)", "cmd": "pma", "icon": "web-browser-symbolic"})
+            
+        return clients
+
+    def launch_db_client(self, client, host, ext_port, dbname, user, password, db_type, approot):
+        cid = client["id"]
+        uri = f"{db_type}://{user}:{password}@127.0.0.1:{ext_port}/{dbname}"
+        raw_creds = f"Host: 127.0.0.1\nPort: {ext_port}\nDatabase: {dbname}\nUsername: {user}\nPassword: {password}\nURL: {uri}"
+        
+        # Always copy credentials for quick paste
+        clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        clipboard.set_text(uri, -1)
+        clipboard.store()
+        
+        if cid == "phpmyadmin":
+            pma_url = f"{self.raw_data.get('primary_url', f'https://{self.proj_name}.ddev.site')}:8037"
+            webbrowser.open(pma_url)
+        elif cid == "tableplus":
+            subprocess.Popen([client["cmd"], uri])
+        elif cid == "beekeeper":
+            subprocess.Popen([client["cmd"], uri])
+        elif cid == "dbeaver":
+            # DBeaver launch
+            try:
+                subprocess.Popen([client["cmd"], "-con", f"driver={db_type}|host=127.0.0.1|port={ext_port}|database={dbname}|user={user}|password={password}"])
+            except Exception:
+                subprocess.Popen([client["cmd"]])
+        else:
+            try:
+                subprocess.Popen([client["cmd"]])
+            except Exception as e:
+                print("Error launching client:", e)
+
+    def show_install_db_dialog(self, approot, proj_name, primary_url):
+        dialog = InstallDBClientDialog(self, approot, proj_name, primary_url)
+        dialog.run()
+
+
 
     def load_project_details(self, proj):
         self.proj = proj
@@ -1776,7 +1986,7 @@ class ProjectDetailsView(Gtk.Box):
         
         db_card.pack_start(grid_db, False, False, 0)
         
-        # DB Buttons
+        # DB Buttons and Installed Clients
         db_btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         db_btn_row.set_margin_top(4)
         
@@ -1785,16 +1995,40 @@ class ProjectDetailsView(Gtk.Box):
         btn_copy_db = Gtk.Button()
         b_c = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         b_c.pack_start(Gtk.Image.new_from_icon_name("edit-copy-symbolic", Gtk.IconSize.MENU), False, False, 0)
-        b_c.pack_start(Gtk.Label(label="Copiar Credenciales para DBeaver / TablePlus"), False, False, 0)
+        b_c.pack_start(Gtk.Label(label="Copiar Credenciales"), False, False, 0)
         btn_copy_db.add(b_c)
         btn_copy_db.connect("clicked", lambda b, text=raw_db_creds: self.copy_to_clipboard(text, "Credenciales copiadas al portapapeles"))
         db_btn_row.pack_start(btn_copy_db, False, False, 0)
         
+        installed_clients = self.get_installed_db_clients(approot)
+        
+        if is_running and installed_clients:
+            for cl in installed_clients:
+                btn_cl = Gtk.Button()
+                b_cl = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                b_cl.pack_start(Gtk.Image.new_from_icon_name(cl.get("icon", "drive-harddisk-symbolic"), Gtk.IconSize.MENU), False, False, 0)
+                b_cl.pack_start(Gtk.Label(label=f"Abrir en {cl['name']}"), False, False, 0)
+                btn_cl.add(b_cl)
+                btn_cl.get_style_context().add_class("btn-primary" if cl["id"] == "dbeaver" else "btn-quick")
+                btn_cl.set_tooltip_text(f"Conectar a {db_name} en {cl['name']}")
+                btn_cl.connect("clicked", lambda b, c=cl: self.launch_db_client(c, "127.0.0.1", ext_port_str, db_name, db_user, db_pass, db_type, approot))
+                db_btn_row.pack_start(btn_cl, False, False, 0)
+        elif not installed_clients:
+            btn_inst_db = Gtk.Button()
+            b_idb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_idb.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_idb.pack_start(Gtk.Label(label="Instalar Cliente Visual (DBeaver / phpMyAdmin)"), False, False, 0)
+            btn_inst_db.add(b_idb)
+            btn_inst_db.get_style_context().add_class("btn-primary")
+            btn_inst_db.set_tooltip_text("No tienes DBeaver o TablePlus instalado. Pulsa para ver opciones de instalación.")
+            btn_inst_db.connect("clicked", lambda b: self.show_install_db_dialog(approot, pname, primary_url))
+            db_btn_row.pack_start(btn_inst_db, False, False, 0)
+            
         if is_running:
             btn_launch_db = Gtk.Button()
             b_ld = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
             b_ld.pack_start(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic", Gtk.IconSize.MENU), False, False, 0)
-            b_ld.pack_start(Gtk.Label(label="Abrir Consola MySQL / DB"), False, False, 0)
+            b_ld.pack_start(Gtk.Label(label="Consola CLI (ddev mysql)"), False, False, 0)
             btn_launch_db.add(b_ld)
             btn_launch_db.connect("clicked", lambda b: self.main_app.open_terminal(approot, "ddev mysql" if "postgres" not in db_type else "ddev psql"))
             db_btn_row.pack_start(btn_launch_db, False, False, 0)
