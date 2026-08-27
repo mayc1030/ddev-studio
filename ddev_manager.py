@@ -1531,6 +1531,8 @@ services:
       - VIRTUAL_HOST=${DDEV_HOSTNAME}
       - HTTP_EXPOSE=8978:8978
       - HTTPS_EXPOSE=8979:8978
+    volumes:
+      - "./cloudbeaver/workspace:/opt/cloudbeaver/workspace"
 """
 
 class DBContainersDialog(Gtk.Dialog):
@@ -1727,7 +1729,8 @@ class DBContainersDialog(Gtk.Dialog):
 
     def toggle_dbeaver(self, enable):
         self.destroy()
-        cb_file = os.path.join(self.approot, ".ddev", "docker-compose.cloudbeaver.yaml")
+        cb_compose_file = os.path.join(self.approot, ".ddev", "docker-compose.cloudbeaver.yaml")
+        cb_ws_dir = os.path.join(self.approot, ".ddev", "cloudbeaver", "workspace")
         dialog = ProgressDialog(self.parent_view.main_app, title=f"DBeaver en Docker: {self.proj_name}")
         dialog.set_status("Configurando contenedor DBeaver (CloudBeaver)...")
         
@@ -1736,15 +1739,106 @@ class DBContainersDialog(Gtk.Dialog):
                 def log(t):
                     GLib.idle_add(dialog.append_log, t)
                 if enable:
-                    log("🐬 Creando configuración para DBeaver (CloudBeaver) en Docker...\n")
-                    os.makedirs(os.path.join(self.approot, ".ddev"), exist_ok=True)
-                    with open(cb_file, "w", encoding="utf-8") as f:
+                    log("🐬 Preparando auto-configuración de DBeaver (CloudBeaver)...\n")
+                    conf_dir = os.path.join(cb_ws_dir, "conf")
+                    global_dir = os.path.join(cb_ws_dir, "GlobalConfiguration", ".dbeaver")
+                    os.makedirs(conf_dir, exist_ok=True)
+                    os.makedirs(global_dir, exist_ok=True)
+                    
+                    # 1. Server configuration (Disable initial wizard, enable instant auto-access)
+                    cb_conf = {
+                        "server": {
+                            "serverPort": 8978,
+                            "serverURL": "http://localhost:8978",
+                            "rootURI": "/",
+                            "expireSessionAfterPeriod": 1800000,
+                            "database": {
+                                "pool": {
+                                    "minIdleConnections": 4,
+                                    "maxIdleConnections": 10,
+                                    "maxConnections": 100,
+                                    "validationQuery": "SELECT 1"
+                                }
+                            }
+                        },
+                        "app": {
+                            "anonymousAccessEnabled": True,
+                            "supportsCustomConnections": True,
+                            "publicCredentialsSaveEnabled": True,
+                            "adminCredentialsSaveEnabled": True,
+                            "enableReverseProxyAuth": False,
+                            "forwardProxy": False,
+                            "linkExternalCredentialsWithUser": True,
+                            "redirectOnFederatedAuth": False
+                        }
+                    }
+                    with open(os.path.join(conf_dir, "cloudbeaver.conf"), "w", encoding="utf-8") as f:
+                        json.dump(cb_conf, f, indent=2)
+                    log("✓ Modo instantáneo configurado (sin asistente inicial).\n")
+                    
+                    # 2. Pre-configured database connection (Auto-connect to DDEV DB)
+                    db_type = self.parent_view.raw_data.get("database_type", "mariadb")
+                    is_pg = ("postgres" in db_type.lower())
+                    
+                    data_sources = {
+                        "folders": {},
+                        "connections": {
+                            "ddev-database": {
+                                "provider": "postgresql" if is_pg else "mysql",
+                                "driver": "postgres-jdbc" if is_pg else "mariaDB",
+                                "name": f"DDEV Database ({self.proj_name})",
+                                "save-password": True,
+                                "read-only": False,
+                                "configuration": {
+                                    "host": "db",
+                                    "port": "5432" if is_pg else "3306",
+                                    "database": "db",
+                                    "url": f"jdbc:postgresql://db:5432/db" if is_pg else "jdbc:mariadb://db:3306/db",
+                                    "configurationType": "MANUAL",
+                                    "type": "dev",
+                                    "auth-model": "native",
+                                    "handlers": {}
+                                }
+                            }
+                        },
+                        "connection-types": {
+                            "dev": {
+                                "name": "Development",
+                                "color": "255,255,255",
+                                "description": "Regular development database",
+                                "auto-commit": True,
+                                "confirm-execute": False,
+                                "confirm-data-change": False,
+                                "smart-commit": False,
+                                "smart-commit-recover": False,
+                                "auto-close-transactions": True,
+                                "close-transactions-period": 1800
+                            }
+                        }
+                    }
+                    with open(os.path.join(global_dir, "data-sources.json"), "w", encoding="utf-8") as f:
+                        json.dump(data_sources, f, indent=2)
+                        
+                    creds = {
+                        "ddev-database": {
+                            "#credentials#": {
+                                "user": "db",
+                                "password": "db"
+                            }
+                        }
+                    }
+                    with open(os.path.join(global_dir, "credentials-config.json"), "w", encoding="utf-8") as f:
+                        json.dump(creds, f, indent=2)
+                    log("✓ Conexión a la base de datos pre-configurada (db:db@db).\n")
+                    
+                    # 3. Docker Compose template
+                    with open(cb_compose_file, "w", encoding="utf-8") as f:
                         f.write(CLOUDBEAVER_COMPOSE_TEMPLATE)
-                    log("✓ Archivo .ddev/docker-compose.cloudbeaver.yaml configurado.\n")
+                    log("✓ Archivo .ddev/docker-compose.cloudbeaver.yaml creado.\n")
                 else:
                     log("🗑️ Eliminando configuración de DBeaver...\n")
-                    if os.path.exists(cb_file):
-                        os.remove(cb_file)
+                    if os.path.exists(cb_compose_file):
+                        os.remove(cb_compose_file)
                 
                 log("\n🔄 Reiniciando proyecto DDEV para aplicar cambios de contenedor...\n")
                 p2 = subprocess.Popen(["ddev", "restart", "-y"], cwd=self.approot, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
