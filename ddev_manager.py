@@ -1531,7 +1531,12 @@ services:
       - VIRTUAL_HOST=${DDEV_HOSTNAME}
       - HTTP_EXPOSE=8978:8978
       - HTTPS_EXPOSE=8979:8978
+      - CLOUDBEAVER_APP_ANONYMOUS_ACCESS_ENABLED=true
+      - CLOUDBEAVER_APP_GRANT_CONNECTIONS_ACCESS_TO_ANONYMOUS_TEAM=true
+      - CLOUDBEAVER_APP_SUPPORTS_CUSTOM_CONNECTIONS=true
     volumes:
+      - "./cloudbeaver/conf/initial-data.conf:/opt/cloudbeaver/conf/initial-data.conf"
+      - "./cloudbeaver/conf/initial-data-sources.conf:/opt/cloudbeaver/conf/initial-data-sources.conf"
       - "./cloudbeaver/workspace:/opt/cloudbeaver/workspace"
 """
 
@@ -1730,7 +1735,9 @@ class DBContainersDialog(Gtk.Dialog):
     def toggle_dbeaver(self, enable):
         self.destroy()
         cb_compose_file = os.path.join(self.approot, ".ddev", "docker-compose.cloudbeaver.yaml")
-        cb_ws_dir = os.path.join(self.approot, ".ddev", "cloudbeaver", "workspace")
+        cb_base_dir = os.path.join(self.approot, ".ddev", "cloudbeaver")
+        conf_dir = os.path.join(cb_base_dir, "conf")
+        ws_dir = os.path.join(cb_base_dir, "workspace")
         dialog = ProgressDialog(self.parent_view.main_app, title=f"DBeaver en Docker: {self.proj_name}")
         dialog.set_status("Configurando contenedor DBeaver (CloudBeaver)...")
         
@@ -1739,48 +1746,48 @@ class DBContainersDialog(Gtk.Dialog):
                 def log(t):
                     GLib.idle_add(dialog.append_log, t)
                 if enable:
-                    log("🐬 Preparando auto-configuración de DBeaver (CloudBeaver)...\n")
-                    conf_dir = os.path.join(cb_ws_dir, "conf")
-                    global_dir = os.path.join(cb_ws_dir, "GlobalConfiguration", ".dbeaver")
+                    log("🐬 Preparando auto-configuración instantánea de DBeaver (CloudBeaver)...\n")
                     os.makedirs(conf_dir, exist_ok=True)
-                    os.makedirs(global_dir, exist_ok=True)
                     
-                    # 1. Server configuration (Disable initial wizard, enable instant auto-access)
-                    cb_conf = {
-                        "server": {
-                            "serverPort": 8978,
-                            "serverURL": "http://localhost:8978",
-                            "rootURI": "/",
-                            "expireSessionAfterPeriod": 1800000,
-                            "database": {
-                                "pool": {
-                                    "minIdleConnections": 4,
-                                    "maxIdleConnections": 10,
-                                    "maxConnections": 100,
-                                    "validationQuery": "SELECT 1"
-                                }
-                            }
-                        },
-                        "app": {
-                            "anonymousAccessEnabled": True,
-                            "supportsCustomConnections": True,
-                            "publicCredentialsSaveEnabled": True,
-                            "adminCredentialsSaveEnabled": True,
-                            "enableReverseProxyAuth": False,
-                            "forwardProxy": False,
-                            "linkExternalCredentialsWithUser": True,
-                            "redirectOnFederatedAuth": False
-                        }
-                    }
-                    with open(os.path.join(conf_dir, "cloudbeaver.conf"), "w", encoding="utf-8") as f:
-                        json.dump(cb_conf, f, indent=2)
+                    # 1. initial-data.conf (Skips initial setup wizard, enables anonymous direct access)
+                    init_data_content = """{
+    adminName: "admin",
+    adminPassword: "admin",
+    serverName: "DDEV Studio DBeaver",
+    anonymousAccessEnabled: true,
+    supportsCustomConnections: true,
+    grantConnectionsAccessToAnonymousTeam: true,
+    teams: [
+        {
+            subjectId: "admin",
+            teamName: "Admin",
+            description: "Administrative access. Has all permissions.",
+            permissions: [ "admin" ]
+        },
+        {
+            subjectId: "user",
+            teamName: "User",
+            description: "All users, including anonymous.",
+            permissions: [ "admin" ]
+        }
+    ],
+    users: [
+        {
+            userId: "admin",
+            teams: [ "admin" ]
+        }
+    ]
+}
+"""
+                    with open(os.path.join(conf_dir, "initial-data.conf"), "w", encoding="utf-8") as f:
+                        f.write(init_data_content)
                     log("✓ Modo instantáneo configurado (sin asistente inicial).\n")
                     
-                    # 2. Pre-configured database connection (Auto-connect to DDEV DB)
+                    # 2. initial-data-sources.conf (Pre-configured connection to DDEV DB)
                     db_type = self.parent_view.raw_data.get("database_type", "mariadb")
                     is_pg = ("postgres" in db_type.lower())
                     
-                    data_sources = {
+                    init_sources = {
                         "folders": {},
                         "connections": {
                             "ddev-database": {
@@ -1793,42 +1800,22 @@ class DBContainersDialog(Gtk.Dialog):
                                     "host": "db",
                                     "port": "5432" if is_pg else "3306",
                                     "database": "db",
-                                    "url": f"jdbc:postgresql://db:5432/db" if is_pg else "jdbc:mariadb://db:3306/db",
-                                    "configurationType": "MANUAL",
+                                    "url": "jdbc:postgresql://db:5432/db" if is_pg else "jdbc:mariadb://db:3306/db",
+                                    "user": "db",
+                                    "password": "db",
                                     "type": "dev",
                                     "auth-model": "native",
+                                    "auth-properties": {
+                                        "user": "db",
+                                        "password": "db"
+                                    },
                                     "handlers": {}
                                 }
                             }
-                        },
-                        "connection-types": {
-                            "dev": {
-                                "name": "Development",
-                                "color": "255,255,255",
-                                "description": "Regular development database",
-                                "auto-commit": True,
-                                "confirm-execute": False,
-                                "confirm-data-change": False,
-                                "smart-commit": False,
-                                "smart-commit-recover": False,
-                                "auto-close-transactions": True,
-                                "close-transactions-period": 1800
-                            }
                         }
                     }
-                    with open(os.path.join(global_dir, "data-sources.json"), "w", encoding="utf-8") as f:
-                        json.dump(data_sources, f, indent=2)
-                        
-                    creds = {
-                        "ddev-database": {
-                            "#credentials#": {
-                                "user": "db",
-                                "password": "db"
-                            }
-                        }
-                    }
-                    with open(os.path.join(global_dir, "credentials-config.json"), "w", encoding="utf-8") as f:
-                        json.dump(creds, f, indent=2)
+                    with open(os.path.join(conf_dir, "initial-data-sources.conf"), "w", encoding="utf-8") as f:
+                        json.dump(init_sources, f, indent=2)
                     log("✓ Conexión a la base de datos pre-configurada (db:db@db).\n")
                     
                     # 3. Docker Compose template
