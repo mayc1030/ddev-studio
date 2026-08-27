@@ -2419,7 +2419,13 @@ class ProjectDetailsView(Gtk.Box):
         db_card.pack_start(db_btn_box, False, False, 0)
         self.content_box.pack_start(db_card, False, False, 0)
         
-        # 3. Environment & Runtime Card (Webserver, PHP, Node.js, Xdebug)
+        # 3. Environment & Runtime Card (Webserver, PHP / Python / Node.js / Xdebug)
+        ptype_lower = ptype.lower()
+        is_python = any(k in ptype_lower for k in ["python", "django", "flask", "fastapi"])
+        is_js = any(k in ptype_lower for k in ["angular", "react", "vue", "next", "nuxt", "node", "express", "svelte", "astro"])
+        is_static = (ptype_lower in ["html", "static", "apache", "nginx"])
+        is_php = not (is_python or is_js or is_static)
+        
         env_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         env_card.get_style_context().add_class("project-card")
         
@@ -2434,40 +2440,84 @@ class ProjectDetailsView(Gtk.Box):
         grid_env.set_column_spacing(20)
         grid_env.set_row_spacing(6)
         
+        # Col 1: Webserver & Docroot (Universal)
         grid_env.attach(Gtk.Label(label="Servidor Web:", halign=Gtk.Align.END), 0, 0, 1, 1)
         grid_env.attach(Gtk.Label(label=f"<b>{webserver}</b>", use_markup=True, halign=Gtk.Align.START), 1, 0, 1, 1)
         
         grid_env.attach(Gtk.Label(label="Directorio Web (Docroot):", halign=Gtk.Align.END), 0, 1, 1, 1)
         grid_env.attach(Gtk.Label(label=f"<tt><b>{docroot if docroot else '.'}</b></tt>", use_markup=True, halign=Gtk.Align.START), 1, 1, 1, 1)
         
-        grid_env.attach(Gtk.Label(label="Versión de PHP:", halign=Gtk.Align.END), 2, 0, 1, 1)
-        grid_env.attach(Gtk.Label(label=f"<b>PHP {php_ver}</b>", use_markup=True, halign=Gtk.Align.START), 3, 0, 1, 1)
-        
-        grid_env.attach(Gtk.Label(label="Versión de Node.js:", halign=Gtk.Align.END), 2, 1, 1, 1)
-        grid_env.attach(Gtk.Label(label=f"<b>Node.js v{node_ver}</b>" if node_ver else "<b>No activo</b>", use_markup=True, halign=Gtk.Align.START), 3, 1, 1, 1)
-        
-        grid_env.attach(Gtk.Label(label="Xdebug:", halign=Gtk.Align.END), 0, 2, 1, 1)
-        xdbg_st = "<span color='#10b981'><b>ACTIVO (Enabled)</b></span>" if is_xdebug else "<span color='#94a3b8'>Desactivado</span>"
-        grid_env.attach(Gtk.Label(label=xdbg_st, use_markup=True, halign=Gtk.Align.START), 1, 2, 1, 1)
-        
+        # Col 2: Framework-specific runtimes
+        if is_php:
+            grid_env.attach(Gtk.Label(label="Versión de PHP:", halign=Gtk.Align.END), 2, 0, 1, 1)
+            grid_env.attach(Gtk.Label(label=f"<b>PHP {php_ver}</b>", use_markup=True, halign=Gtk.Align.START), 3, 0, 1, 1)
+            
+            grid_env.attach(Gtk.Label(label="Node.js (Herramientas):", halign=Gtk.Align.END), 2, 1, 1, 1)
+            node_txt = f"<b>v{node_ver}</b>" if (node_ver and node_ver != "N/A") else "<i>No configurado</i>"
+            grid_env.attach(Gtk.Label(label=node_txt, use_markup=True, halign=Gtk.Align.START), 3, 1, 1, 1)
+            
+            grid_env.attach(Gtk.Label(label="Xdebug (PHP):", halign=Gtk.Align.END), 0, 2, 1, 1)
+            xdbg_st = "<span color='#10b981'><b>ACTIVO (Enabled)</b></span>" if is_xdebug else "<span color='#94a3b8'>Desactivado</span>"
+            grid_env.attach(Gtk.Label(label=xdbg_st, use_markup=True, halign=Gtk.Align.START), 1, 2, 1, 1)
+            
+        elif is_python:
+            grid_env.attach(Gtk.Label(label="Entorno de Ejecución:", halign=Gtk.Align.END), 2, 0, 1, 1)
+            grid_env.attach(Gtk.Label(label=f"<b>Python 3 (WSGI/ASGI)</b>", use_markup=True, halign=Gtk.Align.START), 3, 0, 1, 1)
+            
+            grid_env.attach(Gtk.Label(label="Node.js (Frontend):", halign=Gtk.Align.END), 2, 1, 1, 1)
+            node_txt = f"<b>v{node_ver}</b>" if (node_ver and node_ver != "N/A") else "<i>No requerido</i>"
+            grid_env.attach(Gtk.Label(label=node_txt, use_markup=True, halign=Gtk.Align.START), 3, 1, 1, 1)
+            
+        elif is_js:
+            grid_env.attach(Gtk.Label(label="Runtime Principal:", halign=Gtk.Align.END), 2, 0, 1, 1)
+            node_txt = f"<b>Node.js v{node_ver}</b>" if (node_ver and node_ver != "N/A") else "<b>Node.js (LTS)</b>"
+            grid_env.attach(Gtk.Label(label=node_txt, use_markup=True, halign=Gtk.Align.START), 3, 0, 1, 1)
+            
+            grid_env.attach(Gtk.Label(label="Tipo de Aplicación:", halign=Gtk.Align.END), 2, 1, 1, 1)
+            grid_env.attach(Gtk.Label(label=f"<b>{ptype.capitalize()} SPA / Frontend</b>", use_markup=True, halign=Gtk.Align.START), 3, 1, 1, 1)
+            
+        else: # static / html
+            grid_env.attach(Gtk.Label(label="Tipo de Proyecto:", halign=Gtk.Align.END), 2, 0, 1, 1)
+            grid_env.attach(Gtk.Label(label="<b>HTML / Estático</b>", use_markup=True, halign=Gtk.Align.START), 3, 0, 1, 1)
+            
         env_card.pack_start(grid_env, False, False, 0)
         
-        # Xdebug button
+        # Contextual Action buttons
         if is_running:
             env_btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
             env_btn_row.set_margin_top(4)
             
-            btn_xdebug = Gtk.Button()
-            b_xd = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            b_xd.pack_start(Gtk.Image.new_from_icon_name("system-run-symbolic", Gtk.IconSize.MENU), False, False, 0)
-            lbl_xd_btn = "Desactivar Xdebug (ddev xdebug off)" if is_xdebug else "Activar Xdebug (ddev xdebug on)"
-            b_xd.pack_start(Gtk.Label(label=lbl_xd_btn), False, False, 0)
-            btn_xdebug.add(b_xd)
-            btn_xdebug.connect("clicked", lambda b: self.toggle_xdebug(not is_xdebug))
-            env_btn_row.pack_start(btn_xdebug, False, False, 0)
-            
-            env_card.pack_start(env_btn_row, False, False, 0)
-            
+            if is_php:
+                btn_xdebug = Gtk.Button()
+                b_xd = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                b_xd.pack_start(Gtk.Image.new_from_icon_name("system-run-symbolic", Gtk.IconSize.MENU), False, False, 0)
+                lbl_xd_btn = "Desactivar Xdebug (ddev xdebug off)" if is_xdebug else "Activar Xdebug (ddev xdebug on)"
+                b_xd.pack_start(Gtk.Label(label=lbl_xd_btn), False, False, 0)
+                btn_xdebug.add(b_xd)
+                btn_xdebug.connect("clicked", lambda b: self.toggle_xdebug(not is_xdebug))
+                env_btn_row.pack_start(btn_xdebug, False, False, 0)
+                
+            elif is_python:
+                btn_py = Gtk.Button()
+                b_py = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                b_py.pack_start(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic", Gtk.IconSize.MENU), False, False, 0)
+                b_py.pack_start(Gtk.Label(label="Consola Python (ddev exec python)"), False, False, 0)
+                btn_py.add(b_py)
+                btn_py.connect("clicked", lambda b: self.main_app.open_terminal(approot, "ddev exec python"))
+                env_btn_row.pack_start(btn_py, False, False, 0)
+                
+            elif is_js:
+                btn_npm = Gtk.Button()
+                b_npm = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                b_npm.pack_start(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic", Gtk.IconSize.MENU), False, False, 0)
+                b_npm.pack_start(Gtk.Label(label="Consola NPM / Node (ddev npm)"), False, False, 0)
+                btn_npm.add(b_npm)
+                btn_npm.connect("clicked", lambda b: self.main_app.open_terminal(approot, "ddev npm"))
+                env_btn_row.pack_start(btn_npm, False, False, 0)
+                
+            if env_btn_row.get_children():
+                env_card.pack_start(env_btn_row, False, False, 0)
+                
         self.content_box.pack_start(env_card, False, False, 0)
         
         # 4. Registered URLs and Domains Card
