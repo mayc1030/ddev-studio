@@ -2051,6 +2051,7 @@ class ProjectDetailsView(Gtk.Box):
         primary_url = self.raw_data.get("primary_url", f"https://{pname}.ddev.site")
         mailpit_url = self.raw_data.get("mailpit_https_url") or self.raw_data.get("mailpit_url") or f"https://{pname}.ddev.site:8026"
         is_xdebug = self.raw_data.get("xdebug_enabled", False)
+        services = self.raw_data.get("services", {}) or {}
         
         # 1. Header Overview Card
         header_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
