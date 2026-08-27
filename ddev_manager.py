@@ -3499,8 +3499,29 @@ class DDEVManagerWindow(Gtk.Window):
         for child in self.projects_list_box.get_children():
             self.projects_list_box.remove(child)
             
-        loading_lbl = Gtk.Label(label="Cargando proyectos de DDEV...")
-        self.projects_list_box.pack_start(loading_lbl, True, True, 20)
+        loader_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        loader_box.set_halign(Gtk.Align.CENTER)
+        loader_box.set_valign(Gtk.Align.CENTER)
+        loader_box.set_margin_top(80)
+        loader_box.set_margin_bottom(80)
+        
+        spinner = Gtk.Spinner()
+        spinner.get_style_context().add_class("big-spinner")
+        spinner.set_size_request(48, 48)
+        spinner.start()
+        loader_box.pack_start(spinner, False, False, 0)
+        
+        lbl_title = Gtk.Label()
+        lbl_title.set_markup("<span size='large' weight='600'>Cargando proyectos...</span>")
+        lbl_title.set_halign(Gtk.Align.CENTER)
+        loader_box.pack_start(lbl_title, False, False, 0)
+        
+        lbl_sub = Gtk.Label()
+        lbl_sub.set_markup("<span color='#94a3b8' size='medium'>Consultando estado de DDEV</span>")
+        lbl_sub.set_halign(Gtk.Align.CENTER)
+        loader_box.pack_start(lbl_sub, False, False, 0)
+        
+        self.projects_list_box.pack_start(loader_box, True, True, 0)
         self.projects_list_box.show_all()
         
         def run_list():
