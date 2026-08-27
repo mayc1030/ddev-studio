@@ -1972,13 +1972,50 @@ if (file_exists(__DIR__ . '/local.settings.php')) {{
                     f.write(alias_code)
                 log(f"✓ Alias de Drush creado en drush/sites/{slug}.site.yml.")
 
-                # 8. Ensure dynamic sites mapping in factory-hooks/pre-sites-php/sites.local.php
-                hook_dir = os.path.join(base_dir, "factory-hooks", "pre-sites-php")
-                os.makedirs(hook_dir, exist_ok=True)
-                hook_file = os.path.join(hook_dir, "sites.local.php")
-                if not os.path.exists(hook_file):
-                    with open(hook_file, "w") as f:
+                # 8. Ensure dynamic sites mapping in <docroot>/sites/sites.php (Standard Drupal & DDEV)
+                sites_php_file = os.path.join(base_dir, docroot_dir, "sites", "sites.php")
+                if not os.path.exists(sites_php_file):
+                    with open(sites_php_file, "w") as f:
                         f.write("""<?php
+/**
+ * @file
+ * Drupal multi-site configuration file for DDEV.
+ */
+
+// Dynamic DDEV multisite mapping
+$sites_base = __DIR__;
+if (is_dir($sites_base)) {
+  $entries = scandir($sites_base);
+  foreach ($entries as $entry) {
+    if ($entry !== '.' && $entry !== '..' && $entry !== 'default' && $entry !== 'all' && $entry !== 'g' && $entry !== 'settings' && is_dir($sites_base . '/' . $entry)) {
+      $sites[$entry . '.ddev.site'] = $entry;
+      if (!empty($_ENV['DDEV_PROJECT'])) {
+        $sites[$entry . '.' . $_ENV['DDEV_PROJECT'] . '.ddev.site'] = $entry;
+      }
+      $sites['local.' . $entry . '.com'] = $entry;
+    }
+  }
+}
+""")
+                    log(f"✓ Archivo {docroot_dir}/sites/sites.php creado con mapeo dinámico.")
+                else:
+                    try:
+                        with open(sites_php_file, "r") as f:
+                            s_content = f.read()
+                        if f"{subsite_domain}" not in s_content and "$sites_base" not in s_content and "ddev.site" not in s_content:
+                            with open(sites_php_file, "a") as f:
+                                f.write(f"\n$sites['{subsite_domain}'] = '{slug}';\n")
+                            log(f"✓ Mapeo {subsite_domain} agregado a {docroot_dir}/sites/sites.php.")
+                    except Exception as ex:
+                        log(f"Nota en sites.php: {ex}")
+
+                # Also support Acquia factory-hooks if directory exists
+                hook_dir = os.path.join(base_dir, "factory-hooks", "pre-sites-php")
+                if os.path.exists(hook_dir):
+                    hook_file = os.path.join(hook_dir, "sites.local.php")
+                    if not os.path.exists(hook_file):
+                        with open(hook_file, "w") as f:
+                            f.write("""<?php
 if (!file_exists('/var/acquia')) {
   $sites_base = defined('DRUPAL_ROOT') ? DRUPAL_ROOT . '/sites' : __DIR__ . '/../../docroot/sites';
   if (is_dir($sites_base)) {
