@@ -809,43 +809,29 @@ class DDEVManagerWindow(Gtk.Window):
         approot = proj.get("approot", "")
         is_drupal = "drupal" in ptype or (approot and (os.path.exists(os.path.join(approot, "docroot", "sites")) or os.path.exists(os.path.join(approot, "web", "sites")) or os.path.exists(os.path.join(approot, "sites"))))
         if is_drupal:
-            is_multisite = False
             subsite_count = 0
             
-            # Scan sites directory
+            # Scan sites directory for actual subsite folders
             for d in ["docroot", "web", "."]:
                 sites_dir = os.path.join(approot, d, "sites") if approot else ""
                 if sites_dir and os.path.isdir(sites_dir):
                     try:
-                        entries = [e for e in os.listdir(sites_dir) if os.path.isdir(os.path.join(sites_dir, e)) and e not in ['default', 'all', 'g', 'settings']]
+                        entries = [
+                            e for e in os.listdir(sites_dir)
+                            if os.path.isdir(os.path.join(sites_dir, e)) and e not in ['default', 'all', 'g', 'settings', 'simpletest']
+                        ]
                         if entries:
-                            is_multisite = True
                             subsite_count = len(entries)
                             break
-                        sites_php = os.path.join(sites_dir, "sites.php")
-                        if os.path.isfile(sites_php):
-                            is_multisite = True
-                            break
-                    except Exception:
-                        pass
-            
-            # Check additional_fqdns / additional_hostnames in .ddev/config.yaml
-            if not is_multisite and approot:
-                ddev_cfg = os.path.join(approot, ".ddev", "config.yaml")
-                if os.path.exists(ddev_cfg):
-                    try:
-                        with open(ddev_cfg, "r") as f:
-                            c = f.read()
-                        lines = [l for l in c.splitlines() if not l.strip().startswith("#")]
-                        if any("additional_fqdns:" in l and "[]" not in l for l in lines) or any("additional_hostnames:" in l and "[]" not in l for l in lines):
-                            is_multisite = True
                     except Exception:
                         pass
                         
+            is_multisite = (subsite_count > 0)
+            
             lbl_drupal_mode = Gtk.Label()
             lbl_drupal_mode.get_style_context().add_class("badge")
             if is_multisite:
-                lbl_drupal_mode.set_label(f"💧 MULTISITE ({subsite_count})" if subsite_count > 0 else "💧 MULTISITE")
+                lbl_drupal_mode.set_label(f"💧 MULTISITE ({subsite_count})")
                 lbl_drupal_mode.get_style_context().add_class("badge-multisite")
                 lbl_drupal_mode.set_tooltip_text(f"Drupal Multisite con {subsite_count} subsitio(s) configurado(s)")
             else:
