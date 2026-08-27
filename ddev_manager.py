@@ -190,8 +190,8 @@ CUSTOM_CSS = b"""
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
 }
 .big-spinner {
-    min-width: 48px;
-    min-height: 48px;
+    min-width: 72px;
+    min-height: 72px;
 }
 .loader-spinner {
     min-width: 32px;
@@ -2298,15 +2298,19 @@ class ProjectDetailsView(Gtk.Box):
         
         spinner = Gtk.Spinner()
         spinner.get_style_context().add_class("big-spinner")
-        spinner.set_size_request(48, 48)
+        spinner.set_size_request(72, 72)
         spinner.start()
         loader_box.pack_start(spinner, False, False, 0)
         
-        lbl_text = Gtk.Label()
-        lbl_text.set_markup(f"<span size='large' weight='600'>Cargando detalles...</span>\\n<span color='#38bdf8' size='medium'><b>{self.proj_name}</b></span>")
-        lbl_text.set_justify(Gtk.Justification.CENTER)
-        lbl_text.set_halign(Gtk.Align.CENTER)
-        loader_box.pack_start(lbl_text, False, False, 0)
+        lbl_title = Gtk.Label()
+        lbl_title.set_markup("<span size='x-large' weight='600'>Cargando detalles...</span>")
+        lbl_title.set_halign(Gtk.Align.CENTER)
+        loader_box.pack_start(lbl_title, False, False, 0)
+        
+        lbl_proj = Gtk.Label()
+        lbl_proj.set_markup(f"<span color='#38bdf8' size='large'><b>{self.proj_name}</b></span>")
+        lbl_proj.set_halign(Gtk.Align.CENTER)
+        loader_box.pack_start(lbl_proj, False, False, 0)
         
         self.content_box.pack_start(loader_box, True, True, 0)
         self.content_box.show_all()
