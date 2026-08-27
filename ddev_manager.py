@@ -1668,6 +1668,8 @@ class DDEVManagerWindow(Gtk.Window):
         lbl_ms_desc.set_halign(Gtk.Align.START)
         self.drupal_version_box.pack_start(lbl_ms_desc, False, False, 0)
         
+        self.drupal_version_box.show_all()
+        self.drupal_version_box.set_no_show_all(True)
         box.pack_start(self.drupal_version_box, False, False, 0)
         
         # Section 3: Advanced Options Expander
@@ -1724,7 +1726,6 @@ class DDEVManagerWindow(Gtk.Window):
         self.chk_auto_install.set_active(True)
         exp_box.pack_start(self.chk_auto_install, False, False, 0)
         
-        self.drupal_version_box.set_no_show_all(True)
         self.expander_new_project.add(exp_box)
         box.pack_start(self.expander_new_project, False, False, 0)
         
@@ -1865,7 +1866,6 @@ class DDEVManagerWindow(Gtk.Window):
         
         # Options box
         self.box_import_drupal_options = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        self.box_import_drupal_options.set_no_show_all(True)
         self.chk_import_multisite = Gtk.CheckButton(label="Habilitar arquitectura Drupal Multisite (Configurar sites.php dinámico)")
         self.chk_import_multisite.set_active(True)
         self.box_import_drupal_options.pack_start(self.chk_import_multisite, False, False, 0)
@@ -1874,6 +1874,9 @@ class DDEVManagerWindow(Gtk.Window):
         lbl_ms_hint.set_markup("<small><span color='#94a3b8'>Permite crear múltiples marcas y subsitios con bases de datos y dominios independientes en este proyecto.</span></small>")
         lbl_ms_hint.set_halign(Gtk.Align.START)
         self.box_import_drupal_options.pack_start(lbl_ms_hint, False, False, 0)
+        
+        self.box_import_drupal_options.show_all()
+        self.box_import_drupal_options.set_no_show_all(True)
         self.card_import_details.pack_start(self.box_import_drupal_options, False, False, 0)
         
         self.chk_import_composer = Gtk.CheckButton(label="Ejecutar 'ddev composer install' si faltan dependencias o Drush")
@@ -1942,11 +1945,12 @@ class DDEVManagerWindow(Gtk.Window):
             is_python = fw_id in ["django", "flask"]
             
             # Show/hide Drupal version selector
-            if is_drupal:
-                self.drupal_version_box.show_all()
-                self.on_drupal_version_changed(self.combo_drupal_ver)
-            else:
-                self.drupal_version_box.hide()
+            if hasattr(self, "drupal_version_box"):
+                self.drupal_version_box.set_visible(is_drupal)
+                if is_drupal:
+                    self.on_drupal_version_changed(self.combo_drupal_ver)
+            
+            if not is_drupal:
                 php_val = self.selected_framework.get("php", "8.3")
                 for idx, text in enumerate(["8.3", "8.2", "8.1", "8.4", "8.0", "7.4"]):
                     if text == php_val:
@@ -1955,28 +1959,16 @@ class DDEVManagerWindow(Gtk.Window):
 
             # Runtime fields visibility in Advanced Options
             if hasattr(self, "lbl_new_php") and hasattr(self, "combo_php"):
-                if is_php:
-                    self.lbl_new_php.show()
-                    self.combo_php.show()
-                else:
-                    self.lbl_new_php.hide()
-                    self.combo_php.hide()
+                self.lbl_new_php.set_visible(is_php)
+                self.combo_php.set_visible(is_php)
                     
             if hasattr(self, "lbl_new_nodejs") and hasattr(self, "combo_node"):
-                if is_node:
-                    self.lbl_new_nodejs.show()
-                    self.combo_node.show()
-                else:
-                    self.lbl_new_nodejs.hide()
-                    self.combo_node.hide()
+                self.lbl_new_nodejs.set_visible(is_node)
+                self.combo_node.set_visible(is_node)
                     
             if hasattr(self, "lbl_new_python") and hasattr(self, "lbl_new_python_info"):
-                if is_python:
-                    self.lbl_new_python.show()
-                    self.lbl_new_python_info.show()
-                else:
-                    self.lbl_new_python.hide()
-                    self.lbl_new_python_info.hide()
+                self.lbl_new_python.set_visible(is_python)
+                self.lbl_new_python_info.set_visible(is_python)
 
             # Database options in Advanced Options
             if hasattr(self, "combo_db"):
@@ -2009,18 +2001,18 @@ class DDEVManagerWindow(Gtk.Window):
             if hasattr(self, "chk_auto_install"):
                 if fw_id == "drupal":
                     self.chk_auto_install.set_label("Instalar Drupal y crear superusuario administrador (admin / admin)")
-                    self.chk_auto_install.show()
+                    self.chk_auto_install.set_visible(True)
                     self.chk_auto_install.set_active(True)
                 elif fw_id == "wordpress":
                     self.chk_auto_install.set_label("Instalar WordPress y crear usuario administrador (admin / admin)")
-                    self.chk_auto_install.show()
+                    self.chk_auto_install.set_visible(True)
                     self.chk_auto_install.set_active(True)
                 elif fw_id == "django":
                     self.chk_auto_install.set_label("Crear superusuario (admin / admin) y ejecutar migraciones iniciales")
-                    self.chk_auto_install.show()
+                    self.chk_auto_install.set_visible(True)
                     self.chk_auto_install.set_active(True)
                 else:
-                    self.chk_auto_install.hide()
+                    self.chk_auto_install.set_visible(False)
 
     def on_drupal_version_changed(self, combo):
         idx = combo.get_active()
@@ -2822,35 +2814,20 @@ class DDEVManagerWindow(Gtk.Window):
         is_python = t_id in ["django", "flask"]
         
         if hasattr(self, "box_import_drupal_options"):
-            if is_dr:
-                self.box_import_drupal_options.show_all()
-            else:
-                self.box_import_drupal_options.hide()
+            self.box_import_drupal_options.set_visible(is_dr)
             
         # Runtime visibility
         if hasattr(self, "lbl_import_php") and hasattr(self, "combo_import_php"):
-            if is_php:
-                self.lbl_import_php.show()
-                self.combo_import_php.show()
-            else:
-                self.lbl_import_php.hide()
-                self.combo_import_php.hide()
+            self.lbl_import_php.set_visible(is_php)
+            self.combo_import_php.set_visible(is_php)
                 
         if hasattr(self, "lbl_import_nodejs") and hasattr(self, "combo_import_nodejs"):
-            if is_node:
-                self.lbl_import_nodejs.show()
-                self.combo_import_nodejs.show()
-            else:
-                self.lbl_import_nodejs.hide()
-                self.combo_import_nodejs.hide()
+            self.lbl_import_nodejs.set_visible(is_node)
+            self.combo_import_nodejs.set_visible(is_node)
                 
         if hasattr(self, "lbl_import_python") and hasattr(self, "lbl_import_python_info"):
-            if is_python:
-                self.lbl_import_python.show()
-                self.lbl_import_python_info.show()
-            else:
-                self.lbl_import_python.hide()
-                self.lbl_import_python_info.hide()
+            self.lbl_import_python.set_visible(is_python)
+            self.lbl_import_python_info.set_visible(is_python)
             
         # Database options
         if hasattr(self, "combo_import_db"):
@@ -2897,6 +2874,7 @@ class DDEVManagerWindow(Gtk.Window):
                 self.chk_import_composer.set_label("Instalar dependencias de Python si falta el entorno .venv/")
             else:
                 self.chk_import_composer.set_label("Instalar dependencias automáticamente si faltan")
+            self.chk_import_composer.set_visible(True)
 
     def on_import_project_clicked(self, widget):
         target_dir = self.entry_import_path.get_text().strip()
