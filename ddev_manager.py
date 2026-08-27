@@ -2663,8 +2663,24 @@ class DDEVManagerWindow(Gtk.Window):
     def on_import_type_changed(self, combo):
         t_id = combo.get_active_id() or ""
         is_dr = "drupal" in t_id
+        is_php = is_dr or t_id in ["laravel", "php", "symfony"]
+        
         if hasattr(self, "box_import_drupal_options"):
             self.box_import_drupal_options.set_visible(is_dr)
+            
+        if hasattr(self, "chk_import_composer"):
+            if is_dr:
+                self.chk_import_composer.set_label("Ejecutar 'ddev composer install' si falta vendor/ (Drush y dependencias de Drupal)")
+            elif t_id == "wordpress":
+                self.chk_import_composer.set_label("Ejecutar 'ddev composer install' si el proyecto usa Composer (Bedrock)")
+            elif is_php:
+                self.chk_import_composer.set_label("Ejecutar 'ddev composer install' si falta la carpeta vendor/")
+            elif t_id in ["generic", "react", "vue", "angular"]:
+                self.chk_import_composer.set_label("Ejecutar 'ddev npm install' si falta la carpeta node_modules/")
+            elif t_id in ["django", "flask"]:
+                self.chk_import_composer.set_label("Instalar dependencias de Python si falta el entorno .venv/")
+            else:
+                self.chk_import_composer.set_label("Instalar dependencias automáticamente si faltan")
 
     def on_import_project_clicked(self, widget):
         target_dir = self.entry_import_path.get_text().strip()
@@ -2756,7 +2772,7 @@ if (is_dir($sites_base)) {
                 set_st("Iniciando contenedores DDEV...")
                 self.run_subproc(["ddev", "start", "-y"], target_dir, dialog)
                 
-                # 4. Composer install if requested and needed
+                # 4. Dependency install if requested and needed
                 if do_composer:
                     vendor_dir = os.path.join(target_dir, "vendor")
                     composer_json = os.path.join(target_dir, "composer.json")
@@ -2765,6 +2781,22 @@ if (is_dir($sites_base)) {
                         log("📦 Ejecutando 'ddev composer install'...")
                         self.run_subproc(["ddev", "composer", "install"], target_dir, dialog)
                         log("✓ Dependencias de Composer instaladas.")
+                        
+                    node_modules = os.path.join(target_dir, "node_modules")
+                    package_json = os.path.join(target_dir, "package.json")
+                    if os.path.exists(package_json) and not os.path.exists(node_modules) and not os.path.exists(composer_json):
+                        set_st("Instalando dependencias de Node.js...")
+                        log("📦 Ejecutando 'ddev npm install'...")
+                        self.run_subproc(["ddev", "npm", "install"], target_dir, dialog)
+                        log("✓ Dependencias de Node.js instaladas.")
+                        
+                    req_txt = os.path.join(target_dir, "requirements.txt")
+                    venv_dir = os.path.join(target_dir, ".venv")
+                    if os.path.exists(req_txt) and not os.path.exists(venv_dir):
+                        set_st("Configurando entorno virtual Python e instalando dependencias...")
+                        log("🐍 Creando .venv e instalando dependencias...")
+                        self.run_subproc(["ddev", "exec", "python3 -m venv /var/www/html/.venv && /var/www/html/.venv/bin/pip install -r requirements.txt"], target_dir, dialog)
+                        log("✓ Dependencias de Python instaladas.")
                         
                 primary_url = f"https://{slug}.ddev.site"
                 log("\n" + "="*50)
