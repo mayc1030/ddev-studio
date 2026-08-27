@@ -1622,7 +1622,7 @@ class DBContainersDialog(Gtk.Dialog):
         box.pack_start(card_dbeaver, False, False, 0)
         
         # 2. phpMyAdmin in DDEV
-        has_pma = (os.path.exists(os.path.join(ddev_dir, "docker-compose.phpmyadmin.yaml")) or os.path.exists(os.path.join(ddev_dir, "addon-metadata", "phpmyadmin")))
+        has_pma = os.path.exists(os.path.join(ddev_dir, "docker-compose.phpmyadmin.yaml"))
         pma_url = f"{primary_url}:8037"
         
         card_pma = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -1673,9 +1673,9 @@ class DBContainersDialog(Gtk.Dialog):
         card_pma.pack_start(pma_actions_row, False, False, 0)
         box.pack_start(card_pma, False, False, 0)
         
-        # 3. Adminer in DDEV
-        has_adm = (os.path.exists(os.path.join(ddev_dir, "docker-compose.adminer.yaml")) or os.path.exists(os.path.join(ddev_dir, "addon-metadata", "adminer")))
-        adm_url = f"{primary_url}:8036"
+        # 3. Adminer in DDEV (Port 9101 HTTPS / 9100 HTTP)
+        has_adm = os.path.exists(os.path.join(ddev_dir, "docker-compose.adminer.yaml"))
+        adm_url = f"{primary_url}:9101"
         
         card_adm = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         card_adm.get_style_context().add_class("option-highlight-box" if has_adm else "project-card")
@@ -1703,7 +1703,7 @@ class DBContainersDialog(Gtk.Dialog):
             btn_open_adm = Gtk.Button()
             b_op_a = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
             b_op_a.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
-            b_op_a.pack_start(Gtk.Label(label="Abrir Adminer en Navegador (:8036)"), False, False, 0)
+            b_op_a.pack_start(Gtk.Label(label="Abrir Adminer en Navegador (:9101)"), False, False, 0)
             btn_open_adm.add(b_op_a)
             btn_open_adm.get_style_context().add_class("btn-primary")
             btn_open_adm.connect("clicked", lambda b, u=adm_url: webbrowser.open(u))
@@ -1737,7 +1737,6 @@ class DBContainersDialog(Gtk.Dialog):
         cb_compose_file = os.path.join(self.approot, ".ddev", "docker-compose.cloudbeaver.yaml")
         cb_base_dir = os.path.join(self.approot, ".ddev", "cloudbeaver")
         conf_dir = os.path.join(cb_base_dir, "conf")
-        ws_dir = os.path.join(cb_base_dir, "workspace")
         dialog = ProgressDialog(self.parent_view.main_app, title=f"DBeaver en Docker: {self.proj_name}")
         dialog.set_status("Configurando contenedor DBeaver (CloudBeaver)...")
         
@@ -1749,7 +1748,6 @@ class DBContainersDialog(Gtk.Dialog):
                     log("🐬 Preparando auto-configuración instantánea de DBeaver (CloudBeaver)...\n")
                     os.makedirs(conf_dir, exist_ok=True)
                     
-                    # 1. initial-data.conf (Skips initial setup wizard, enables anonymous direct access)
                     init_data_content = """{
     adminName: "admin",
     adminPassword: "admin",
@@ -1783,7 +1781,6 @@ class DBContainersDialog(Gtk.Dialog):
                         f.write(init_data_content)
                     log("✓ Modo instantáneo configurado (sin asistente inicial).\n")
                     
-                    # 2. initial-data-sources.conf (Pre-configured connection to DDEV DB)
                     db_type = self.parent_view.raw_data.get("database_type", "mariadb")
                     is_pg = ("postgres" in db_type.lower())
                     
@@ -1818,7 +1815,6 @@ class DBContainersDialog(Gtk.Dialog):
                         json.dump(init_sources, f, indent=2)
                     log("✓ Conexión a la base de datos pre-configurada (db:db@db).\n")
                     
-                    # 3. Docker Compose template
                     with open(cb_compose_file, "w", encoding="utf-8") as f:
                         f.write(CLOUDBEAVER_COMPOSE_TEMPLATE)
                     log("✓ Archivo .ddev/docker-compose.cloudbeaver.yaml creado.\n")
@@ -1826,6 +1822,8 @@ class DBContainersDialog(Gtk.Dialog):
                     log("🗑️ Eliminando configuración de DBeaver...\n")
                     if os.path.exists(cb_compose_file):
                         os.remove(cb_compose_file)
+                    if os.path.exists(cb_base_dir):
+                        shutil.rmtree(cb_base_dir, ignore_errors=True)
                 
                 log("\n🔄 Reiniciando proyecto DDEV para aplicar cambios de contenedor...\n")
                 p2 = subprocess.Popen(["ddev", "restart", "-y"], cwd=self.approot, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -1853,17 +1851,30 @@ class DBContainersDialog(Gtk.Dialog):
                     GLib.idle_add(dialog.append_log, t)
                 
                 if enable:
-                    log(f"📦 Ejecutando 'ddev get ddev/ddev-{addon_id}'...\n")
+                    log(f"📦 Instalando complemento oficial 'ddev get ddev/ddev-{addon_id}'...\n")
                     p = subprocess.Popen(["ddev", "get", f"ddev/ddev-{addon_id}"], cwd=self.approot, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                     for line in iter(p.stdout.readline, ''):
                         log(line)
                     p.stdout.close()
                     p.wait()
                 else:
-                    log(f"🗑️ Deshabilitando complemento {addon_id}...\n")
-                    f_yaml = os.path.join(self.approot, ".ddev", f"docker-compose.{addon_id}.yaml")
-                    if os.path.exists(f_yaml):
-                        os.remove(f_yaml)
+                    log(f"🗑️ Desinstalando complemento oficial {addon_id}...\n")
+                    # Try official ddev add-on remove command first
+                    p = subprocess.Popen(["ddev", "add-on", "remove", addon_id], cwd=self.approot, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                    for line in iter(p.stdout.readline, ''):
+                        log(line)
+                    p.stdout.close()
+                    p.wait()
+                    
+                    # Ensure all related files and metadata are thoroughly removed
+                    for f_name in [f"docker-compose.{addon_id}.yaml", f"docker-compose.{addon_id}_norouter.yaml"]:
+                        f_path = os.path.join(self.approot, ".ddev", f_name)
+                        if os.path.exists(f_path):
+                            os.remove(f_path)
+                    meta_dir = os.path.join(self.approot, ".ddev", "addon-metadata", addon_id)
+                    if os.path.exists(meta_dir):
+                        shutil.rmtree(meta_dir, ignore_errors=True)
+                    log(f"✓ Archivos y metadatos de {addon_id} eliminados por completo.\n")
                 
                 log(f"\n🔄 Reiniciando proyecto DDEV...\n")
                 p2 = subprocess.Popen(["ddev", "restart", "-y"], cwd=self.approot, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -1872,8 +1883,8 @@ class DBContainersDialog(Gtk.Dialog):
                 p2.stdout.close()
                 p2.wait()
                 
-                target_url = f"{self.primary_url}:8037" if addon_id == "phpmyadmin" else f"{self.primary_url}:8036"
-                GLib.idle_add(dialog.finish, True, f"{addon_id} {'habilitado con éxito' if enable else 'deshabilitado'}", target_url if enable else "", self.approot)
+                target_url = f"{self.primary_url}:8037" if addon_id == "phpmyadmin" else f"{self.primary_url}:9101"
+                GLib.idle_add(dialog.finish, True, f"{addon_id} {'habilitado con éxito' if enable else 'desinstalado con éxito'}", target_url if enable else "", self.approot)
                 GLib.idle_add(self.parent_view.refresh_details)
             except Exception as ex:
                 GLib.idle_add(dialog.finish, False, f"Error: {ex}", "", self.approot)
@@ -1931,10 +1942,32 @@ class ProjectDetailsView(Gtk.Box):
         self.content_box.set_margin_end(6)
         self.scrolled.add(self.content_box)
 
-    def get_project_db_addons(self, approot=""):
+    def get_project_db_addons(self, approot="", services=None):
         addons = []
         if not approot or not os.path.exists(approot):
             return addons
+        ddev_dir = os.path.join(approot, ".ddev")
+        services = services or {}
+        
+        # 1. DBeaver in Docker
+        if os.path.exists(os.path.join(ddev_dir, "docker-compose.cloudbeaver.yaml")):
+            cb_svc = services.get("cloudbeaver", {})
+            cb_url = cb_svc.get("https_url") if isinstance(cb_svc, dict) else None
+            addons.append({"id": "cloudbeaver", "name": "DBeaver", "port": 8979, "url": cb_url, "icon": "drive-harddisk-symbolic"})
+            
+        # 2. phpMyAdmin
+        if os.path.exists(os.path.join(ddev_dir, "docker-compose.phpmyadmin.yaml")):
+            pma_svc = services.get("phpmyadmin", {})
+            pma_url = pma_svc.get("https_url") if isinstance(pma_svc, dict) else None
+            addons.append({"id": "phpmyadmin", "name": "phpMyAdmin", "port": 8037, "url": pma_url, "icon": "web-browser-symbolic"})
+            
+        # 3. Adminer (Default DDEV port 9101 HTTPS / 9100 HTTP)
+        if os.path.exists(os.path.join(ddev_dir, "docker-compose.adminer.yaml")):
+            adm_svc = services.get("adminer", {})
+            adm_url = adm_svc.get("https_url") if isinstance(adm_svc, dict) else None
+            addons.append({"id": "adminer", "name": "Adminer", "port": 9101, "url": adm_url, "icon": "web-browser-symbolic"})
+            
+        return addons
         ddev_dir = os.path.join(approot, ".ddev")
         
         # DBeaver in Docker
@@ -2179,7 +2212,7 @@ class ProjectDetailsView(Gtk.Box):
         btn_copy_db.connect("clicked", lambda b, text=raw_db_creds: self.copy_to_clipboard(text, "Credenciales copiadas al portapapeles"))
         db_btn_row.pack_start(btn_copy_db, False, False, 0)
         
-        active_addons = self.get_project_db_addons(approot)
+        active_addons = self.get_project_db_addons(approot, services)
         
         if is_running and active_addons:
             for ad in active_addons:
@@ -2190,7 +2223,7 @@ class ProjectDetailsView(Gtk.Box):
                 btn_ad.add(b_ad)
                 btn_ad.get_style_context().add_class("btn-primary" if "DBeaver" in ad['name'] else "btn-quick")
                 target_port = ad["port"]
-                ad_url = f"{primary_url}:{target_port}"
+                ad_url = ad.get("url") or f"{primary_url}:{target_port}"
                 btn_ad.set_tooltip_text(f"Abrir interfaz de {ad['name']} ({ad_url})")
                 btn_ad.connect("clicked", lambda b, u=ad_url: webbrowser.open(u))
                 db_btn_row.pack_start(btn_ad, False, False, 0)
