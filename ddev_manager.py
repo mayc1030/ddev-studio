@@ -1518,6 +1518,416 @@ if (!file_exists('/var/acquia')) {
             threading.Thread(target=task, daemon=True).start()
 
 
+class ProjectDetailsView(Gtk.Box):
+    def __init__(self, main_app):
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        self.main_app = main_app
+        self.proj = {}
+        self.proj_name = ""
+        self.base_dir = ""
+        self.raw_data = {}
+        
+        self.set_margin_start(16)
+        self.set_margin_end(16)
+        self.set_margin_top(10)
+        self.set_margin_bottom(14)
+        
+        # 0. Top Navigation Bar
+        nav_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        nav_bar.get_style_context().add_class("nav-bar-box")
+        
+        self.btn_back = Gtk.Button()
+        btn_back_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        btn_back_box.pack_start(Gtk.Image.new_from_icon_name("go-previous-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+        btn_back_box.pack_start(Gtk.Label(label="Volver a Mis Proyectos"), False, False, 0)
+        self.btn_back.add(btn_back_box)
+        self.btn_back.get_style_context().add_class("btn-back")
+        self.btn_back.connect("clicked", lambda b: self.main_app.show_projects_list())
+        nav_bar.pack_start(self.btn_back, False, False, 0)
+        
+        self.lbl_breadcrumb = Gtk.Label()
+        self.lbl_breadcrumb.set_markup("<span color='#94a3b8'>Mis Proyectos / </span><b>Detalles del Proyecto</b>")
+        self.lbl_breadcrumb.set_halign(Gtk.Align.START)
+        nav_bar.pack_start(self.lbl_breadcrumb, True, True, 0)
+        
+        btn_refresh = Gtk.Button()
+        btn_refresh.add(Gtk.Image.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON))
+        btn_refresh.set_tooltip_text("Refrescar detalles y estado en vivo")
+        btn_refresh.connect("clicked", lambda b: self.refresh_details())
+        nav_bar.pack_start(btn_refresh, False, False, 0)
+        
+        self.pack_start(nav_bar, False, False, 0)
+        
+        # Scrolled content
+        self.scrolled = Gtk.ScrolledWindow()
+        self.scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.scrolled.set_vexpand(True)
+        self.pack_start(self.scrolled, True, True, 0)
+        
+        self.content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.content_box.set_margin_top(4)
+        self.content_box.set_margin_end(6)
+        self.scrolled.add(self.content_box)
+
+    def load_project_details(self, proj):
+        self.proj = proj
+        self.proj_name = proj.get("name", "")
+        self.base_dir = proj.get("approot", "")
+        self.lbl_breadcrumb.set_markup(f"<span color='#94a3b8'>Mis Proyectos / </span><b>{self.proj_name}</b> <span color='#0284c7'>[Detalles y Servicios]</span>")
+        self.refresh_details()
+
+    def refresh_details(self):
+        for child in self.content_box.get_children():
+            self.content_box.remove(child)
+            
+        loading_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        loading_box.set_margin_top(30)
+        loading_lbl = Gtk.Label()
+        loading_lbl.set_markup(f"<b>Obteniendo radiografía en vivo de <i>{self.proj_name}</i> (ddev describe)...</b>")
+        loading_box.pack_start(loading_lbl, True, True, 0)
+        self.content_box.pack_start(loading_box, True, True, 0)
+        self.content_box.show_all()
+        
+        def fetch():
+            try:
+                res = subprocess.run(["ddev", "describe", "-j", self.proj_name], capture_output=True, text=True, timeout=15)
+                raw_data = None
+                for line in res.stdout.splitlines():
+                    line = line.strip()
+                    if line.startswith("{") and "raw" in line:
+                        try:
+                            parsed = json.loads(line)
+                            if "raw" in parsed:
+                                raw_data = parsed["raw"]
+                                break
+                        except Exception:
+                            pass
+                if not raw_data:
+                    # fallback to project dict
+                    raw_data = self.proj
+            except Exception:
+                raw_data = self.proj
+                
+            GLib.idle_add(self.render_details_ui, raw_data)
+            
+        threading.Thread(target=fetch, daemon=True).start()
+
+    def render_details_ui(self, data):
+        for child in self.content_box.get_children():
+            self.content_box.remove(child)
+            
+        self.raw_data = data or {}
+        pname = self.raw_data.get("name", self.proj_name)
+        status = self.raw_data.get("status", "stopped").lower()
+        is_running = ("running" in status or "ok" in status)
+        ptype = self.raw_data.get("type", self.proj.get("type", "generic"))
+        approot = self.raw_data.get("approot", self.base_dir)
+        php_ver = self.raw_data.get("php_version", "N/A")
+        node_ver = self.raw_data.get("nodejs_version", "N/A")
+        docroot = self.raw_data.get("docroot", "")
+        webserver = self.raw_data.get("webserver_type", "nginx-fpm")
+        primary_url = self.raw_data.get("primary_url", f"https://{pname}.ddev.site")
+        mailpit_url = self.raw_data.get("mailpit_https_url") or self.raw_data.get("mailpit_url") or f"https://{pname}.ddev.site:8026"
+        is_xdebug = self.raw_data.get("xdebug_enabled", False)
+        
+        # 1. Header Overview Card
+        header_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        header_card.get_style_context().add_class("option-highlight-box")
+        
+        top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        
+        # Find icon
+        icon_file = "ddev.svg"
+        for fw_cand in ["drupal", "wordpress", "laravel", "django", "flask", "angular", "react", "vue", "php", "symfony"]:
+            if fw_cand in ptype.lower():
+                icon_file = f"{fw_cand}.svg"
+                break
+        pix = load_icon(icon_file, 36)
+        if pix:
+            top_row.pack_start(Gtk.Image.new_from_pixbuf(pix), False, False, 0)
+            
+        title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+        t_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        lbl_name = Gtk.Label()
+        lbl_name.set_markup(f"<big><b>{pname}</b></big>")
+        t_row.pack_start(lbl_name, False, False, 0)
+        
+        # Status badge
+        lbl_st = Gtk.Label(label="EN EJECUCIÓN" if is_running else "DETENIDO")
+        lbl_st.get_style_context().add_class("badge")
+        lbl_st.get_style_context().add_class("badge-running" if is_running else "badge-stopped")
+        t_row.pack_start(lbl_st, False, False, 0)
+        
+        # Type badge
+        lbl_type = Gtk.Label(label=ptype.upper())
+        lbl_type.get_style_context().add_class("badge")
+        lbl_type.get_style_context().add_class("badge-tech")
+        t_row.pack_start(lbl_type, False, False, 0)
+        title_box.pack_start(t_row, False, False, 0)
+        
+        lbl_path = Gtk.Label()
+        lbl_path.set_markup(f"<small><span color='#94a3b8'>📁 <b>Ubicación:</b> {approot}</span></small>")
+        lbl_path.set_halign(Gtk.Align.START)
+        title_box.pack_start(lbl_path, False, False, 0)
+        top_row.pack_start(title_box, True, True, 0)
+        
+        header_card.pack_start(top_row, False, False, 0)
+        
+        # Action buttons row
+        btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        
+        btn_toggle = Gtk.Button()
+        b_t = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        if is_running:
+            b_t.pack_start(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_t.pack_start(Gtk.Label(label="Detener DDEV"), False, False, 0)
+            btn_toggle.add(b_t)
+            btn_toggle.connect("clicked", lambda b: self.execute_action_and_refresh("stop"))
+        else:
+            b_t.pack_start(Gtk.Image.new_from_icon_name("media-playback-start-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_t.pack_start(Gtk.Label(label="Iniciar DDEV"), False, False, 0)
+            btn_toggle.add(b_t)
+            btn_toggle.get_style_context().add_class("btn-primary")
+            btn_toggle.connect("clicked", lambda b: self.execute_action_and_refresh("start"))
+        btn_row.pack_start(btn_toggle, False, False, 0)
+        
+        if primary_url and is_running:
+            btn_web = Gtk.Button()
+            b_web = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_web.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_web.pack_start(Gtk.Label(label="Abrir Web"), False, False, 0)
+            btn_web.add(b_web)
+            btn_web.connect("clicked", lambda b, u=primary_url: webbrowser.open(u))
+            btn_row.pack_start(btn_web, False, False, 0)
+            
+        if is_running:
+            btn_mailpit = Gtk.Button()
+            b_mp = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_mp.pack_start(Gtk.Image.new_from_icon_name("mail-unread-symbolic" if Gtk.IconTheme.get_default().has_icon("mail-unread-symbolic") else "document-send-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_mp.pack_start(Gtk.Label(label="Bandeja Mailpit"), False, False, 0)
+            btn_mailpit.add(b_mp)
+            btn_mailpit.set_tooltip_text(f"Abrir capturador de correos Mailpit ({mailpit_url})")
+            btn_mailpit.connect("clicked", lambda b, u=mailpit_url: webbrowser.open(u))
+            btn_row.pack_start(btn_mailpit, False, False, 0)
+            
+        btn_folder = Gtk.Button()
+        b_fold = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_fold.pack_start(Gtk.Image.new_from_icon_name("folder-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_fold.pack_start(Gtk.Label(label="Carpeta"), False, False, 0)
+        btn_folder.add(b_fold)
+        btn_folder.connect("clicked", lambda b, p=approot: subprocess.Popen(["xdg-open", p]))
+        btn_row.pack_start(btn_folder, False, False, 0)
+        
+        btn_term = Gtk.Button()
+        b_term = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_term.pack_start(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_term.pack_start(Gtk.Label(label="Terminal"), False, False, 0)
+        btn_term.add(b_term)
+        btn_term.connect("clicked", lambda b, p=approot: self.main_app.open_terminal(p))
+        btn_row.pack_start(btn_term, False, False, 0)
+        
+        header_card.pack_start(btn_row, False, False, 0)
+        self.content_box.pack_start(header_card, False, False, 0)
+        
+        # 2. Database Card (Connection & Credentials)
+        db_info = self.raw_data.get("dbinfo") or {}
+        db_type = self.raw_data.get("database_type", self.raw_data.get("db_type", "mariadb"))
+        db_ver = self.raw_data.get("database_version", "10.11")
+        db_name = db_info.get("dbname", "db")
+        db_user = db_info.get("username", "db")
+        db_pass = db_info.get("password", "db")
+        db_in_port = db_info.get("dbPort", "3306")
+        db_pub_port = db_info.get("published_port", -1)
+        ext_port_str = str(db_pub_port) if (db_pub_port and db_pub_port > 0) else f"{db_in_port} (Automático)"
+        
+        db_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        db_card.get_style_context().add_class("project-card")
+        
+        db_title_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        db_title_row.pack_start(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        lbl_db_title = Gtk.Label()
+        lbl_db_title.set_markup("<b>Base de Datos &amp; Conexión Externa</b>")
+        db_title_row.pack_start(lbl_db_title, False, False, 0)
+        db_card.pack_start(db_title_row, False, False, 0)
+        
+        grid_db = Gtk.Grid()
+        grid_db.set_column_spacing(20)
+        grid_db.set_row_spacing(6)
+        
+        # Col 1
+        grid_db.attach(Gtk.Label(label="Motor:", halign=Gtk.Align.END), 0, 0, 1, 1)
+        grid_db.attach(Gtk.Label(label=f"<b>{db_type.upper()} {db_ver}</b>", use_markup=True, halign=Gtk.Align.START), 1, 0, 1, 1)
+        
+        grid_db.attach(Gtk.Label(label="Host Local:", halign=Gtk.Align.END), 0, 1, 1, 1)
+        grid_db.attach(Gtk.Label(label="<b>127.0.0.1</b> (o <tt>localhost</tt>)", use_markup=True, halign=Gtk.Align.START), 1, 1, 1, 1)
+        
+        grid_db.attach(Gtk.Label(label="Puerto Externo:", halign=Gtk.Align.END), 0, 2, 1, 1)
+        grid_db.attach(Gtk.Label(label=f"<b>{ext_port_str}</b>", use_markup=True, halign=Gtk.Align.START), 1, 2, 1, 1)
+        
+        # Col 2
+        grid_db.attach(Gtk.Label(label="Base de datos:", halign=Gtk.Align.END), 2, 0, 1, 1)
+        grid_db.attach(Gtk.Label(label=f"<tt><b>{db_name}</b></tt>", use_markup=True, halign=Gtk.Align.START), 3, 0, 1, 1)
+        
+        grid_db.attach(Gtk.Label(label="Usuario:", halign=Gtk.Align.END), 2, 1, 1, 1)
+        grid_db.attach(Gtk.Label(label=f"<tt><b>{db_user}</b></tt> (o <tt>root</tt>)", use_markup=True, halign=Gtk.Align.START), 3, 1, 1, 1)
+        
+        grid_db.attach(Gtk.Label(label="Contraseña:", halign=Gtk.Align.END), 2, 2, 1, 1)
+        grid_db.attach(Gtk.Label(label=f"<tt><b>{db_pass}</b></tt> (o <tt>root</tt>)", use_markup=True, halign=Gtk.Align.START), 3, 2, 1, 1)
+        
+        db_card.pack_start(grid_db, False, False, 0)
+        
+        # DB Buttons
+        db_btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        db_btn_row.set_margin_top(4)
+        
+        raw_db_creds = f"Host: 127.0.0.1\nPort: {ext_port_str}\nDatabase: {db_name}\nUsername: {db_user}\nPassword: {db_pass}\nURL: {db_type}://{db_user}:{db_pass}@127.0.0.1:{ext_port_str}/{db_name}"
+        
+        btn_copy_db = Gtk.Button()
+        b_c = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_c.pack_start(Gtk.Image.new_from_icon_name("edit-copy-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_c.pack_start(Gtk.Label(label="Copiar Credenciales para DBeaver / TablePlus"), False, False, 0)
+        btn_copy_db.add(b_c)
+        btn_copy_db.connect("clicked", lambda b, text=raw_db_creds: self.copy_to_clipboard(text, "Credenciales copiadas al portapapeles"))
+        db_btn_row.pack_start(btn_copy_db, False, False, 0)
+        
+        if is_running:
+            btn_launch_db = Gtk.Button()
+            b_ld = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_ld.pack_start(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_ld.pack_start(Gtk.Label(label="Abrir Consola MySQL / DB"), False, False, 0)
+            btn_launch_db.add(b_ld)
+            btn_launch_db.connect("clicked", lambda b: self.main_app.open_terminal(approot, "ddev mysql" if "postgres" not in db_type else "ddev psql"))
+            db_btn_row.pack_start(btn_launch_db, False, False, 0)
+            
+        db_card.pack_start(db_btn_row, False, False, 0)
+        self.content_box.pack_start(db_card, False, False, 0)
+        
+        # 3. Environment & Runtime Card (Webserver, PHP, Node.js, Xdebug)
+        env_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        env_card.get_style_context().add_class("project-card")
+        
+        env_title_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        env_title_row.pack_start(Gtk.Image.new_from_icon_name("preferences-system-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        lbl_env_title = Gtk.Label()
+        lbl_env_title.set_markup("<b>Servidor Web, Runtimes &amp; Depuración</b>")
+        env_title_row.pack_start(lbl_env_title, False, False, 0)
+        env_card.pack_start(env_title_row, False, False, 0)
+        
+        grid_env = Gtk.Grid()
+        grid_env.set_column_spacing(20)
+        grid_env.set_row_spacing(6)
+        
+        grid_env.attach(Gtk.Label(label="Servidor Web:", halign=Gtk.Align.END), 0, 0, 1, 1)
+        grid_env.attach(Gtk.Label(label=f"<b>{webserver}</b>", use_markup=True, halign=Gtk.Align.START), 1, 0, 1, 1)
+        
+        grid_env.attach(Gtk.Label(label="Directorio Web (Docroot):", halign=Gtk.Align.END), 0, 1, 1, 1)
+        grid_env.attach(Gtk.Label(label=f"<tt><b>{docroot if docroot else '.'}</b></tt>", use_markup=True, halign=Gtk.Align.START), 1, 1, 1, 1)
+        
+        grid_env.attach(Gtk.Label(label="Versión de PHP:", halign=Gtk.Align.END), 2, 0, 1, 1)
+        grid_env.attach(Gtk.Label(label=f"<b>PHP {php_ver}</b>", use_markup=True, halign=Gtk.Align.START), 3, 0, 1, 1)
+        
+        grid_env.attach(Gtk.Label(label="Versión de Node.js:", halign=Gtk.Align.END), 2, 1, 1, 1)
+        grid_env.attach(Gtk.Label(label=f"<b>Node.js v{node_ver}</b>" if node_ver else "<b>No activo</b>", use_markup=True, halign=Gtk.Align.START), 3, 1, 1, 1)
+        
+        grid_env.attach(Gtk.Label(label="Xdebug:", halign=Gtk.Align.END), 0, 2, 1, 1)
+        xdbg_st = "<span color='#10b981'><b>ACTIVO (Enabled)</b></span>" if is_xdebug else "<span color='#94a3b8'>Desactivado</span>"
+        grid_env.attach(Gtk.Label(label=xdbg_st, use_markup=True, halign=Gtk.Align.START), 1, 2, 1, 1)
+        
+        env_card.pack_start(grid_env, False, False, 0)
+        
+        # Xdebug button
+        if is_running:
+            env_btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            env_btn_row.set_margin_top(4)
+            
+            btn_xdebug = Gtk.Button()
+            b_xd = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_xd.pack_start(Gtk.Image.new_from_icon_name("system-run-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            lbl_xd_btn = "Desactivar Xdebug (ddev xdebug off)" if is_xdebug else "Activar Xdebug (ddev xdebug on)"
+            b_xd.pack_start(Gtk.Label(label=lbl_xd_btn), False, False, 0)
+            btn_xdebug.add(b_xd)
+            btn_xdebug.connect("clicked", lambda b: self.toggle_xdebug(not is_xdebug))
+            env_btn_row.pack_start(btn_xdebug, False, False, 0)
+            
+            env_card.pack_start(env_btn_row, False, False, 0)
+            
+        self.content_box.pack_start(env_card, False, False, 0)
+        
+        # 4. Registered URLs and Domains Card
+        urls_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        urls_card.get_style_context().add_class("project-card")
+        
+        url_title_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        url_title_row.pack_start(Gtk.Image.new_from_icon_name("network-server-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        lbl_u_title = Gtk.Label()
+        lbl_u_title.set_markup("<b>Dominios &amp; URLs Registradas en este Proyecto</b>")
+        url_title_row.pack_start(lbl_u_title, False, False, 0)
+        urls_card.pack_start(url_title_row, False, False, 0)
+        
+        hostnames = self.raw_data.get("hostnames") or []
+        if not hostnames and primary_url:
+            hostnames = [primary_url.replace("https://", "").replace("http://", "")]
+            
+        for h in hostnames:
+            h_url = f"https://{h}"
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+            lbl_item = Gtk.Label()
+            lbl_item.set_markup(f"<a href='{h_url}'><b>{h_url}</b></a>")
+            lbl_item.set_halign(Gtk.Align.START)
+            row.pack_start(lbl_item, True, True, 0)
+            
+            btn_op = Gtk.Button()
+            btn_op.add(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU))
+            btn_op.set_tooltip_text(f"Abrir {h_url} en el navegador")
+            btn_op.connect("clicked", lambda b, u=h_url: webbrowser.open(u))
+            row.pack_start(btn_op, False, False, 0)
+            
+            btn_cp = Gtk.Button()
+            btn_cp.add(Gtk.Image.new_from_icon_name("edit-copy-symbolic", Gtk.IconSize.MENU))
+            btn_cp.set_tooltip_text(f"Copiar {h_url}")
+            btn_cp.connect("clicked", lambda b, u=h_url: self.copy_to_clipboard(u, "URL copiada"))
+            row.pack_start(btn_cp, False, False, 0)
+            
+            urls_card.pack_start(row, False, False, 0)
+            
+        self.content_box.pack_start(urls_card, False, False, 0)
+        self.content_box.show_all()
+
+    def copy_to_clipboard(self, text, message="Copiado al portapapeles"):
+        clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        clipboard.set_text(text, -1)
+        clipboard.store()
+        dialog = Gtk.MessageDialog(
+            transient_for=self.main_app,
+            flags=0,
+            message_type=Gtk.MessageType.INFO,
+            buttons=Gtk.ButtonsType.OK,
+            text=message
+        )
+        dialog.format_secondary_text(f"Contenido:\n{text}")
+        dialog.run()
+        dialog.destroy()
+
+    def toggle_xdebug(self, enable):
+        cmd = ["ddev", "xdebug", "on"] if enable else ["ddev", "xdebug", "off"]
+        pname = self.proj_name
+        dialog = ProgressDialog(self.main_app, title=f"Xdebug: {pname}")
+        dialog.set_status(f"Cambiando Xdebug a {'ON' if enable else 'OFF'}...")
+        def task():
+            p = subprocess.Popen(cmd, cwd=self.base_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            for line in iter(p.stdout.readline, ''):
+                GLib.idle_add(dialog.append_log, line)
+            p.stdout.close()
+            p.wait()
+            GLib.idle_add(dialog.finish, p.returncode == 0, f"Xdebug {'activado' if enable else 'desactivado'}")
+            GLib.idle_add(self.refresh_details)
+        threading.Thread(target=task, daemon=True).start()
+
+    def execute_action_and_refresh(self, action):
+        p = self.proj
+        self.main_app.execute_simple_action(action, p)
+        GLib.timeout_add(1500, self.refresh_details)
+
 class DDEVManagerWindow(Gtk.Window):
     def __init__(self):
         super().__init__(title="DDEV Studio")
@@ -2191,6 +2601,10 @@ class DDEVManagerWindow(Gtk.Window):
         self.subsites_manager_view = SubsitesManagerView(self)
         self.stack_projects_tab.add_named(self.subsites_manager_view, "subsites")
         
+        # View 3: Project Details Embedded View
+        self.project_details_view = ProjectDetailsView(self)
+        self.stack_projects_tab.add_named(self.project_details_view, "details")
+        
         return self.stack_projects_tab
 
     def refresh_projects(self):
@@ -2493,6 +2907,12 @@ class DDEVManagerWindow(Gtk.Window):
             btn_term.connect("clicked", lambda b, path=approot: self.open_terminal(path))
             actions_box.pack_start(btn_term, False, False, 0)
             
+        btn_details = Gtk.Button()
+        btn_details.add(Gtk.Image.new_from_icon_name("dialog-information-symbolic", Gtk.IconSize.BUTTON))
+        btn_details.set_tooltip_text("Ver detalles, servicios y credenciales de este proyecto (ddev describe)")
+        btn_details.connect("clicked", lambda b, p=proj: self.open_project_details(p))
+        actions_box.pack_start(btn_details, False, False, 0)
+        
         btn_del = Gtk.Button()
         btn_del.add(Gtk.Image.new_from_icon_name("user-trash-symbolic", Gtk.IconSize.BUTTON))
         btn_del.set_tooltip_text("Eliminar proyecto DDEV")
@@ -2882,6 +3302,10 @@ class DDEVManagerWindow(Gtk.Window):
     def open_subsites_manager(self, proj):
         self.subsites_manager_view.load_project(proj)
         self.stack_projects_tab.set_visible_child_name("subsites")
+
+    def open_project_details(self, proj):
+        self.project_details_view.load_project_details(proj)
+        self.stack_projects_tab.set_visible_child_name("details")
 
     def show_projects_list(self):
         self.stack_projects_tab.set_visible_child_name("list")
