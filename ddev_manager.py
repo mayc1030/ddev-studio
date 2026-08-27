@@ -1667,7 +1667,7 @@ class DDEVManagerWindow(Gtk.Window):
         box.pack_start(self.drupal_version_box, False, False, 0)
         
         # Section 3: Advanced Options Expander
-        expander = Gtk.Expander(label="Opciones avanzadas (PHP, Base de datos, etc.)")
+        self.expander_new_project = Gtk.Expander(label="Opciones avanzadas (Entorno, Base de datos, etc.)")
         exp_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         exp_box.set_margin_top(10)
         exp_box.set_margin_start(16)
@@ -1677,33 +1677,44 @@ class DDEVManagerWindow(Gtk.Window):
         grid_adv.set_row_spacing(8)
         exp_box.pack_start(grid_adv, False, False, 0)
         
-        grid_adv.attach(Gtk.Label(label="Versión de PHP:", halign=Gtk.Align.END), 0, 0, 1, 1)
+        # Row 0 - PHP Version
+        self.lbl_new_php = Gtk.Label(label="Versión de PHP:", halign=Gtk.Align.END)
+        grid_adv.attach(self.lbl_new_php, 0, 0, 1, 1)
         self.combo_php = Gtk.ComboBoxText()
         for v in ["8.3", "8.2", "8.1", "8.4", "8.0", "7.4"]:
             self.combo_php.append_text(v)
         self.combo_php.set_active(0)
         grid_adv.attach(self.combo_php, 1, 0, 1, 1)
-        
-        grid_adv.attach(Gtk.Label(label="Base de datos:", halign=Gtk.Align.END), 0, 1, 1, 1)
-        self.combo_db = Gtk.ComboBoxText()
-        for db in ["mariadb:10.11", "mysql:8.0", "postgres:16", "mariadb:10.5"]:
-            self.combo_db.append_text(db)
-        self.combo_db.set_active(0)
-        grid_adv.attach(self.combo_db, 1, 1, 1, 1)
-        
-        grid_adv.attach(Gtk.Label(label="Node.js:", halign=Gtk.Align.END), 0, 2, 1, 1)
+
+        # Row 0 - Node.js Version
+        self.lbl_new_nodejs = Gtk.Label(label="Versión de Node.js:", halign=Gtk.Align.END)
+        grid_adv.attach(self.lbl_new_nodejs, 0, 0, 1, 1)
         self.combo_node = Gtk.ComboBoxText()
         for n in ["22", "20", "18"]:
-            self.combo_node.append_text(n)
-        self.combo_node.set_active(0)
-        grid_adv.attach(self.combo_node, 1, 2, 1, 1)
+            self.combo_node.append(n, f"Node.js v{n}")
+        self.combo_node.set_active_id("22")
+        grid_adv.attach(self.combo_node, 1, 0, 1, 1)
+
+        # Row 0 - Python Runtime Info
+        self.lbl_new_python = Gtk.Label(label="Entorno de Ejecución:", halign=Gtk.Align.END)
+        grid_adv.attach(self.lbl_new_python, 0, 0, 1, 1)
+        self.lbl_new_python_info = Gtk.Label(halign=Gtk.Align.START)
+        self.lbl_new_python_info.set_markup("<span color='#38bdf8'><b>🐍 Python 3.x con entorno virtual .venv aislado</b></span>")
+        grid_adv.attach(self.lbl_new_python_info, 1, 0, 1, 1)
         
-        self.chk_auto_install = Gtk.CheckButton(label="Ejecutar instalador inicial automático (ej. crear admin/admin en WP/Drupal)")
+        # Row 1 - Database
+        self.lbl_new_db = Gtk.Label(label="Base de datos:", halign=Gtk.Align.END)
+        grid_adv.attach(self.lbl_new_db, 0, 1, 1, 1)
+        self.combo_db = Gtk.ComboBoxText()
+        grid_adv.attach(self.combo_db, 1, 1, 1, 1)
+        
+        # Auto install checkbox
+        self.chk_auto_install = Gtk.CheckButton(label="Instalar CMS y crear superusuario administrador (admin / admin)")
         self.chk_auto_install.set_active(True)
         exp_box.pack_start(self.chk_auto_install, False, False, 0)
         
-        expander.add(exp_box)
-        box.pack_start(expander, False, False, 0)
+        self.expander_new_project.add(exp_box)
+        box.pack_start(self.expander_new_project, False, False, 0)
         
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         btn_box.set_margin_top(16)
@@ -1718,8 +1729,7 @@ class DDEVManagerWindow(Gtk.Window):
         first_child = self.flowbox_fw.get_child_at_index(0)
         if first_child:
             self.flowbox_fw.select_child(first_child)
-            self.selected_framework = FRAMEWORKS[0]
-            self.drupal_version_box.show()
+            self.on_framework_selected(self.flowbox_fw, first_child)
             
         return box
 
@@ -1907,8 +1917,13 @@ class DDEVManagerWindow(Gtk.Window):
             self.selected_framework = widget.fw_data
             fw_id = self.selected_framework["id"]
             
+            is_drupal = (fw_id == "drupal")
+            is_php = fw_id in ["drupal", "wordpress", "laravel", "symfony", "php"]
+            is_node = fw_id in ["angular", "react", "vue", "generic"]
+            is_python = fw_id in ["django", "flask"]
+            
             # Show/hide Drupal version selector
-            if fw_id == "drupal":
+            if is_drupal:
                 self.drupal_version_box.show()
                 self.on_drupal_version_changed(self.combo_drupal_ver)
             else:
@@ -1918,6 +1933,61 @@ class DDEVManagerWindow(Gtk.Window):
                     if text == php_val:
                         self.combo_php.set_active(idx)
                         break
+
+            # Runtime fields visibility in Advanced Options
+            if hasattr(self, "lbl_new_php") and hasattr(self, "combo_php"):
+                self.lbl_new_php.set_visible(is_php)
+                self.combo_php.set_visible(is_php)
+            if hasattr(self, "lbl_new_nodejs") and hasattr(self, "combo_node"):
+                self.lbl_new_nodejs.set_visible(is_node)
+                self.combo_node.set_visible(is_node)
+            if hasattr(self, "lbl_new_python") and hasattr(self, "lbl_new_python_info"):
+                self.lbl_new_python.set_visible(is_python)
+                self.lbl_new_python_info.set_visible(is_python)
+
+            # Database options in Advanced Options
+            if hasattr(self, "combo_db"):
+                curr_db = self.combo_db.get_active_id()
+                self.combo_db.remove_all()
+                if is_node:
+                    self.combo_db.append("none", "🚫 Ninguna (Solo Frontend / Ahorro de RAM)")
+                    self.combo_db.append("mariadb:10.11", "MariaDB 10.11")
+                    self.combo_db.append("mysql:8.0", "MySQL 8.0")
+                    self.combo_db.append("postgres:16", "PostgreSQL 16")
+                    self.combo_db.set_active_id("none")
+                elif fw_id == "django":
+                    self.combo_db.append("postgres:16", "PostgreSQL 16 (Recomendada)")
+                    self.combo_db.append("mysql:8.0", "MySQL 8.0")
+                    self.combo_db.append("mariadb:10.11", "MariaDB 10.11")
+                    self.combo_db.set_active_id("postgres:16")
+                elif fw_id == "flask":
+                    self.combo_db.append("mariadb:10.11", "MariaDB 10.11 (Recomendada)")
+                    self.combo_db.append("postgres:16", "PostgreSQL 16")
+                    self.combo_db.append("mysql:8.0", "MySQL 8.0")
+                    self.combo_db.set_active_id("mariadb:10.11")
+                else:
+                    self.combo_db.append("mariadb:10.11", "MariaDB 10.11 (Recomendada)")
+                    self.combo_db.append("mysql:8.0", "MySQL 8.0")
+                    self.combo_db.append("postgres:16", "PostgreSQL 16")
+                    self.combo_db.append("mariadb:10.5", "MariaDB 10.5")
+                    self.combo_db.set_active_id("mariadb:10.11")
+
+            # Checkbox auto-install contextual
+            if hasattr(self, "chk_auto_install"):
+                if fw_id == "drupal":
+                    self.chk_auto_install.set_label("Instalar Drupal y crear superusuario administrador (admin / admin)")
+                    self.chk_auto_install.set_visible(True)
+                    self.chk_auto_install.set_active(True)
+                elif fw_id == "wordpress":
+                    self.chk_auto_install.set_label("Instalar WordPress y crear usuario administrador (admin / admin)")
+                    self.chk_auto_install.set_visible(True)
+                    self.chk_auto_install.set_active(True)
+                elif fw_id == "django":
+                    self.chk_auto_install.set_label("Crear superusuario (admin / admin) y ejecutar migraciones iniciales")
+                    self.chk_auto_install.set_visible(True)
+                    self.chk_auto_install.set_active(True)
+                else:
+                    self.chk_auto_install.set_visible(False)
 
     def on_drupal_version_changed(self, combo):
         idx = combo.get_active()
@@ -3057,7 +3127,8 @@ if (is_dir($sites_base)) {
                 drupal_ver_info = DRUPAL_VERSIONS[idx]
 
         php_version = self.combo_php.get_active_text() or fw.get("php", "8.3")
-        db_type = self.combo_db.get_active_text() or fw.get("db", "mariadb:10.11")
+        db_type = self.combo_db.get_active_id() or self.combo_db.get_active_text() or fw.get("db", "mariadb:10.11")
+        node_version = self.combo_node.get_active_id() or self.combo_node.get_active_text() or fw.get("nodejs", "22")
         node_version = self.combo_node.get_active_text() or "22"
         auto_install = self.chk_auto_install.get_active()
         
@@ -3562,6 +3633,10 @@ web_extra_daemons:
                         f"--nodejs-version={node_version}",
                         "--web-environment-add=NG_CLI_ANALYTICS=false"
                     ]
+                    if db_type == "none":
+                        cfg_cmd.append("--omit-containers=db")
+                    else:
+                        cfg_cmd.append(f"--database={db_type}")
                     self.run_subproc(cfg_cmd, target_dir, dialog)
 
                     set_st("Iniciando contenedores DDEV...")
