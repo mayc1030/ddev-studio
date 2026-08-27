@@ -1518,11 +1518,25 @@ if (!file_exists('/var/acquia')) {
             threading.Thread(target=task, daemon=True).start()
 
 
-class InstallDBClientDialog(Gtk.Dialog):
+CLOUDBEAVER_COMPOSE_TEMPLATE = """#ddev-generated
+services:
+  cloudbeaver:
+    container_name: ddev-${DDEV_SITENAME}-cloudbeaver
+    image: dbeaver/cloudbeaver:latest
+    restart: "no"
+    labels:
+      com.ddev.site-name: ${DDEV_SITENAME}
+      com.ddev.approot: ${DDEV_APPROOT}
+    environment:
+      - VIRTUAL_HOST=${DDEV_HOSTNAME}
+      - HTTP_EXPOSE=8978:8978
+      - HTTPS_EXPOSE=8979:8978
+"""
+
+class DBContainersDialog(Gtk.Dialog):
     def __init__(self, parent_view, approot, proj_name, primary_url):
-        # transient_for must be a Gtk.Window (parent_view.main_app)
-        super().__init__(title="Gestor de Bases de Datos", transient_for=parent_view.main_app, modal=True)
-        self.set_default_size(560, 480)
+        super().__init__(title="Gestores de Base de Datos en Docker", transient_for=parent_view.main_app, modal=True)
+        self.set_default_size(600, 520)
         self.approot = approot
         self.proj_name = proj_name
         self.primary_url = primary_url
@@ -1536,105 +1550,173 @@ class InstallDBClientDialog(Gtk.Dialog):
         box.set_margin_bottom(16)
         
         lbl_title = Gtk.Label()
-        lbl_title.set_markup("<big><b>Gestores Visuales de Base de Datos</b></big>")
+        lbl_title.set_markup("<big><b>Gestores de Base de Datos en Contenedor (Docker)</b></big>")
         lbl_title.set_halign(Gtk.Align.START)
         box.pack_start(lbl_title, False, False, 0)
         
         lbl_desc = Gtk.Label()
-        lbl_desc.set_markup(f"<small><span color='#94a3b8'>No se detectó DBeaver ni TablePlus instalados en tu sistema.\\nElige una de las siguientes opciones para conectarte a <b>{proj_name}</b>:</span></small>")
+        lbl_desc.set_markup(f"<small><span color='#94a3b8'>Ejecuta herramientas visuales de base de datos directamente dentro del entorno Docker de <b>{proj_name}</b>.\\nNo consumen RAM cuando el proyecto está apagado y no requieren instalar software en tu equipo.</span></small>")
         lbl_desc.set_halign(Gtk.Align.START)
         lbl_desc.set_line_wrap(True)
         box.pack_start(lbl_desc, False, False, 0)
         
-        # Option 1: DBeaver CE
+        ddev_dir = os.path.join(approot, ".ddev")
+        
+        # 1. DBeaver in Docker (CloudBeaver)
+        has_dbeaver = os.path.exists(os.path.join(ddev_dir, "docker-compose.cloudbeaver.yaml"))
+        dbeaver_url = f"{primary_url}:8979"
+        
         card_dbeaver = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        card_dbeaver.get_style_context().add_class("option-highlight-box")
+        card_dbeaver.get_style_context().add_class("option-highlight-box" if has_dbeaver else "project-card")
         
         row_db1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         row_db1.pack_start(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic", Gtk.IconSize.MENU), False, False, 0)
-        lbl_c1 = Gtk.Label(use_markup=True)
-        lbl_c1.set_markup("<b>🐬 DBeaver Community Edition</b> <span color='#10b981'><b>(Recomendado / 100% Gratis)</b></span>")
-        row_db1.pack_start(lbl_c1, False, False, 0)
+        lbl_db1_title = Gtk.Label(use_markup=True)
+        lbl_db1_title.set_markup("<b>🐬 DBeaver en Docker (CloudBeaver)</b>")
+        row_db1.pack_start(lbl_db1_title, False, False, 0)
+        
+        lbl_db1_st = Gtk.Label(label="HABILITADO" if has_dbeaver else "NO HABILITADO")
+        lbl_db1_st.get_style_context().add_class("badge")
+        lbl_db1_st.get_style_context().add_class("badge-running" if has_dbeaver else "badge-stopped")
+        row_db1.pack_start(lbl_db1_st, False, False, 0)
         card_dbeaver.pack_start(row_db1, False, False, 0)
         
-        lbl_c1_desc = Gtk.Label()
-        lbl_c1_desc.set_markup("<small>Gestor de base de datos universal, gratuito y potente para Linux (MariaDB, PostgreSQL, MySQL).</small>")
-        lbl_c1_desc.set_line_wrap(True)
-        lbl_c1_desc.set_halign(Gtk.Align.START)
-        card_dbeaver.pack_start(lbl_c1_desc, False, False, 0)
+        lbl_db1_desc = Gtk.Label()
+        lbl_db1_desc.set_markup("<small>La versión oficial de DBeaver Community en Docker. Editor SQL avanzado, diagramas ER y soporte multi-motor.</small>")
+        lbl_db1_desc.set_line_wrap(True)
+        lbl_db1_desc.set_halign(Gtk.Align.START)
+        card_dbeaver.pack_start(lbl_db1_desc, False, False, 0)
         
-        btn_inst_dbeaver = Gtk.Button()
-        b_d = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        b_d.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
-        b_d.pack_start(Gtk.Label(label="Instalar DBeaver CE Automáticamente (APT / Snap)"), False, False, 0)
-        btn_inst_dbeaver.add(b_d)
-        btn_inst_dbeaver.get_style_context().add_class("btn-primary")
-        btn_inst_dbeaver.connect("clicked", self.on_install_dbeaver)
-        card_dbeaver.pack_start(btn_inst_dbeaver, False, False, 0)
+        db_actions_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        if has_dbeaver:
+            btn_open_db = Gtk.Button()
+            b_op = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_op.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_op.pack_start(Gtk.Label(label="Abrir DBeaver en Navegador (:8979)"), False, False, 0)
+            btn_open_db.add(b_op)
+            btn_open_db.get_style_context().add_class("btn-primary")
+            btn_open_db.connect("clicked", lambda b, u=dbeaver_url: webbrowser.open(u))
+            db_actions_row.pack_start(btn_open_db, False, False, 0)
+            
+            btn_rem_db = Gtk.Button(label="Deshabilitar DBeaver")
+            btn_rem_db.connect("clicked", lambda b: self.toggle_dbeaver(False))
+            db_actions_row.pack_start(btn_rem_db, False, False, 0)
+        else:
+            btn_act_db = Gtk.Button()
+            b_ac = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_ac.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_ac.pack_start(Gtk.Label(label="Habilitar DBeaver en Docker (1 Clic)"), False, False, 0)
+            btn_act_db.add(b_ac)
+            btn_act_db.get_style_context().add_class("btn-primary")
+            btn_act_db.connect("clicked", lambda b: self.toggle_dbeaver(True))
+            db_actions_row.pack_start(btn_act_db, False, False, 0)
+            
+        card_dbeaver.pack_start(db_actions_row, False, False, 0)
         box.pack_start(card_dbeaver, False, False, 0)
         
-        # Option 2: TablePlus for Linux
-        card_tp = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        card_tp.get_style_context().add_class("project-card")
+        # 2. phpMyAdmin in DDEV
+        has_pma = (os.path.exists(os.path.join(ddev_dir, "docker-compose.phpmyadmin.yaml")) or os.path.exists(os.path.join(ddev_dir, "addon-metadata", "phpmyadmin")))
+        pma_url = f"{primary_url}:8037"
         
-        row_tp1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        row_tp1.pack_start(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic", Gtk.IconSize.MENU), False, False, 0)
-        lbl_tp = Gtk.Label(use_markup=True)
-        lbl_tp.set_markup("<b>🐘 TablePlus para Linux</b> <span color='#38bdf8'><b>(Rápido &amp; Moderno)</b></span>")
-        row_tp1.pack_start(lbl_tp, False, False, 0)
-        card_tp.pack_start(row_tp1, False, False, 0)
-        
-        lbl_tp_desc = Gtk.Label()
-        lbl_tp_desc.set_markup("<small>Cliente visual ultrarrápido y minimalista. Se instala mediante el repositorio oficial de Ubuntu.</small>")
-        lbl_tp_desc.set_line_wrap(True)
-        lbl_tp_desc.set_halign(Gtk.Align.START)
-        card_tp.pack_start(lbl_tp_desc, False, False, 0)
-        
-        tp_btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        btn_inst_tp = Gtk.Button()
-        b_itp = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        b_itp.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
-        b_itp.pack_start(Gtk.Label(label="Instalar TablePlus en Ubuntu"), False, False, 0)
-        btn_inst_tp.add(b_itp)
-        btn_inst_tp.get_style_context().add_class("btn-quick")
-        btn_inst_tp.connect("clicked", self.on_install_tableplus)
-        tp_btns.pack_start(btn_inst_tp, False, False, 0)
-        
-        btn_web_tp = Gtk.Button()
-        b_wtp = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        b_wtp.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
-        b_wtp.pack_start(Gtk.Label(label="Web Oficial de TablePlus"), False, False, 0)
-        btn_web_tp.add(b_wtp)
-        btn_web_tp.connect("clicked", lambda b: webbrowser.open("https://tableplus.com/linux"))
-        tp_btns.pack_start(btn_web_tp, False, False, 0)
-        card_tp.pack_start(tp_btns, False, False, 0)
-        box.pack_start(card_tp, False, False, 0)
-        
-        # Option 3: phpMyAdmin in DDEV
         card_pma = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        card_pma.get_style_context().add_class("project-card")
+        card_pma.get_style_context().add_class("option-highlight-box" if has_pma else "project-card")
         
         row_pma1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         row_pma1.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
-        lbl_c2 = Gtk.Label(use_markup=True)
-        lbl_c2.set_markup("<b>🌐 phpMyAdmin en DDEV</b> <span color='#f59e0b'><b>(Web / Sin Instalar Software)</b></span>")
-        row_pma1.pack_start(lbl_c2, False, False, 0)
+        lbl_pma_title = Gtk.Label(use_markup=True)
+        lbl_pma_title.set_markup("<b>🌐 phpMyAdmin</b>")
+        row_pma1.pack_start(lbl_pma_title, False, False, 0)
+        
+        lbl_pma_st = Gtk.Label(label="HABILITADO" if has_pma else "NO HABILITADO")
+        lbl_pma_st.get_style_context().add_class("badge")
+        lbl_pma_st.get_style_context().add_class("badge-running" if has_pma else "badge-stopped")
+        row_pma1.pack_start(lbl_pma_st, False, False, 0)
         card_pma.pack_start(row_pma1, False, False, 0)
         
-        lbl_c2_desc = Gtk.Label()
-        lbl_c2_desc.set_markup("<small>Sin instalar programas pesados en tu equipo. Corre phpMyAdmin dentro de Docker en tu navegador.</small>")
-        lbl_c2_desc.set_line_wrap(True)
-        lbl_c2_desc.set_halign(Gtk.Align.START)
-        card_pma.pack_start(lbl_c2_desc, False, False, 0)
+        lbl_pma_desc = Gtk.Label()
+        lbl_pma_desc.set_markup("<small>El gestor clásico de base de datos para MariaDB y MySQL. Interfaz intuitiva y completa.</small>")
+        lbl_pma_desc.set_line_wrap(True)
+        lbl_pma_desc.set_halign(Gtk.Align.START)
+        card_pma.pack_start(lbl_pma_desc, False, False, 0)
         
-        btn_inst_pma = Gtk.Button()
-        b_p = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        b_p.pack_start(Gtk.Image.new_from_icon_name("list-add-symbolic", Gtk.IconSize.MENU), False, False, 0)
-        b_p.pack_start(Gtk.Label(label="Habilitar phpMyAdmin en este proyecto"), False, False, 0)
-        btn_inst_pma.add(b_p)
-        btn_inst_pma.connect("clicked", self.on_install_phpmyadmin)
-        card_pma.pack_start(btn_inst_pma, False, False, 0)
+        pma_actions_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        if has_pma:
+            btn_open_pma = Gtk.Button()
+            b_op_p = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_op_p.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_op_p.pack_start(Gtk.Label(label="Abrir phpMyAdmin en Navegador (:8037)"), False, False, 0)
+            btn_open_pma.add(b_op_p)
+            btn_open_pma.get_style_context().add_class("btn-primary")
+            btn_open_pma.connect("clicked", lambda b, u=pma_url: webbrowser.open(u))
+            pma_actions_row.pack_start(btn_open_pma, False, False, 0)
+            
+            btn_rem_pma = Gtk.Button(label="Deshabilitar phpMyAdmin")
+            btn_rem_pma.connect("clicked", lambda b: self.toggle_addon("phpmyadmin", False))
+            pma_actions_row.pack_start(btn_rem_pma, False, False, 0)
+        else:
+            btn_act_pma = Gtk.Button()
+            b_ac_p = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_ac_p.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_ac_p.pack_start(Gtk.Label(label="Habilitar phpMyAdmin en Docker (1 Clic)"), False, False, 0)
+            btn_act_pma.add(b_ac_p)
+            btn_act_pma.get_style_context().add_class("btn-primary")
+            btn_act_pma.connect("clicked", lambda b: self.toggle_addon("phpmyadmin", True))
+            pma_actions_row.pack_start(btn_act_pma, False, False, 0)
+            
+        card_pma.pack_start(pma_actions_row, False, False, 0)
         box.pack_start(card_pma, False, False, 0)
+        
+        # 3. Adminer in DDEV
+        has_adm = (os.path.exists(os.path.join(ddev_dir, "docker-compose.adminer.yaml")) or os.path.exists(os.path.join(ddev_dir, "addon-metadata", "adminer")))
+        adm_url = f"{primary_url}:8036"
+        
+        card_adm = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        card_adm.get_style_context().add_class("option-highlight-box" if has_adm else "project-card")
+        
+        row_adm1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        row_adm1.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        lbl_adm_title = Gtk.Label(use_markup=True)
+        lbl_adm_title.set_markup("<b>⚡ Adminer (Ultra Rápido &amp; Ligero)</b>")
+        row_adm1.pack_start(lbl_adm_title, False, False, 0)
+        
+        lbl_adm_st = Gtk.Label(label="HABILITADO" if has_adm else "NO HABILITADO")
+        lbl_adm_st.get_style_context().add_class("badge")
+        lbl_adm_st.get_style_context().add_class("badge-running" if has_adm else "badge-stopped")
+        row_adm1.pack_start(lbl_adm_st, False, False, 0)
+        card_adm.pack_start(row_adm1, False, False, 0)
+        
+        lbl_adm_desc = Gtk.Label()
+        lbl_adm_desc.set_markup("<small>Gestor de alto rendimiento y consumo casi nulo (&lt; 5 MB RAM). Compatible con MariaDB, MySQL y PostgreSQL.</small>")
+        lbl_adm_desc.set_line_wrap(True)
+        lbl_adm_desc.set_halign(Gtk.Align.START)
+        card_adm.pack_start(lbl_adm_desc, False, False, 0)
+        
+        adm_actions_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        if has_adm:
+            btn_open_adm = Gtk.Button()
+            b_op_a = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_op_a.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_op_a.pack_start(Gtk.Label(label="Abrir Adminer en Navegador (:8036)"), False, False, 0)
+            btn_open_adm.add(b_op_a)
+            btn_open_adm.get_style_context().add_class("btn-primary")
+            btn_open_adm.connect("clicked", lambda b, u=adm_url: webbrowser.open(u))
+            adm_actions_row.pack_start(btn_open_adm, False, False, 0)
+            
+            btn_rem_adm = Gtk.Button(label="Deshabilitar Adminer")
+            btn_rem_adm.connect("clicked", lambda b: self.toggle_addon("adminer", False))
+            adm_actions_row.pack_start(btn_rem_adm, False, False, 0)
+        else:
+            btn_act_adm = Gtk.Button()
+            b_ac_a = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_ac_a.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_ac_a.pack_start(Gtk.Label(label="Habilitar Adminer en Docker (1 Clic)"), False, False, 0)
+            btn_act_adm.add(b_ac_a)
+            btn_act_adm.get_style_context().add_class("btn-primary")
+            btn_act_adm.connect("clicked", lambda b: self.toggle_addon("adminer", True))
+            adm_actions_row.pack_start(btn_act_adm, False, False, 0)
+            
+        card_adm.pack_start(adm_actions_row, False, False, 0)
+        box.pack_start(card_adm, False, False, 0)
         
         # Close button
         btn_close = Gtk.Button(label="Cerrar")
@@ -1643,42 +1725,74 @@ class InstallDBClientDialog(Gtk.Dialog):
         
         self.show_all()
 
-    def on_install_dbeaver(self, widget):
+    def toggle_dbeaver(self, enable):
         self.destroy()
-        inst_cmd = "echo '🚀 Instalando DBeaver Community Edition en Ubuntu...'; sudo snap install dbeaver-ce || (echo 'Descargando paquete deb oficial...' && wget -O /tmp/dbeaver.deb https://dbeaver.io/files/dbeaver-ce_latest_amd64.deb && sudo apt update && sudo apt install -y /tmp/dbeaver.deb); echo '¡Instalación finalizada!'; read -p 'Presiona Enter para cerrar...'"
-        self.parent_view.main_app.open_terminal("/tmp", inst_cmd)
-
-    def on_install_tableplus(self, widget):
-        self.destroy()
-        tp_cmd = "echo '🚀 Instalando TablePlus en Ubuntu...'; sudo wget -qO - https://deb.tableplus.com/apt.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/tableplus-archive.gpg > /dev/null && sudo add-apt-repository -y \"deb [arch=amd64] https://deb.tableplus.com/debian/public $(lsb_release -cs) main\" && sudo apt update && sudo apt install -y tableplus; echo '¡Instalación de TablePlus finalizada!'; read -p 'Presiona Enter para cerrar...'"
-        self.parent_view.main_app.open_terminal("/tmp", tp_cmd)
-
-    def on_install_phpmyadmin(self, widget):
-        self.destroy()
-        dialog = ProgressDialog(self.parent_view.main_app, title=f"Habilitando phpMyAdmin: {self.proj_name}")
-        dialog.set_status("Descargando complemento ddev/ddev-phpmyadmin...")
+        cb_file = os.path.join(self.approot, ".ddev", "docker-compose.cloudbeaver.yaml")
+        dialog = ProgressDialog(self.parent_view.main_app, title=f"DBeaver en Docker: {self.proj_name}")
+        dialog.set_status("Configurando contenedor DBeaver (CloudBeaver)...")
         
         def task():
             try:
                 def log(t):
                     GLib.idle_add(dialog.append_log, t)
+                if enable:
+                    log("🐬 Creando configuración para DBeaver (CloudBeaver) en Docker...\n")
+                    os.makedirs(os.path.join(self.approot, ".ddev"), exist_ok=True)
+                    with open(cb_file, "w", encoding="utf-8") as f:
+                        f.write(CLOUDBEAVER_COMPOSE_TEMPLATE)
+                    log("✓ Archivo .ddev/docker-compose.cloudbeaver.yaml configurado.\n")
+                else:
+                    log("🗑️ Eliminando configuración de DBeaver...\n")
+                    if os.path.exists(cb_file):
+                        os.remove(cb_file)
                 
-                log("📦 Ejecutando 'ddev get ddev/ddev-phpmyadmin'...\n")
-                p = subprocess.Popen(["ddev", "get", "ddev/ddev-phpmyadmin"], cwd=self.approot, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-                for line in iter(p.stdout.readline, ''):
-                    log(line)
-                p.stdout.close()
-                p.wait()
-                
-                log("\n🔄 Reiniciando proyecto DDEV para activar el contenedor phpMyAdmin...\n")
+                log("\n🔄 Reiniciando proyecto DDEV para aplicar cambios de contenedor...\n")
                 p2 = subprocess.Popen(["ddev", "restart", "-y"], cwd=self.approot, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 for line in iter(p2.stdout.readline, ''):
                     log(line)
                 p2.stdout.close()
                 p2.wait()
                 
-                pma_url = f"{self.primary_url}:8037"
-                GLib.idle_add(dialog.finish, True, "phpMyAdmin habilitado con éxito", pma_url, self.approot)
+                db_url = f"{self.primary_url}:8979" if enable else ""
+                GLib.idle_add(dialog.finish, True, f"DBeaver en Docker {'habilitado' if enable else 'deshabilitado'}", db_url, self.approot)
+                GLib.idle_add(self.parent_view.refresh_details)
+            except Exception as ex:
+                GLib.idle_add(dialog.finish, False, f"Error: {ex}", "", self.approot)
+                
+        threading.Thread(target=task, daemon=True).start()
+
+    def toggle_addon(self, addon_id, enable):
+        self.destroy()
+        dialog = ProgressDialog(self.parent_view.main_app, title=f"{addon_id}: {self.proj_name}")
+        dialog.set_status(f"{'Habilitando' if enable else 'Deshabilitando'} {addon_id}...")
+        
+        def task():
+            try:
+                def log(t):
+                    GLib.idle_add(dialog.append_log, t)
+                
+                if enable:
+                    log(f"📦 Ejecutando 'ddev get ddev/ddev-{addon_id}'...\n")
+                    p = subprocess.Popen(["ddev", "get", f"ddev/ddev-{addon_id}"], cwd=self.approot, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                    for line in iter(p.stdout.readline, ''):
+                        log(line)
+                    p.stdout.close()
+                    p.wait()
+                else:
+                    log(f"🗑️ Deshabilitando complemento {addon_id}...\n")
+                    f_yaml = os.path.join(self.approot, ".ddev", f"docker-compose.{addon_id}.yaml")
+                    if os.path.exists(f_yaml):
+                        os.remove(f_yaml)
+                
+                log(f"\n🔄 Reiniciando proyecto DDEV...\n")
+                p2 = subprocess.Popen(["ddev", "restart", "-y"], cwd=self.approot, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in iter(p2.stdout.readline, ''):
+                    log(line)
+                p2.stdout.close()
+                p2.wait()
+                
+                target_url = f"{self.primary_url}:8037" if addon_id == "phpmyadmin" else f"{self.primary_url}:8036"
+                GLib.idle_add(dialog.finish, True, f"{addon_id} {'habilitado con éxito' if enable else 'deshabilitado'}", target_url if enable else "", self.approot)
                 GLib.idle_add(self.parent_view.refresh_details)
             except Exception as ex:
                 GLib.idle_add(dialog.finish, False, f"Error: {ex}", "", self.approot)
@@ -1736,65 +1850,28 @@ class ProjectDetailsView(Gtk.Box):
         self.content_box.set_margin_end(6)
         self.scrolled.add(self.content_box)
 
-    def get_installed_db_clients(self, approot=""):
-        clients = []
-        # DBeaver
-        for cand in ["dbeaver", "dbeaver-ce", "/snap/bin/dbeaver-ce"]:
-            if shutil.which(cand):
-                clients.append({"id": "dbeaver", "name": "DBeaver", "cmd": cand, "icon": "drive-harddisk-symbolic"})
-                break
-        # TablePlus
-        for cand in ["tableplus", "/snap/bin/tableplus"]:
-            if shutil.which(cand):
-                clients.append({"id": "tableplus", "name": "TablePlus", "cmd": cand, "icon": "drive-harddisk-symbolic"})
-                break
-        # Beekeeper
-        for cand in ["beekeeper-studio", "/snap/bin/beekeeper-studio"]:
-            if shutil.which(cand):
-                clients.append({"id": "beekeeper", "name": "Beekeeper Studio", "cmd": cand, "icon": "drive-harddisk-symbolic"})
-                break
-        # MySQL Workbench
-        for cand in ["mysql-workbench", "/snap/bin/mysql-workbench"]:
-            if shutil.which(cand):
-                clients.append({"id": "mysql-workbench", "name": "MySQL Workbench", "cmd": cand, "icon": "drive-harddisk-symbolic"})
-                break
-        # phpMyAdmin in DDEV
-        if approot and (os.path.exists(os.path.join(approot, ".ddev", "docker-compose.phpmyadmin.yaml")) or os.path.exists(os.path.join(approot, ".ddev", "addon-metadata", "phpmyadmin"))):
-            clients.append({"id": "phpmyadmin", "name": "phpMyAdmin (Web)", "cmd": "pma", "icon": "web-browser-symbolic"})
+    def get_project_db_addons(self, approot=""):
+        addons = []
+        if not approot or not os.path.exists(approot):
+            return addons
+        ddev_dir = os.path.join(approot, ".ddev")
+        
+        # DBeaver in Docker
+        if os.path.exists(os.path.join(ddev_dir, "docker-compose.cloudbeaver.yaml")):
+            addons.append({"id": "cloudbeaver", "name": "DBeaver (Docker)", "port": 8979, "icon": "drive-harddisk-symbolic"})
             
-        return clients
+        # phpMyAdmin
+        if os.path.exists(os.path.join(ddev_dir, "docker-compose.phpmyadmin.yaml")) or os.path.exists(os.path.join(ddev_dir, "addon-metadata", "phpmyadmin")):
+            addons.append({"id": "phpmyadmin", "name": "phpMyAdmin", "port": 8037, "icon": "web-browser-symbolic"})
+            
+        # Adminer
+        if os.path.exists(os.path.join(ddev_dir, "docker-compose.adminer.yaml")) or os.path.exists(os.path.join(ddev_dir, "addon-metadata", "adminer")):
+            addons.append({"id": "adminer", "name": "Adminer", "port": 8036, "icon": "web-browser-symbolic"})
+            
+        return addons
 
-    def launch_db_client(self, client, host, ext_port, dbname, user, password, db_type, approot):
-        cid = client["id"]
-        uri = f"{db_type}://{user}:{password}@127.0.0.1:{ext_port}/{dbname}"
-        raw_creds = f"Host: 127.0.0.1\nPort: {ext_port}\nDatabase: {dbname}\nUsername: {user}\nPassword: {password}\nURL: {uri}"
-        
-        # Always copy credentials for quick paste
-        clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
-        clipboard.set_text(uri, -1)
-        clipboard.store()
-        
-        if cid == "phpmyadmin":
-            pma_url = f"{self.raw_data.get('primary_url', f'https://{self.proj_name}.ddev.site')}:8037"
-            webbrowser.open(pma_url)
-        elif cid == "tableplus":
-            subprocess.Popen([client["cmd"], uri])
-        elif cid == "beekeeper":
-            subprocess.Popen([client["cmd"], uri])
-        elif cid == "dbeaver":
-            # DBeaver launch
-            try:
-                subprocess.Popen([client["cmd"], "-con", f"driver={db_type}|host=127.0.0.1|port={ext_port}|database={dbname}|user={user}|password={password}"])
-            except Exception:
-                subprocess.Popen([client["cmd"]])
-        else:
-            try:
-                subprocess.Popen([client["cmd"]])
-            except Exception as e:
-                print("Error launching client:", e)
-
-    def show_install_db_dialog(self, approot, proj_name, primary_url):
-        dialog = InstallDBClientDialog(self, approot, proj_name, primary_url)
+    def show_db_containers_dialog(self, approot, proj_name, primary_url):
+        dialog = DBContainersDialog(self, approot, proj_name, primary_url)
         dialog.run()
         dialog.destroy()
 
@@ -2007,11 +2084,11 @@ class ProjectDetailsView(Gtk.Box):
         
         db_card.pack_start(grid_db, False, False, 0)
         
-        # DB Buttons and Installed Clients
+        # DB Buttons and Container Addons
         db_btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         db_btn_row.set_margin_top(4)
         
-        raw_db_creds = f"Host: 127.0.0.1\nPort: {ext_port_str}\nDatabase: {db_name}\nUsername: {db_user}\nPassword: {db_pass}\nURL: {db_type}://{db_user}:{db_pass}@127.0.0.1:{ext_port_str}/{db_name}"
+        raw_db_creds = f"Host: 127.0.0.1\\nPort: {ext_port_str}\\nDatabase: {db_name}\\nUsername: {db_user}\\nPassword: {db_pass}\\nURL: {db_type}://{db_user}:{db_pass}@127.0.0.1:{ext_port_str}/{db_name}"
         
         btn_copy_db = Gtk.Button()
         b_c = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -2021,29 +2098,33 @@ class ProjectDetailsView(Gtk.Box):
         btn_copy_db.connect("clicked", lambda b, text=raw_db_creds: self.copy_to_clipboard(text, "Credenciales copiadas al portapapeles"))
         db_btn_row.pack_start(btn_copy_db, False, False, 0)
         
-        installed_clients = self.get_installed_db_clients(approot)
+        active_addons = self.get_project_db_addons(approot)
         
-        if is_running and installed_clients:
-            for cl in installed_clients:
-                btn_cl = Gtk.Button()
-                b_cl = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-                b_cl.pack_start(Gtk.Image.new_from_icon_name(cl.get("icon", "drive-harddisk-symbolic"), Gtk.IconSize.MENU), False, False, 0)
-                b_cl.pack_start(Gtk.Label(label=f"Abrir en {cl['name']}"), False, False, 0)
-                btn_cl.add(b_cl)
-                btn_cl.get_style_context().add_class("btn-primary" if cl["id"] == "dbeaver" else "btn-quick")
-                btn_cl.set_tooltip_text(f"Conectar a {db_name} en {cl['name']}")
-                btn_cl.connect("clicked", lambda b, c=cl: self.launch_db_client(c, "127.0.0.1", ext_port_str, db_name, db_user, db_pass, db_type, approot))
-                db_btn_row.pack_start(btn_cl, False, False, 0)
-        elif not installed_clients:
-            btn_inst_db = Gtk.Button()
-            b_idb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            b_idb.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
-            b_idb.pack_start(Gtk.Label(label="Conectar Gestor Visual (DBeaver / TablePlus / phpMyAdmin)"), False, False, 0)
-            btn_inst_db.add(b_idb)
-            btn_inst_db.get_style_context().add_class("btn-primary")
-            btn_inst_db.set_tooltip_text("Pulsa para abrir el asistente de conexión o instalación de DBeaver, TablePlus o phpMyAdmin")
-            btn_inst_db.connect("clicked", lambda b: self.show_install_db_dialog(approot, pname, primary_url))
-            db_btn_row.pack_start(btn_inst_db, False, False, 0)
+        if is_running and active_addons:
+            for ad in active_addons:
+                btn_ad = Gtk.Button()
+                b_ad = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                b_ad.pack_start(Gtk.Image.new_from_icon_name(ad.get("icon", "web-browser-symbolic"), Gtk.IconSize.MENU), False, False, 0)
+                b_ad.pack_start(Gtk.Label(label=f"Abrir {ad['name']}"), False, False, 0)
+                btn_ad.add(b_ad)
+                btn_ad.get_style_context().add_class("btn-primary" if "DBeaver" in ad['name'] else "btn-quick")
+                target_port = ad["port"]
+                ad_url = f"{primary_url}:{target_port}"
+                btn_ad.set_tooltip_text(f"Abrir interfaz de {ad['name']} ({ad_url})")
+                btn_ad.connect("clicked", lambda b, u=ad_url: webbrowser.open(u))
+                db_btn_row.pack_start(btn_ad, False, False, 0)
+                
+        btn_manage_db = Gtk.Button()
+        b_mdb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_mdb.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_label_txt = "Gestores en Docker (DBeaver / phpMyAdmin / Adminer)" if not active_addons else "Gestionar Gestores Web"
+        b_mdb.pack_start(Gtk.Label(label=b_label_txt), False, False, 0)
+        btn_manage_db.add(b_mdb)
+        if not active_addons:
+            btn_manage_db.get_style_context().add_class("btn-primary")
+        btn_manage_db.set_tooltip_text("Habilitar o gestionar DBeaver, phpMyAdmin o Adminer corriendo dentro de Docker")
+        btn_manage_db.connect("clicked", lambda b: self.show_db_containers_dialog(approot, pname, primary_url))
+        db_btn_row.pack_start(btn_manage_db, False, False, 0)
             
         if is_running:
             btn_launch_db = Gtk.Button()
