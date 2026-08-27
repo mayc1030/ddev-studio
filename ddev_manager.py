@@ -2064,7 +2064,7 @@ if (!file_exists('/var/acquia')) {
             text=f"¿Estás seguro de eliminar el subsitio '{s_name}'?"
         )
         dialog.format_secondary_text(
-            f"Se eliminará la base de datos MariaDB '{s_name}' y la carpeta:\n{s_path}\n\nNota: La carpeta del proyecto base permanecerá intacta."
+            f"Se eliminará la base de datos MariaDB '{s_name}', el dominio y la carpeta:\n{s_path}\n\nNota: La carpeta del proyecto base permanecerá intacta."
         )
         res = dialog.run()
         dialog.destroy()
@@ -2075,19 +2075,42 @@ if (!file_exists('/var/acquia')) {
             
             def task():
                 try:
-                    # Drop DB
+                    # 1. Drop DB
                     GLib.idle_add(del_dialog.append_log, f"Eliminando base de datos '{s_name}'...\n")
                     subprocess.run(["ddev", "mysql", "-uroot", "-proot", "-hdb", "-e", f"DROP DATABASE IF EXISTS `{s_name}`;"], cwd=base_dir, capture_output=True)
                     
-                    # Remove folder
+                    # 2. Fix Drupal read-only permissions (555/444) and remove folder
                     if os.path.exists(s_path):
                         GLib.idle_add(del_dialog.append_log, f"Eliminando carpeta {s_path}...\n")
+                        subprocess.run(["chmod", "-R", "u+w", s_path], capture_output=True)
                         shutil.rmtree(s_path, ignore_errors=True)
+                        if os.path.exists(s_path):
+                            subprocess.run(["rm", "-rf", s_path], capture_output=True)
                         
-                    # Remove Drush alias
+                    # 3. Remove Drush alias
                     alias_file = os.path.join(base_dir, "drush", "sites", f"{s_name}.site.yml")
                     if os.path.exists(alias_file):
-                        os.remove(alias_file)
+                        try:
+                            os.remove(alias_file)
+                        except Exception:
+                            pass
+                            
+                    # 4. Remove domain from additional_fqdns in .ddev/config.yaml
+                    ddev_cfg = os.path.join(base_dir, ".ddev", "config.yaml")
+                    subsite_domain = f"{s_name}.ddev.site"
+                    if os.path.exists(ddev_cfg):
+                        try:
+                            with open(ddev_cfg, "r") as f:
+                                lines = f.readlines()
+                            new_lines = [l for l in lines if subsite_domain not in l]
+                            with open(ddev_cfg, "w") as f:
+                                f.writelines(new_lines)
+                        except Exception:
+                            pass
+                            
+                    # 5. Restart DDEV to release domain
+                    GLib.idle_add(del_dialog.append_log, f"Actualizando router de DDEV...\n")
+                    subprocess.run(["ddev", "restart", "-y"], cwd=base_dir, capture_output=True)
                         
                     GLib.idle_add(del_dialog.finish, True, f"Subsitio '{s_name}' eliminado con éxito", "", base_dir)
                     GLib.idle_add(self.refresh_multisite_subsites)
