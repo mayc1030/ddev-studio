@@ -159,6 +159,19 @@ CUSTOM_CSS = b"""
     background-color: alpha(#f59e0b, 0.3);
     border-color: #f59e0b;
 }
+.nav-bar-box {
+    padding: 4px 2px;
+    margin-bottom: 2px;
+}
+.btn-back {
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 6px 14px;
+    background-color: alpha(@theme_selected_bg_color, 0.15);
+}
+.btn-back:hover {
+    background-color: alpha(@theme_selected_bg_color, 0.3);
+}
 """
 
 FRAMEWORKS = [
@@ -533,24 +546,56 @@ def detect_project_details(folder_path):
     }
 
 
-class SubsitesManagerDialog(Gtk.Dialog):
-    def __init__(self, parent, proj, main_app):
-        pname = proj.get("name", "Proyecto Drupal")
-        super().__init__(title=f"💧 Drupal Multisite: {pname}", transient_for=parent, flags=Gtk.DialogFlags.MODAL)
-        self.set_default_size(960, 720)
-        self.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
-        self.proj = proj
+class SubsitesManagerView(Gtk.Box):
+    def __init__(self, main_app):
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.main_app = main_app
-        self.base_dir = proj.get("approot", "")
-        self.base_name = pname
+        self.proj = {}
+        self.base_dir = ""
+        self.base_name = ""
         self.subsites = []
         
-        box = self.get_content_area()
-        box.set_spacing(12)
-        box.set_margin_start(16)
-        box.set_margin_end(16)
-        box.set_margin_top(16)
-        box.set_margin_bottom(16)
+        self.set_margin_start(16)
+        self.set_margin_end(16)
+        self.set_margin_top(10)
+        self.set_margin_bottom(14)
+        
+        # 0. Top Navigation Bar (Back button + Breadcrumb + Quick Refresh)
+        nav_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        nav_bar.get_style_context().add_class("nav-bar-box")
+        
+        self.btn_back = Gtk.Button()
+        btn_back_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        btn_back_box.pack_start(Gtk.Image.new_from_icon_name("go-previous-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+        btn_back_box.pack_start(Gtk.Label(label="Volver a Mis Proyectos"), False, False, 0)
+        self.btn_back.add(btn_back_box)
+        self.btn_back.get_style_context().add_class("btn-back")
+        self.btn_back.connect("clicked", lambda b: self.main_app.show_projects_list())
+        nav_bar.pack_start(self.btn_back, False, False, 0)
+        
+        self.lbl_breadcrumb = Gtk.Label()
+        self.lbl_breadcrumb.set_markup("<span color='#94a3b8'>Mis Proyectos / </span><b>Drupal Multisite</b>")
+        self.lbl_breadcrumb.set_halign(Gtk.Align.START)
+        nav_bar.pack_start(self.lbl_breadcrumb, True, True, 0)
+        
+        btn_refresh_top = Gtk.Button()
+        btn_refresh_top.add(Gtk.Image.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON))
+        btn_refresh_top.set_tooltip_text("Refrescar estado y subsitios")
+        btn_refresh_top.connect("clicked", lambda b: self.refresh_subsites())
+        nav_bar.pack_start(btn_refresh_top, False, False, 0)
+        
+        self.pack_start(nav_bar, False, False, 0)
+        
+        # Main scrolled content for Subsites Manager
+        scrolled_main = Gtk.ScrolledWindow()
+        scrolled_main.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scrolled_main.set_vexpand(True)
+        self.pack_start(scrolled_main, True, True, 0)
+        
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        content_box.set_margin_top(4)
+        content_box.set_margin_end(6)
+        scrolled_main.add(content_box)
         
         # 1. Header Box (Project Summary & Controls)
         header_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -562,15 +607,15 @@ class SubsitesManagerDialog(Gtk.Dialog):
             top_row.pack_start(Gtk.Image.new_from_pixbuf(pix_dp), False, False, 0)
             
         title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        lbl_title = Gtk.Label()
-        lbl_title.set_markup(f"<big><b>{pname}</b></big> <span color='#8b5cf6'><b>[DRUPAL MULTISITE]</b></span>")
-        lbl_title.set_halign(Gtk.Align.START)
-        title_box.pack_start(lbl_title, False, False, 0)
+        self.lbl_header_title = Gtk.Label()
+        self.lbl_header_title.set_markup("<b>Proyecto Drupal</b> <span color='#8b5cf6'><b>[DRUPAL MULTISITE]</b></span>")
+        self.lbl_header_title.set_halign(Gtk.Align.START)
+        title_box.pack_start(self.lbl_header_title, False, False, 0)
         
-        lbl_path = Gtk.Label()
-        lbl_path.set_markup(f"<small><span color='#94a3b8'>📁 <b>Ubicación:</b> {self.base_dir}</span></small>")
-        lbl_path.set_halign(Gtk.Align.START)
-        title_box.pack_start(lbl_path, False, False, 0)
+        self.lbl_header_path = Gtk.Label()
+        self.lbl_header_path.set_markup("<small><span color='#94a3b8'>📁 <b>Ubicación:</b> /</span></small>")
+        self.lbl_header_path.set_halign(Gtk.Align.START)
+        title_box.pack_start(self.lbl_header_path, False, False, 0)
         top_row.pack_start(title_box, True, True, 0)
         
         header_card.pack_start(top_row, False, False, 0)
@@ -609,7 +654,7 @@ class SubsitesManagerDialog(Gtk.Dialog):
         ctrl_row.pack_start(btn_base_term, False, False, 0)
         
         header_card.pack_start(ctrl_row, False, False, 0)
-        box.pack_start(header_card, False, False, 0)
+        content_box.pack_start(header_card, False, False, 0)
         
         # 2. Provision New Subsite Expander
         self.expander_new = Gtk.Expander(label="➕ Crear / Aprovisionar Nuevo Subsitio en este Proyecto")
@@ -656,35 +701,28 @@ class SubsitesManagerDialog(Gtk.Dialog):
         form_box.pack_start(btn_create, False, False, 0)
         
         self.expander_new.add(form_box)
-        box.pack_start(self.expander_new, False, False, 0)
+        content_box.pack_start(self.expander_new, False, False, 0)
         
-        # 3. Subsites List Header & ScrolledWindow
+        # 3. Subsites List Header & Container
         list_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.lbl_subsites_count = Gtk.Label()
         self.lbl_subsites_count.set_markup("<b>Subsitios Aprovisionados:</b>")
         self.lbl_subsites_count.set_halign(Gtk.Align.START)
         list_header.pack_start(self.lbl_subsites_count, True, True, 0)
-        
-        btn_refresh_sub = Gtk.Button(label="🔄 Refrescar")
-        btn_refresh_sub.connect("clicked", lambda b: self.refresh_subsites())
-        list_header.pack_start(btn_refresh_sub, False, False, 0)
-        box.pack_start(list_header, False, False, 0)
-        
-        scrolled = Gtk.ScrolledWindow()
-        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scrolled.set_vexpand(True)
+        content_box.pack_start(list_header, False, False, 0)
         
         self.subsites_list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        scrolled.add(self.subsites_list_box)
-        box.pack_start(scrolled, True, True, 0)
-        
-        # Bottom close button
-        btn_close = Gtk.Button(label="Cerrar")
-        btn_close.connect("clicked", lambda b: self.destroy())
-        btn_close.set_halign(Gtk.Align.END)
-        box.pack_start(btn_close, False, False, 0)
-        
-        self.show_all()
+        content_box.pack_start(self.subsites_list_box, False, False, 0)
+
+    def load_project(self, proj):
+        self.proj = proj
+        self.base_name = proj.get("name", "Proyecto Drupal")
+        self.base_dir = proj.get("approot", "")
+        self.lbl_breadcrumb.set_markup(f"<span color='#94a3b8'>Mis Proyectos / </span><b>{self.base_name}</b> <span color='#8b5cf6'>[Drupal Multisite]</span>")
+        self.lbl_header_title.set_markup(f"<big><b>{self.base_name}</b></big> <span color='#8b5cf6'><b>[DRUPAL MULTISITE]</b></span>")
+        self.lbl_header_path.set_markup(f"<small><span color='#94a3b8'>📁 <b>Ubicación:</b> {self.base_dir}</span></small>")
+        self.entry_subsite_name.set_text("")
+        self.expander_new.set_expanded(False)
         self.refresh_subsites()
 
     def update_ddev_fqdns(self, base_dir, add_subsite=None, remove_subsite=None):
@@ -945,7 +983,7 @@ class SubsitesManagerDialog(Gtk.Dialog):
         return card
 
     def execute_base_ddev_action(self, action):
-        dialog = ProgressDialog(self, title=f"DDEV: {action.capitalize()} {self.base_name}")
+        dialog = ProgressDialog(self.main_app, title=f"DDEV: {action.capitalize()} {self.base_name}")
         dialog.set_status(f"Ejecutando ddev {action} en {self.base_name}...")
         
         def task():
@@ -965,7 +1003,7 @@ class SubsitesManagerDialog(Gtk.Dialog):
         threading.Thread(target=task, daemon=True).start()
 
     def execute_base_composer_install(self):
-        dialog = ProgressDialog(self, title=f"Composer Install: {self.base_name}")
+        dialog = ProgressDialog(self.main_app, title=f"Composer Install: {self.base_name}")
         dialog.set_status(f"Ejecutando ddev composer install en {self.base_name}...")
         
         def task():
@@ -984,7 +1022,7 @@ class SubsitesManagerDialog(Gtk.Dialog):
         if action_key == "import_db":
             dialog = Gtk.FileChooserDialog(
                 title=f"Seleccionar archivo SQL para importar en {subsite_name}",
-                parent=self,
+                parent=self.main_app,
                 action=Gtk.FileChooserAction.OPEN
             )
             dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
@@ -1007,7 +1045,7 @@ class SubsitesManagerDialog(Gtk.Dialog):
                 src_file = dialog.get_filename()
                 dialog.destroy()
                 
-                prog_dialog = ProgressDialog(self, title=f"Importando BD: {subsite_name}")
+                prog_dialog = ProgressDialog(self.main_app, title=f"Importando BD: {subsite_name}")
                 prog_dialog.set_status(f"Importando {os.path.basename(src_file)} en base de datos '{subsite_name}'...")
                 
                 def task():
@@ -1034,7 +1072,7 @@ class SubsitesManagerDialog(Gtk.Dialog):
             
             dialog = Gtk.FileChooserDialog(
                 title=f"Guardar respaldo de base de datos de {subsite_name}",
-                parent=self,
+                parent=self.main_app,
                 action=Gtk.FileChooserAction.SAVE
             )
             dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
@@ -1053,7 +1091,7 @@ class SubsitesManagerDialog(Gtk.Dialog):
                 out_file = dialog.get_filename()
                 dialog.destroy()
                 
-                prog_dialog = ProgressDialog(self, title=f"Exportando BD: {subsite_name}")
+                prog_dialog = ProgressDialog(self.main_app, title=f"Exportando BD: {subsite_name}")
                 prog_dialog.set_status(f"Exportando base de datos '{subsite_name}' a {os.path.basename(out_file)}...")
                 
                 def task():
@@ -1090,7 +1128,7 @@ class SubsitesManagerDialog(Gtk.Dialog):
         cmd = ["ddev", "drush", f"--uri={subsite_url}"] + args
         cmd_str = " ".join(cmd)
         
-        dialog = ProgressDialog(self, title=f"Drush: {title} ({subsite_name})")
+        dialog = ProgressDialog(self.main_app, title=f"Drush: {title} ({subsite_name})")
         dialog.set_status(f"Ejecutando en {subsite_name}...")
         
         def task():
@@ -1134,7 +1172,7 @@ class SubsitesManagerDialog(Gtk.Dialog):
         raw_name = self.entry_subsite_name.get_text().strip()
         slug = re.sub(r'[^a-zA-Z0-9_-]', '-', raw_name).lower()
         if not slug:
-            msg = Gtk.MessageDialog(transient_for=self, flags=0, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text="Por favor ingresa un nombre para el subsitio (ej. mikes, corona)")
+            msg = Gtk.MessageDialog(transient_for=self.main_app, flags=0, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text="Por favor ingresa un nombre para el subsitio (ej. mikes, corona)")
             msg.run()
             msg.destroy()
             self.entry_subsite_name.grab_focus()
@@ -1142,7 +1180,7 @@ class SubsitesManagerDialog(Gtk.Dialog):
 
         base_dir = self.base_dir
         if not os.path.exists(base_dir):
-            msg = Gtk.MessageDialog(transient_for=self, flags=0, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text=f"El proyecto base '{base_dir}' no existe")
+            msg = Gtk.MessageDialog(transient_for=self.main_app, flags=0, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text=f"El proyecto base '{base_dir}' no existe")
             msg.run()
             msg.destroy()
             return
@@ -1152,7 +1190,7 @@ class SubsitesManagerDialog(Gtk.Dialog):
         subsite_domain = f"{slug}.ddev.site"
         subsite_url = f"https://{subsite_domain}"
 
-        dialog = ProgressDialog(self, title=f"Aprovisionando Subsitio: {slug}")
+        dialog = ProgressDialog(self.main_app, title=f"Aprovisionando Subsitio: {slug}")
         dialog.set_status(f"Creando subsitio {slug} ({subsite_url})...")
 
         def task():
@@ -1179,7 +1217,6 @@ class SubsitesManagerDialog(Gtk.Dialog):
                 set_st(f"Registrando dominio {subsite_domain} en DDEV...")
                 self.update_ddev_fqdns(base_dir, add_subsite=slug)
                 log(f"✓ Dominio {subsite_domain} registrado en DDEV.")
-
 
                 # 3. Ensure DDEV is started
                 set_st("Iniciando entorno DDEV...")
@@ -1374,7 +1411,7 @@ if (!file_exists('/var/acquia')) {
         s_path = subsite["path"]
         
         dialog = Gtk.MessageDialog(
-            transient_for=self,
+            transient_for=self.main_app,
             flags=0,
             message_type=Gtk.MessageType.WARNING,
             buttons=Gtk.ButtonsType.OK_CANCEL,
@@ -1387,7 +1424,7 @@ if (!file_exists('/var/acquia')) {
         dialog.destroy()
         
         if res == Gtk.ResponseType.OK:
-            del_dialog = ProgressDialog(self, title=f"Eliminando Subsitio {s_name}")
+            del_dialog = ProgressDialog(self.main_app, title=f"Eliminando Subsitio {s_name}")
             del_dialog.set_status(f"Eliminando base de datos y archivos de {s_name}...")
             
             def task():
@@ -2045,11 +2082,16 @@ class DDEVManagerWindow(Gtk.Window):
         dialog.destroy()
 
     def build_tab_projects(self):
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        vbox.set_margin_start(16)
-        vbox.set_margin_end(16)
-        vbox.set_margin_top(14)
-        vbox.set_margin_bottom(14)
+        self.stack_projects_tab = Gtk.Stack()
+        self.stack_projects_tab.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
+        self.stack_projects_tab.set_transition_duration(200)
+        
+        # View 1: Main Projects List
+        self.box_projects_list_view = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        self.box_projects_list_view.set_margin_start(16)
+        self.box_projects_list_view.set_margin_end(16)
+        self.box_projects_list_view.set_margin_top(14)
+        self.box_projects_list_view.set_margin_bottom(14)
         
         search_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         self.search_entry = Gtk.SearchEntry()
@@ -2068,16 +2110,22 @@ class DDEVManagerWindow(Gtk.Window):
         btn_new_shortcut.connect("clicked", lambda b: self.switch_to_new_project_tab("create"))
         search_box.pack_start(btn_new_shortcut, False, False, 0)
         
-        vbox.pack_start(search_box, False, False, 0)
+        self.box_projects_list_view.pack_start(search_box, False, False, 0)
         
         self.projects_scrolled = Gtk.ScrolledWindow()
         self.projects_scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         
         self.projects_list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.projects_scrolled.add(self.projects_list_box)
-        vbox.pack_start(self.projects_scrolled, True, True, 0)
+        self.box_projects_list_view.pack_start(self.projects_scrolled, True, True, 0)
         
-        return vbox
+        self.stack_projects_tab.add_named(self.box_projects_list_view, "list")
+        
+        # View 2: Subsites Manager Embedded View
+        self.subsites_manager_view = SubsitesManagerView(self)
+        self.stack_projects_tab.add_named(self.subsites_manager_view, "subsites")
+        
+        return self.stack_projects_tab
 
     def refresh_projects(self):
         for child in self.projects_list_box.get_children():
@@ -2735,8 +2783,12 @@ class DDEVManagerWindow(Gtk.Window):
         threading.Thread(target=task, daemon=True).start()
 
     def open_subsites_manager(self, proj):
-        dlg = SubsitesManagerDialog(self, proj, self)
-        dlg.run()
+        self.subsites_manager_view.load_project(proj)
+        self.stack_projects_tab.set_visible_child_name("subsites")
+
+    def show_projects_list(self):
+        self.stack_projects_tab.set_visible_child_name("list")
+        self.refresh_projects()
 
     def on_show_about(self, widget):
         about = Gtk.AboutDialog(transient_for=self, modal=True)
