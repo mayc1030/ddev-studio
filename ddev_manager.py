@@ -2691,14 +2691,27 @@ class ProjectDetailsView(Gtk.Box):
         grid_urls.set_column_spacing(16)
         grid_urls.set_row_spacing(6)
         
-        http_urls = self.raw_data.get("httpURLs") or []
+        # Deduplicate URLs per domain (Prefer HTTPS, avoid showing both http and https for the same domain)
         https_urls = self.raw_data.get("httpsURLs") or []
+        http_urls = self.raw_data.get("httpURLs") or []
         all_urls = self.raw_data.get("urls") or []
         
+        seen_hosts = set()
         clean_urls = []
-        for u in https_urls + http_urls + all_urls:
-            if u and u not in clean_urls and not u.startswith("http://127.0.0.1") and not u.startswith("https://127.0.0.1"):
-                clean_urls.append(u)
+        
+        for u in https_urls + all_urls:
+            if u and not u.startswith("http://127.0.0.1") and not u.startswith("https://127.0.0.1"):
+                host = u.replace("https://", "").replace("http://", "").rstrip("/")
+                if host and host not in seen_hosts:
+                    seen_hosts.add(host)
+                    clean_urls.append(u if u.startswith("https://") else f"https://{host}")
+                    
+        for u in http_urls:
+            if u and not u.startswith("http://127.0.0.1") and not u.startswith("https://127.0.0.1"):
+                host = u.replace("http://", "").rstrip("/")
+                if host and host not in seen_hosts:
+                    seen_hosts.add(host)
+                    clean_urls.append(u)
                 
         if not clean_urls:
             clean_urls = [primary_url]
