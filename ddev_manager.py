@@ -1939,7 +1939,7 @@ class DDEVManagerWindow(Gtk.Window):
             
             # Show/hide Drupal version selector
             if is_drupal:
-                self.drupal_version_box.show()
+                self.drupal_version_box.show_all()
                 self.on_drupal_version_changed(self.combo_drupal_ver)
             else:
                 self.drupal_version_box.hide()
@@ -2819,7 +2819,7 @@ class DDEVManagerWindow(Gtk.Window):
         
         if hasattr(self, "box_import_drupal_options"):
             if is_dr:
-                self.box_import_drupal_options.show()
+                self.box_import_drupal_options.show_all()
             else:
                 self.box_import_drupal_options.hide()
             
