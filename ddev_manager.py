@@ -2472,7 +2472,7 @@ class ProjectDetailsView(Gtk.Box):
             db_btn_box.set_margin_top(6)
             
             db_row1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-            raw_db_creds = f"Host: 127.0.0.1\\nPort: {ext_port_str}\\nDatabase: {db_name}\\nUsername: {db_user}\\nPassword: {db_pass}\\nURL: {db_type}://{db_user}:{db_pass}@127.0.0.1:{ext_port_str}/{db_name}"
+            raw_db_creds = f"Host: 127.0.0.1\nPort: {ext_port_str}\nDatabase: {db_name}\nUsername: {db_user}\nPassword: {db_pass}\nURL: {db_type}://{db_user}:{db_pass}@127.0.0.1:{ext_port_str}/{db_name}"
             
             btn_copy_db = Gtk.Button()
             b_c = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -2482,64 +2482,82 @@ class ProjectDetailsView(Gtk.Box):
             btn_copy_db.connect("clicked", lambda b, text=raw_db_creds: self.copy_to_clipboard(text, "Credenciales copiadas al portapapeles"))
             db_row1.pack_start(btn_copy_db, False, False, 0)
             
-            btn_export_db = Gtk.Button()
-            b_exp = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            b_exp.pack_start(Gtk.Image.new_from_icon_name("document-save-symbolic", Gtk.IconSize.MENU), False, False, 0)
-            b_exp.pack_start(Gtk.Label(label="Exportar Base de Datos (.sql.gz)"), False, False, 0)
-            btn_export_db.add(b_exp)
-            btn_export_db.set_tooltip_text("Exportar un volcado completo de la base de datos (ddev export-db)")
-            btn_export_db.connect("clicked", lambda b: self.on_export_db_clicked(approot, pname))
-            db_row1.pack_start(btn_export_db, False, False, 0)
-            
-            btn_import_db = Gtk.Button()
-            b_imp = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            b_imp.pack_start(Gtk.Image.new_from_icon_name("document-open-symbolic", Gtk.IconSize.MENU), False, False, 0)
-            b_imp.pack_start(Gtk.Label(label="Importar Base de Datos (.sql)"), False, False, 0)
-            btn_import_db.add(b_imp)
-            btn_import_db.set_tooltip_text("Importar un archivo de volcado a la base de datos (ddev import-db)")
-            btn_import_db.connect("clicked", lambda b: self.on_import_db_clicked(approot, pname))
-            db_row1.pack_start(btn_import_db, False, False, 0)
-            
-            btn_launch_db = Gtk.Button()
-            b_ld = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            b_ld.pack_start(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic", Gtk.IconSize.MENU), False, False, 0)
-            b_ld.pack_start(Gtk.Label(label="Consola CLI (ddev mysql)"), False, False, 0)
-            btn_launch_db.add(b_ld)
-            btn_launch_db.connect("clicked", lambda b: self.main_app.open_terminal(approot, "ddev mysql" if "postgres" not in db_type else "ddev psql"))
-            db_row1.pack_start(btn_launch_db, False, False, 0)
-            
-            db_btn_box.pack_start(db_row1, False, False, 0)
-            
-            # Row 2: Visual Managers in Containers
-            db_row2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-            active_addons = self.get_project_db_addons(approot, services)
-            if active_addons:
-                for ad in active_addons:
-                    btn_ad = Gtk.Button()
-                    b_ad = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-                    b_ad.pack_start(Gtk.Image.new_from_icon_name(ad.get("icon", "web-browser-symbolic"), Gtk.IconSize.MENU), False, False, 0)
-                    b_ad.pack_start(Gtk.Label(label=f"Abrir {ad['name']}"), False, False, 0)
-                    btn_ad.add(b_ad)
-                    btn_ad.get_style_context().add_class("btn-primary" if "DBeaver" in ad['name'] else "btn-quick")
-                    target_port = ad["port"]
-                    ad_url = ad.get("url") or f"{primary_url}:{target_port}"
-                    btn_ad.set_tooltip_text(f"Abrir interfaz web de {ad['name']} ({ad_url})")
-                    btn_ad.connect("clicked", lambda b, u=ad_url: webbrowser.open(u))
-                    db_row2.pack_start(btn_ad, False, False, 0)
-                    
-            btn_manage_db = Gtk.Button()
-            b_mdb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            b_mdb.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
-            b_label_txt = "Gestores en Docker (phpMyAdmin / Adminer / DBeaver)" if not active_addons else "Gestionar Gestores Web"
-            b_mdb.pack_start(Gtk.Label(label=b_label_txt), False, False, 0)
-            btn_manage_db.add(b_mdb)
-            if not active_addons:
-                btn_manage_db.get_style_context().add_class("btn-primary")
-            btn_manage_db.set_tooltip_text("Habilitar o gestionar phpMyAdmin, Adminer o DBeaver en contenedores Docker")
-            btn_manage_db.connect("clicked", lambda b: self.show_db_containers_dialog(approot, pname, primary_url))
-            db_row2.pack_start(btn_manage_db, False, False, 0)
-            
-            db_btn_box.pack_start(db_row2, False, False, 0)
+            if is_running:
+                btn_export_db = Gtk.Button()
+                b_exp = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                b_exp.pack_start(Gtk.Image.new_from_icon_name("document-save-symbolic", Gtk.IconSize.MENU), False, False, 0)
+                b_exp.pack_start(Gtk.Label(label="Exportar Base de Datos (.sql.gz)"), False, False, 0)
+                btn_export_db.add(b_exp)
+                btn_export_db.set_tooltip_text("Exportar un volcado completo de la base de datos (ddev export-db)")
+                btn_export_db.connect("clicked", lambda b: self.on_export_db_clicked(approot, pname))
+                db_row1.pack_start(btn_export_db, False, False, 0)
+                
+                btn_import_db = Gtk.Button()
+                b_imp = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                b_imp.pack_start(Gtk.Image.new_from_icon_name("document-open-symbolic", Gtk.IconSize.MENU), False, False, 0)
+                b_imp.pack_start(Gtk.Label(label="Importar Base de Datos (.sql)"), False, False, 0)
+                btn_import_db.add(b_imp)
+                btn_import_db.set_tooltip_text("Importar un archivo de volcado a la base de datos (ddev import-db)")
+                btn_import_db.connect("clicked", lambda b: self.on_import_db_clicked(approot, pname))
+                db_row1.pack_start(btn_import_db, False, False, 0)
+                
+                btn_launch_db = Gtk.Button()
+                b_ld = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                b_ld.pack_start(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic", Gtk.IconSize.MENU), False, False, 0)
+                b_ld.pack_start(Gtk.Label(label="Consola CLI (ddev mysql)"), False, False, 0)
+                btn_launch_db.add(b_ld)
+                btn_launch_db.connect("clicked", lambda b: self.main_app.open_terminal(approot, "ddev mysql" if "postgres" not in db_type else "ddev psql"))
+                db_row1.pack_start(btn_launch_db, False, False, 0)
+                
+                db_btn_box.pack_start(db_row1, False, False, 0)
+                
+                # Row 2: Visual Managers in Containers
+                db_row2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+                active_addons = self.get_project_db_addons(approot, services)
+                if active_addons:
+                    for ad in active_addons:
+                        btn_ad = Gtk.Button()
+                        b_ad = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                        b_ad.pack_start(Gtk.Image.new_from_icon_name(ad.get("icon", "web-browser-symbolic"), Gtk.IconSize.MENU), False, False, 0)
+                        b_ad.pack_start(Gtk.Label(label=f"Abrir {ad['name']}"), False, False, 0)
+                        btn_ad.add(b_ad)
+                        btn_ad.get_style_context().add_class("btn-primary" if "DBeaver" in ad['name'] else "btn-quick")
+                        target_port = ad["port"]
+                        ad_url = ad.get("url") or f"{primary_url}:{target_port}"
+                        btn_ad.set_tooltip_text(f"Abrir interfaz web de {ad['name']} ({ad_url})")
+                        btn_ad.connect("clicked", lambda b, u=ad_url: webbrowser.open(u))
+                        db_row2.pack_start(btn_ad, False, False, 0)
+                        
+                btn_manage_db = Gtk.Button()
+                b_mdb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                b_mdb.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
+                b_label_txt = "Gestores en Docker (phpMyAdmin / Adminer / DBeaver)" if not active_addons else "Gestionar Gestores Web"
+                b_mdb.pack_start(Gtk.Label(label=b_label_txt), False, False, 0)
+                btn_manage_db.add(b_mdb)
+                if not active_addons:
+                    btn_manage_db.get_style_context().add_class("btn-primary")
+                btn_manage_db.set_tooltip_text("Habilitar o gestionar phpMyAdmin, Adminer o DBeaver en contenedores Docker")
+                btn_manage_db.connect("clicked", lambda b: self.show_db_containers_dialog(approot, pname, primary_url))
+                db_row2.pack_start(btn_manage_db, False, False, 0)
+                
+                db_btn_box.pack_start(db_row2, False, False, 0)
+            else:
+                btn_manage_db = Gtk.Button()
+                b_mdb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                b_mdb.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
+                b_mdb.pack_start(Gtk.Label(label="Gestores en Docker (Configurar)"), False, False, 0)
+                btn_manage_db.add(b_mdb)
+                btn_manage_db.set_tooltip_text("Habilitar o deshabilitar phpMyAdmin, Adminer o DBeaver")
+                btn_manage_db.connect("clicked", lambda b: self.show_db_containers_dialog(approot, pname, primary_url))
+                db_row1.pack_start(btn_manage_db, False, False, 0)
+                
+                lbl_hint = Gtk.Label()
+                lbl_hint.set_markup("<small><span color='#94a3b8'>💡 Inicia el proyecto para exportar/importar, abrir la consola SQL o acceder a los gestores web.</span></small>")
+                lbl_hint.set_halign(Gtk.Align.START)
+                
+                db_btn_box.pack_start(db_row1, False, False, 0)
+                db_btn_box.pack_start(lbl_hint, False, False, 0)
+                
             db_card.pack_start(db_btn_box, False, False, 0)
             self.content_box.pack_start(db_card, False, False, 0)
             
@@ -2600,42 +2618,43 @@ class ProjectDetailsView(Gtk.Box):
             
         env_card.pack_start(grid_env, False, False, 0)
         
-        # Contextual Action buttons
-        env_btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        env_btn_row.set_margin_top(4)
-        
-        if is_php:
-            btn_xdebug = Gtk.Button()
-            b_xd = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            b_xd.pack_start(Gtk.Image.new_from_icon_name("system-run-symbolic", Gtk.IconSize.MENU), False, False, 0)
-            lbl_xd_btn = "Desactivar Xdebug (ddev xdebug off)" if is_xdebug else "Activar Xdebug (ddev xdebug on)"
-            b_xd.pack_start(Gtk.Label(label=lbl_xd_btn), False, False, 0)
-            btn_xdebug.add(b_xd)
-            btn_xdebug.get_style_context().add_class("btn-primary" if not is_xdebug else "btn-quick")
-            btn_xdebug.connect("clicked", lambda b: self.toggle_xdebug(not is_xdebug))
-            env_btn_row.pack_start(btn_xdebug, False, False, 0)
+        # Contextual Action buttons (Only when running)
+        if is_running:
+            env_btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            env_btn_row.set_margin_top(4)
             
-        elif is_python:
-            btn_py = Gtk.Button()
-            b_py = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            b_py.pack_start(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic", Gtk.IconSize.MENU), False, False, 0)
-            b_py.pack_start(Gtk.Label(label="Consola Python (ddev exec python)"), False, False, 0)
-            btn_py.add(b_py)
-            btn_py.connect("clicked", lambda b: self.main_app.open_terminal(approot, "ddev exec python"))
-            env_btn_row.pack_start(btn_py, False, False, 0)
-            
-        elif is_js:
-            btn_npm = Gtk.Button()
-            b_npm = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            b_npm.pack_start(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic", Gtk.IconSize.MENU), False, False, 0)
-            b_npm.pack_start(Gtk.Label(label=f"Consola NPM / {tech_type.capitalize()} (ddev npm)"), False, False, 0)
-            btn_npm.add(b_npm)
-            btn_npm.connect("clicked", lambda b: self.main_app.open_terminal(approot, "ddev npm"))
-            env_btn_row.pack_start(btn_npm, False, False, 0)
-            
-        if env_btn_row.get_children():
-            env_card.pack_start(env_btn_row, False, False, 0)
-            
+            if is_php:
+                btn_xdebug = Gtk.Button()
+                b_xd = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                b_xd.pack_start(Gtk.Image.new_from_icon_name("system-run-symbolic", Gtk.IconSize.MENU), False, False, 0)
+                lbl_xd_btn = "Desactivar Xdebug (ddev xdebug off)" if is_xdebug else "Activar Xdebug (ddev xdebug on)"
+                b_xd.pack_start(Gtk.Label(label=lbl_xd_btn), False, False, 0)
+                btn_xdebug.add(b_xd)
+                btn_xdebug.get_style_context().add_class("btn-primary" if not is_xdebug else "btn-quick")
+                btn_xdebug.connect("clicked", lambda b: self.toggle_xdebug(not is_xdebug))
+                env_btn_row.pack_start(btn_xdebug, False, False, 0)
+                
+            elif is_python:
+                btn_py = Gtk.Button()
+                b_py = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                b_py.pack_start(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic", Gtk.IconSize.MENU), False, False, 0)
+                b_py.pack_start(Gtk.Label(label="Consola Python (ddev exec python)"), False, False, 0)
+                btn_py.add(b_py)
+                btn_py.connect("clicked", lambda b: self.main_app.open_terminal(approot, "ddev exec python"))
+                env_btn_row.pack_start(btn_py, False, False, 0)
+                
+            elif is_js:
+                btn_npm = Gtk.Button()
+                b_npm = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                b_npm.pack_start(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic", Gtk.IconSize.MENU), False, False, 0)
+                b_npm.pack_start(Gtk.Label(label=f"Consola NPM / {tech_type.capitalize()} (ddev npm)"), False, False, 0)
+                btn_npm.add(b_npm)
+                btn_npm.connect("clicked", lambda b: self.main_app.open_terminal(approot, "ddev npm"))
+                env_btn_row.pack_start(btn_npm, False, False, 0)
+                
+            if env_btn_row.get_children():
+                env_card.pack_start(env_btn_row, False, False, 0)
+                
         self.content_box.pack_start(env_card, False, False, 0)
         
         # 4. Registered URLs and Domains Card
