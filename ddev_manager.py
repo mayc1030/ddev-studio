@@ -3345,11 +3345,19 @@ web_extra_daemons:
                     ]
                     self.run_subproc(cfg_cmd, target_dir, dialog)
                     
+                    ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
+                    if os.path.exists(ddev_cfg_path):
+                        with open(ddev_cfg_path, "a") as cf:
+                            cf.write("""
+web_environment:
+  - NG_CLI_ANALYTICS=false
+""")
+
                     set_st("Iniciando contenedores DDEV...")
                     self.run_subproc(["ddev", "start", "-y"], target_dir, dialog)
                     
                     set_st("Creando proyecto Angular con @angular/cli...")
-                    self.run_subproc(["ddev", "exec", "npx -y @angular/cli new app --directory=. --routing --style=css --skip-git --defaults"], target_dir, dialog)
+                    self.run_subproc(["ddev", "exec", "NG_CLI_ANALYTICS=false npx -y @angular/cli new app --directory=. --routing --style=css --skip-git --defaults"], target_dir, dialog)
                     
                     set_st("Configurando Nginx Reverse Proxy y Live Dev Server...")
                     nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
@@ -3385,13 +3393,12 @@ web_extra_daemons:
     include /mnt/ddev_config/nginx/*.conf;
 }
 """)
-                    ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
                     if os.path.exists(ddev_cfg_path):
                         with open(ddev_cfg_path, "a") as cf:
                             cf.write("""
 web_extra_daemons:
   - name: angular
-    command: "npm start -- --host 0.0.0.0 --port 4200 --disable-host-check"
+    command: "npx ng serve --host 0.0.0.0 --port 4200 --allowed-hosts"
     directory: /var/www/html
 """)
                     set_st("Reiniciando DDEV para activar Angular Live Dev Server...")
