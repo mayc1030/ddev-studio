@@ -629,6 +629,27 @@ class SubsitesManagerDialog(Gtk.Dialog):
         self.show_all()
         self.refresh_subsites()
 
+    def update_ddev_fqdns(self, base_dir, add_subsite=None, remove_subsite=None):
+        docroot_dir = "docroot" if os.path.exists(os.path.join(base_dir, "docroot")) else ("web" if os.path.exists(os.path.join(base_dir, "web")) else ".")
+        sites_dir = os.path.join(base_dir, docroot_dir, "sites")
+        existing_subsites = set()
+        if os.path.exists(sites_dir):
+            try:
+                for entry in os.listdir(sites_dir):
+                    full_p = os.path.join(sites_dir, entry)
+                    if os.path.isdir(full_p) and entry not in ["default", "g", "settings", "all", "simpletest"]:
+                        existing_subsites.add(entry)
+            except Exception:
+                pass
+        if add_subsite:
+            existing_subsites.add(add_subsite)
+        if remove_subsite and remove_subsite in existing_subsites:
+            existing_subsites.remove(remove_subsite)
+            
+        fqdns = [f"{s}.ddev.site" for s in sorted(existing_subsites)]
+        fqdns_arg = ",".join(fqdns)
+        subprocess.run(["ddev", "config", f"--additional-fqdns={fqdns_arg}"], cwd=base_dir, capture_output=True)
+
     def run_subproc(self, cmd, cwd, dialog):
         GLib.idle_add(dialog.append_log, f"$ {' '.join(cmd)}\n")
         proc = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
@@ -1096,40 +1117,11 @@ class SubsitesManagerDialog(Gtk.Dialog):
                     cfg_cmd = ["ddev", "config", f"--project-name={base_name}", "--project-type=drupal10", "--docroot=docroot", "--php-version=8.3", "--database=mariadb:10.11"]
                     self.run_subproc(cfg_cmd, base_dir, dialog)
 
-                # 2. Add subsite domain to additional_fqdns in .ddev/config.yaml
+                # 2. Add subsite domain to additional_fqdns via native ddev config
                 set_st(f"Registrando dominio {subsite_domain} en DDEV...")
-                try:
-                    with open(ddev_cfg, "r") as f:
-                        lines = f.readlines()
-                    
-                    domain_exists = False
-                    for line in lines:
-                        if not line.strip().startswith("#") and subsite_domain in line:
-                            domain_exists = True
-                            break
-                            
-                    if not domain_exists:
-                        new_lines = []
-                        fqdns_found = False
-                        for line in lines:
-                            stripped = line.strip()
-                            if not line.startswith("#") and stripped.startswith("additional_fqdns:"):
-                                fqdns_found = True
-                                if stripped in ["additional_fqdns: []", "additional_fqdns:[]", "additional_fqdns:"]:
-                                    new_lines.append("additional_fqdns:\n")
-                                    new_lines.append(f"  - {subsite_domain}\n")
-                                else:
-                                    new_lines.append(line)
-                                    new_lines.append(f"  - {subsite_domain}\n")
-                            else:
-                                new_lines.append(line)
-                        if not fqdns_found:
-                            new_lines.insert(7, f"additional_fqdns:\n  - {subsite_domain}\n")
-                        with open(ddev_cfg, "w") as f:
-                            f.writelines(new_lines)
-                        log(f"✓ Dominio {subsite_domain} añadido a additional_fqdns.")
-                except Exception as ex:
-                    log(f"Advertencia editando config.yaml: {ex}")
+                self.update_ddev_fqdns(base_dir, add_subsite=slug)
+                log(f"✓ Dominio {subsite_domain} registrado en DDEV.")
+
 
                 # 3. Ensure DDEV is started
                 set_st("Iniciando entorno DDEV...")
@@ -1362,18 +1354,8 @@ if (!file_exists('/var/acquia')) {
                         except Exception:
                             pass
                             
-                    # 4. Remove domain from additional_fqdns in .ddev/config.yaml
-                    ddev_cfg = os.path.join(base_dir, ".ddev", "config.yaml")
-                    subsite_domain = f"{s_name}.ddev.site"
-                    if os.path.exists(ddev_cfg):
-                        try:
-                            with open(ddev_cfg, "r") as f:
-                                lines = f.readlines()
-                            new_lines = [l for l in lines if subsite_domain not in l]
-                            with open(ddev_cfg, "w") as f:
-                                f.writelines(new_lines)
-                        except Exception:
-                            pass
+                    # 4. Remove domain from additional_fqdns via native ddev config
+                    self.update_ddev_fqdns(base_dir, remove_subsite=s_name)
                             
                     # 5. Restart DDEV to release domain
                     GLib.idle_add(del_dialog.append_log, f"Actualizando router de DDEV...\n")
