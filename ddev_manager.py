@@ -1901,15 +1901,22 @@ def inspect_project_stack(approot, raw_data, proj_dict):
     tech_type = ddev_type
     has_db = True
     
+    # 1. Inspect ddev config if approot exists
     if approot and os.path.exists(approot):
-        # 1. Check if omit_containers contains db
         ddev_cfg = os.path.join(approot, ".ddev", "config.yaml")
         if os.path.exists(ddev_cfg):
             try:
                 with open(ddev_cfg, "r", encoding="utf-8") as f:
                     cfg_text = f.read()
+                    
+                # Check omit_containers for db
                 m_omit = re.search(r"^\s*omit_containers:\s*\[(.*?)\]", cfg_text, re.MULTILINE)
                 if m_omit and "db" in m_omit.group(1):
+                    has_db = False
+                    
+                # Check database type
+                m_db_type = re.search(r"^\s*database:\s*\n\s*type:\s*([^\s]+)", cfg_text, re.MULTILINE)
+                if m_db_type and m_db_type.group(1).strip().strip('"\'').lower() in ["", "none", "null"]:
                     has_db = False
             except Exception:
                 pass
@@ -1990,6 +1997,11 @@ def inspect_project_stack(approot, raw_data, proj_dict):
     is_static = (tech_type in ["html", "static", "apache", "nginx"])
     is_php = not (is_python or is_js or is_static)
     
+    # 5. Check DDEV describe data for DB container status
+    database_type = (raw_data.get("database_type") or "").lower()
+    if database_type in ["none", "empty", "null"]:
+        has_db = False
+
     # Pure frontend / static apps don't have database
     if is_js or is_static:
         has_db = False
@@ -3462,8 +3474,10 @@ class DDEVManagerWindow(Gtk.Window):
         card.get_style_context().add_class("project-card")
         card.project_data = proj
         
-        ptype = proj.get("type", "").lower()
         approot = proj.get("approot", "")
+        tech_type, has_db, is_php, is_python, is_js, is_static = inspect_project_stack(approot, proj, proj)
+        ptype = tech_type.lower()
+        
         icon_name = "php.svg"
         if "wordpress" in ptype:
             icon_name = "wordpress.svg"
@@ -3471,11 +3485,11 @@ class DDEVManagerWindow(Gtk.Window):
             icon_name = "drupal.svg"
         elif "laravel" in ptype:
             icon_name = "laravel.svg"
-        elif "django" in ptype or (approot and os.path.exists(os.path.join(approot, "manage.py"))):
+        elif "django" in ptype:
             icon_name = "django.svg"
-        elif "flask" in ptype or (approot and (os.path.exists(os.path.join(approot, "app.py")) or os.path.exists(os.path.join(approot, "wsgi.py")))):
+        elif "flask" in ptype:
             icon_name = "flask.svg"
-        elif "angular" in ptype or (approot and os.path.exists(os.path.join(approot, "angular.json"))):
+        elif "angular" in ptype:
             icon_name = "angular.svg"
         elif "react" in ptype:
             icon_name = "react.svg"
@@ -3483,7 +3497,9 @@ class DDEVManagerWindow(Gtk.Window):
             icon_name = "vue.svg"
         elif "symfony" in ptype:
             icon_name = "symfony.svg"
-        elif "generic" in ptype or "vite" in ptype:
+        elif "python" in ptype:
+            icon_name = "python.svg"
+        elif is_js:
             icon_name = "react.svg"
             
         pixbuf = load_icon(icon_name, 40)
@@ -3510,7 +3526,7 @@ class DDEVManagerWindow(Gtk.Window):
             lbl_status.get_style_context().add_class("badge-stopped")
         title_row.pack_start(lbl_status, False, False, 0)
         
-        lbl_type = Gtk.Label(label=proj.get("type", "generic"))
+        lbl_type = Gtk.Label(label=tech_type.upper())
         lbl_type.get_style_context().add_class("badge")
         lbl_type.get_style_context().add_class("badge-tech")
         title_row.pack_start(lbl_type, False, False, 0)
