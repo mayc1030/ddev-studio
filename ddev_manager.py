@@ -190,8 +190,8 @@ CUSTOM_CSS = b"""
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
 }
 .big-spinner {
-    min-width: 72px;
-    min-height: 72px;
+    min-width: 48px;
+    min-height: 48px;
 }
 .loader-spinner {
     min-width: 32px;
@@ -2051,67 +2051,6 @@ def inspect_project_stack(approot, raw_data, proj_dict):
         has_db = False
         
     return tech_type, has_db, is_php, is_python, is_js, is_static
-
-import math
-
-class GiantSpinner(Gtk.DrawingArea):
-    def __init__(self, size=160, line_width=12, color=(0.22, 0.74, 0.97)): # Cyan/Sky-blue (#38bdf8)
-        super().__init__()
-        self.size = size
-        self.line_width = line_width
-        self.color = color
-        self.angle = 0.0
-        self.set_size_request(size, size)
-        self.connect("draw", self.on_draw)
-        self._timer_id = None
-
-    def start(self):
-        if not self._timer_id:
-            self._timer_id = GLib.timeout_add(16, self._step)
-
-    def stop(self):
-        if self._timer_id:
-            try:
-                GLib.source_remove(self._timer_id)
-            except Exception:
-                pass
-            self._timer_id = None
-
-    def _step(self):
-        if not self.get_parent():
-            self._timer_id = None
-            return False
-        self.angle = (self.angle + 0.09) % (2 * math.pi)
-        self.queue_draw()
-        return True
-
-    def on_draw(self, widget, cr):
-        width = widget.get_allocated_width()
-        height = widget.get_allocated_height()
-        cx = width / 2.0
-        cy = height / 2.0
-        radius = (min(width, height) - self.line_width * 2) / 2.0
-        if radius <= 0:
-            return False
-
-        # Draw background track
-        cr.set_line_width(self.line_width)
-        cr.set_source_rgba(self.color[0], self.color[1], self.color[2], 0.15)
-        cr.arc(cx, cy, radius, 0, 2 * math.pi)
-        cr.stroke()
-
-        # Draw glowing rotating arc
-        arc_len = 1.25 * math.pi  # ~225 degrees arc
-        start_angle = self.angle
-        end_angle = self.angle + arc_len
-
-        cr.set_line_cap(1) # CAIRO_LINE_CAP_ROUND
-        cr.set_line_width(self.line_width)
-        cr.set_source_rgba(self.color[0], self.color[1], self.color[2], 0.95)
-        cr.arc(cx, cy, radius, start_angle, end_angle)
-        cr.stroke()
-        return False
-
 class ProjectDetailsView(Gtk.Box):
     def __init__(self, main_app):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -2350,65 +2289,30 @@ class ProjectDetailsView(Gtk.Box):
         for child in self.content_box.get_children():
             self.content_box.remove(child)
             
-        loader_outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        loader_outer.set_halign(Gtk.Align.CENTER)
-        loader_outer.set_valign(Gtk.Align.CENTER)
-        loader_outer.set_margin_top(40)
-        loader_outer.set_margin_bottom(40)
+        loader_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        loader_box.set_halign(Gtk.Align.CENTER)
+        loader_box.set_valign(Gtk.Align.CENTER)
+        loader_box.set_margin_top(80)
+        loader_box.set_margin_bottom(80)
         
-        loader_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        loader_card.get_style_context().add_class("loader-card")
-        loader_card.set_size_request(520, -1)
-        
-        # Giant Spinner + DDEV Logo row
-        spin_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=20)
-        spin_row.set_halign(Gtk.Align.CENTER)
-        
-        spinner = GiantSpinner(size=110, line_width=9)
+        spinner = Gtk.Spinner()
+        spinner.get_style_context().add_class("big-spinner")
+        spinner.set_size_request(48, 48)
         spinner.start()
-        spin_row.pack_start(spinner, False, False, 0)
+        loader_box.pack_start(spinner, False, False, 0)
         
-        ddev_icon = load_icon("ddev.svg", 56)
-        if ddev_icon:
-            spin_row.pack_start(Gtk.Image.new_from_pixbuf(ddev_icon), False, False, 0)
-            
-        loader_card.pack_start(spin_row, False, False, 0)
-        
-        # Title and Subtitle
         lbl_title = Gtk.Label()
-        lbl_title.set_markup("<span size='x-large' weight='bold'>Obteniendo radiografía en vivo</span>")
+        lbl_title.set_markup("<span size='large' weight='600'>Cargando detalles...</span>")
         lbl_title.set_halign(Gtk.Align.CENTER)
-        loader_card.pack_start(lbl_title, False, False, 0)
+        loader_box.pack_start(lbl_title, False, False, 0)
         
-        lbl_sub1 = Gtk.Label()
-        lbl_sub1.set_markup("<span color='#94a3b8'>Consultando contenedores Docker, puertos y servicios de</span>")
-        lbl_sub1.set_halign(Gtk.Align.CENTER)
-        loader_card.pack_start(lbl_sub1, False, False, 0)
+        lbl_proj = Gtk.Label()
+        lbl_proj.set_markup(f"<span color='#38bdf8' size='medium'><b>{self.proj_name}</b></span>")
+        lbl_proj.set_halign(Gtk.Align.CENTER)
+        loader_box.pack_start(lbl_proj, False, False, 0)
         
-        lbl_sub2 = Gtk.Label()
-        lbl_sub2.set_markup(f"<span color='#38bdf8' size='large' weight='bold'>{self.proj_name}</span>")
-        lbl_sub2.set_halign(Gtk.Align.CENTER)
-        loader_card.pack_start(lbl_sub2, False, False, 0)
-        
-        # Animated Pulse Progress Bar
-        pbar = Gtk.ProgressBar()
-        pbar.get_style_context().add_class("loader-pbar")
-        pbar.set_margin_top(4)
-        pbar.set_margin_start(24)
-        pbar.set_margin_end(24)
-        loader_card.pack_start(pbar, False, False, 0)
-        
-        loader_outer.pack_start(loader_card, False, False, 0)
-        self.content_box.pack_start(loader_outer, True, True, 0)
+        self.content_box.pack_start(loader_box, True, True, 0)
         self.content_box.show_all()
-        
-        is_loading = [True]
-        def pulse_tick():
-            if is_loading[0] and pbar.get_parent():
-                pbar.pulse()
-                return True
-            return False
-        GLib.timeout_add(80, pulse_tick)
         
         def fetch():
             try:
@@ -2442,12 +2346,7 @@ class ProjectDetailsView(Gtk.Box):
                 except Exception:
                     pass
                     
-            def on_ready():
-                is_loading[0] = False
-                spinner.stop()
-                self.render_details_ui(raw_data)
-                
-            GLib.idle_add(on_ready)
+            GLib.idle_add(self.render_details_ui, raw_data)
             
         threading.Thread(target=fetch, daemon=True).start()
 
