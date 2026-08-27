@@ -1679,8 +1679,10 @@ class DDEVManagerWindow(Gtk.Window):
         
         # Row 0 - PHP Version
         self.lbl_new_php = Gtk.Label(label="Versión de PHP:", halign=Gtk.Align.END)
+        self.lbl_new_php.set_no_show_all(True)
         grid_adv.attach(self.lbl_new_php, 0, 0, 1, 1)
         self.combo_php = Gtk.ComboBoxText()
+        self.combo_php.set_no_show_all(True)
         for v in ["8.3", "8.2", "8.1", "8.4", "8.0", "7.4"]:
             self.combo_php.append_text(v)
         self.combo_php.set_active(0)
@@ -1688,8 +1690,10 @@ class DDEVManagerWindow(Gtk.Window):
 
         # Row 0 - Node.js Version
         self.lbl_new_nodejs = Gtk.Label(label="Versión de Node.js:", halign=Gtk.Align.END)
+        self.lbl_new_nodejs.set_no_show_all(True)
         grid_adv.attach(self.lbl_new_nodejs, 0, 0, 1, 1)
         self.combo_node = Gtk.ComboBoxText()
+        self.combo_node.set_no_show_all(True)
         for n in ["22", "20", "18"]:
             self.combo_node.append(n, f"Node.js v{n}")
         self.combo_node.set_active_id("22")
@@ -1697,8 +1701,10 @@ class DDEVManagerWindow(Gtk.Window):
 
         # Row 0 - Python Runtime Info
         self.lbl_new_python = Gtk.Label(label="Entorno de Ejecución:", halign=Gtk.Align.END)
+        self.lbl_new_python.set_no_show_all(True)
         grid_adv.attach(self.lbl_new_python, 0, 0, 1, 1)
         self.lbl_new_python_info = Gtk.Label(halign=Gtk.Align.START)
+        self.lbl_new_python_info.set_no_show_all(True)
         self.lbl_new_python_info.set_markup("<span color='#38bdf8'><b>🐍 Python 3.x con entorno virtual .venv aislado</b></span>")
         grid_adv.attach(self.lbl_new_python_info, 1, 0, 1, 1)
         
@@ -1710,9 +1716,11 @@ class DDEVManagerWindow(Gtk.Window):
         
         # Auto install checkbox
         self.chk_auto_install = Gtk.CheckButton(label="Instalar CMS y crear superusuario administrador (admin / admin)")
+        self.chk_auto_install.set_no_show_all(True)
         self.chk_auto_install.set_active(True)
         exp_box.pack_start(self.chk_auto_install, False, False, 0)
         
+        self.drupal_version_box.set_no_show_all(True)
         self.expander_new_project.add(exp_box)
         box.pack_start(self.expander_new_project, False, False, 0)
         
@@ -1817,8 +1825,10 @@ class DDEVManagerWindow(Gtk.Window):
         
         # Row 3 - PHP Runtime
         self.lbl_import_php = Gtk.Label(label="Versión de PHP:", halign=Gtk.Align.END)
+        self.lbl_import_php.set_no_show_all(True)
         grid_cfg.attach(self.lbl_import_php, 0, 3, 1, 1)
         self.combo_import_php = Gtk.ComboBoxText()
+        self.combo_import_php.set_no_show_all(True)
         for v in ["8.3", "8.2", "8.1", "8.4", "8.0", "7.4"]:
             self.combo_import_php.append_text(v)
         self.combo_import_php.set_active(0)
@@ -1826,8 +1836,10 @@ class DDEVManagerWindow(Gtk.Window):
 
         # Row 3 - Node.js Runtime
         self.lbl_import_nodejs = Gtk.Label(label="Versión de Node.js:", halign=Gtk.Align.END)
+        self.lbl_import_nodejs.set_no_show_all(True)
         grid_cfg.attach(self.lbl_import_nodejs, 0, 3, 1, 1)
         self.combo_import_nodejs = Gtk.ComboBoxText()
+        self.combo_import_nodejs.set_no_show_all(True)
         for nv in ["22", "20", "18"]:
             self.combo_import_nodejs.append(nv, f"Node.js v{nv}")
         self.combo_import_nodejs.set_active_id("22")
@@ -1835,8 +1847,10 @@ class DDEVManagerWindow(Gtk.Window):
 
         # Row 3 - Python Runtime
         self.lbl_import_python = Gtk.Label(label="Entorno de Ejecución:", halign=Gtk.Align.END)
+        self.lbl_import_python.set_no_show_all(True)
         grid_cfg.attach(self.lbl_import_python, 0, 3, 1, 1)
         self.lbl_import_python_info = Gtk.Label(halign=Gtk.Align.START)
+        self.lbl_import_python_info.set_no_show_all(True)
         self.lbl_import_python_info.set_markup("<span color='#38bdf8'><b>🐍 Python 3.x con entorno .venv aislado</b></span>")
         grid_cfg.attach(self.lbl_import_python_info, 1, 3, 1, 1)
         
@@ -1847,6 +1861,7 @@ class DDEVManagerWindow(Gtk.Window):
         
         # Options box
         self.box_import_drupal_options = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self.box_import_drupal_options.set_no_show_all(True)
         self.chk_import_multisite = Gtk.CheckButton(label="Habilitar arquitectura Drupal Multisite (Configurar sites.php dinámico)")
         self.chk_import_multisite.set_active(True)
         self.box_import_drupal_options.pack_start(self.chk_import_multisite, False, False, 0)
@@ -1936,14 +1951,28 @@ class DDEVManagerWindow(Gtk.Window):
 
             # Runtime fields visibility in Advanced Options
             if hasattr(self, "lbl_new_php") and hasattr(self, "combo_php"):
-                self.lbl_new_php.set_visible(is_php)
-                self.combo_php.set_visible(is_php)
+                if is_php:
+                    self.lbl_new_php.show()
+                    self.combo_php.show()
+                else:
+                    self.lbl_new_php.hide()
+                    self.combo_php.hide()
+                    
             if hasattr(self, "lbl_new_nodejs") and hasattr(self, "combo_node"):
-                self.lbl_new_nodejs.set_visible(is_node)
-                self.combo_node.set_visible(is_node)
+                if is_node:
+                    self.lbl_new_nodejs.show()
+                    self.combo_node.show()
+                else:
+                    self.lbl_new_nodejs.hide()
+                    self.combo_node.hide()
+                    
             if hasattr(self, "lbl_new_python") and hasattr(self, "lbl_new_python_info"):
-                self.lbl_new_python.set_visible(is_python)
-                self.lbl_new_python_info.set_visible(is_python)
+                if is_python:
+                    self.lbl_new_python.show()
+                    self.lbl_new_python_info.show()
+                else:
+                    self.lbl_new_python.hide()
+                    self.lbl_new_python_info.hide()
 
             # Database options in Advanced Options
             if hasattr(self, "combo_db"):
@@ -1976,18 +2005,18 @@ class DDEVManagerWindow(Gtk.Window):
             if hasattr(self, "chk_auto_install"):
                 if fw_id == "drupal":
                     self.chk_auto_install.set_label("Instalar Drupal y crear superusuario administrador (admin / admin)")
-                    self.chk_auto_install.set_visible(True)
+                    self.chk_auto_install.show()
                     self.chk_auto_install.set_active(True)
                 elif fw_id == "wordpress":
                     self.chk_auto_install.set_label("Instalar WordPress y crear usuario administrador (admin / admin)")
-                    self.chk_auto_install.set_visible(True)
+                    self.chk_auto_install.show()
                     self.chk_auto_install.set_active(True)
                 elif fw_id == "django":
                     self.chk_auto_install.set_label("Crear superusuario (admin / admin) y ejecutar migraciones iniciales")
-                    self.chk_auto_install.set_visible(True)
+                    self.chk_auto_install.show()
                     self.chk_auto_install.set_active(True)
                 else:
-                    self.chk_auto_install.set_visible(False)
+                    self.chk_auto_install.hide()
 
     def on_drupal_version_changed(self, combo):
         idx = combo.get_active()
@@ -2789,18 +2818,35 @@ class DDEVManagerWindow(Gtk.Window):
         is_python = t_id in ["django", "flask"]
         
         if hasattr(self, "box_import_drupal_options"):
-            self.box_import_drupal_options.set_visible(is_dr)
+            if is_dr:
+                self.box_import_drupal_options.show()
+            else:
+                self.box_import_drupal_options.hide()
             
         # Runtime visibility
         if hasattr(self, "lbl_import_php") and hasattr(self, "combo_import_php"):
-            self.lbl_import_php.set_visible(is_php)
-            self.combo_import_php.set_visible(is_php)
+            if is_php:
+                self.lbl_import_php.show()
+                self.combo_import_php.show()
+            else:
+                self.lbl_import_php.hide()
+                self.combo_import_php.hide()
+                
         if hasattr(self, "lbl_import_nodejs") and hasattr(self, "combo_import_nodejs"):
-            self.lbl_import_nodejs.set_visible(is_node)
-            self.combo_import_nodejs.set_visible(is_node)
+            if is_node:
+                self.lbl_import_nodejs.show()
+                self.combo_import_nodejs.show()
+            else:
+                self.lbl_import_nodejs.hide()
+                self.combo_import_nodejs.hide()
+                
         if hasattr(self, "lbl_import_python") and hasattr(self, "lbl_import_python_info"):
-            self.lbl_import_python.set_visible(is_python)
-            self.lbl_import_python_info.set_visible(is_python)
+            if is_python:
+                self.lbl_import_python.show()
+                self.lbl_import_python_info.show()
+            else:
+                self.lbl_import_python.hide()
+                self.lbl_import_python_info.hide()
             
         # Database options
         if hasattr(self, "combo_import_db"):
@@ -3786,6 +3832,14 @@ def main():
     app = DDEVManagerWindow()
     app.connect("destroy", Gtk.main_quit)
     app.show_all()
+    
+    # Ensure proper initial framework visibility
+    first_child = app.flowbox_fw.get_child_at_index(0)
+    if first_child:
+        app.on_framework_selected(app.flowbox_fw, first_child)
+    if hasattr(app, "combo_import_type"):
+        app.on_import_type_changed(app.combo_import_type)
+        
     Gtk.main()
 
 
