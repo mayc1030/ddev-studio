@@ -2350,28 +2350,65 @@ class ProjectDetailsView(Gtk.Box):
         for child in self.content_box.get_children():
             self.content_box.remove(child)
             
-        loader_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
-        loader_box.set_halign(Gtk.Align.CENTER)
-        loader_box.set_valign(Gtk.Align.CENTER)
-        loader_box.set_margin_top(60)
-        loader_box.set_margin_bottom(60)
+        loader_outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        loader_outer.set_halign(Gtk.Align.CENTER)
+        loader_outer.set_valign(Gtk.Align.CENTER)
+        loader_outer.set_margin_top(40)
+        loader_outer.set_margin_bottom(40)
         
-        spinner = GiantSpinner(size=160, line_width=12)
+        loader_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        loader_card.get_style_context().add_class("loader-card")
+        loader_card.set_size_request(520, -1)
+        
+        # Giant Spinner + DDEV Logo row
+        spin_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=20)
+        spin_row.set_halign(Gtk.Align.CENTER)
+        
+        spinner = GiantSpinner(size=110, line_width=9)
         spinner.start()
-        loader_box.pack_start(spinner, False, False, 0)
+        spin_row.pack_start(spinner, False, False, 0)
         
+        ddev_icon = load_icon("ddev.svg", 56)
+        if ddev_icon:
+            spin_row.pack_start(Gtk.Image.new_from_pixbuf(ddev_icon), False, False, 0)
+            
+        loader_card.pack_start(spin_row, False, False, 0)
+        
+        # Title and Subtitle
         lbl_title = Gtk.Label()
-        lbl_title.set_markup("<span size='xx-large' weight='600'>Cargando detalles...</span>")
+        lbl_title.set_markup("<span size='x-large' weight='bold'>Obteniendo radiografía en vivo</span>")
         lbl_title.set_halign(Gtk.Align.CENTER)
-        loader_box.pack_start(lbl_title, False, False, 0)
+        loader_card.pack_start(lbl_title, False, False, 0)
         
-        lbl_proj = Gtk.Label()
-        lbl_proj.set_markup(f"<span color='#38bdf8' size='x-large'><b>{self.proj_name}</b></span>")
-        lbl_proj.set_halign(Gtk.Align.CENTER)
-        loader_box.pack_start(lbl_proj, False, False, 0)
+        lbl_sub1 = Gtk.Label()
+        lbl_sub1.set_markup("<span color='#94a3b8'>Consultando contenedores Docker, puertos y servicios de</span>")
+        lbl_sub1.set_halign(Gtk.Align.CENTER)
+        loader_card.pack_start(lbl_sub1, False, False, 0)
         
-        self.content_box.pack_start(loader_box, True, True, 0)
+        lbl_sub2 = Gtk.Label()
+        lbl_sub2.set_markup(f"<span color='#38bdf8' size='large' weight='bold'>{self.proj_name}</span>")
+        lbl_sub2.set_halign(Gtk.Align.CENTER)
+        loader_card.pack_start(lbl_sub2, False, False, 0)
+        
+        # Animated Pulse Progress Bar
+        pbar = Gtk.ProgressBar()
+        pbar.get_style_context().add_class("loader-pbar")
+        pbar.set_margin_top(4)
+        pbar.set_margin_start(24)
+        pbar.set_margin_end(24)
+        loader_card.pack_start(pbar, False, False, 0)
+        
+        loader_outer.pack_start(loader_card, False, False, 0)
+        self.content_box.pack_start(loader_outer, True, True, 0)
         self.content_box.show_all()
+        
+        is_loading = [True]
+        def pulse_tick():
+            if is_loading[0] and pbar.get_parent():
+                pbar.pulse()
+                return True
+            return False
+        GLib.timeout_add(80, pulse_tick)
         
         def fetch():
             try:
@@ -2406,6 +2443,7 @@ class ProjectDetailsView(Gtk.Box):
                     pass
                     
             def on_ready():
+                is_loading[0] = False
                 spinner.stop()
                 self.render_details_ui(raw_data)
                 
