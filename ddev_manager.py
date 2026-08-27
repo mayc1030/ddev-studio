@@ -878,6 +878,9 @@ class DDEVManagerWindow(Gtk.Window):
             add_menu_item(drush_menu, "🔄 Actualizar Base de Datos (drush updb)", "updb", proj)
             
             drush_menu.append(Gtk.SeparatorMenuItem())
+            add_menu_item(drush_menu, "📥 Importar Base de Datos (.sql / .sql.gz)", "import_db", proj)
+            add_menu_item(drush_menu, "📤 Exportar Base de Datos (.sql.gz)", "export_db", proj)
+            drush_menu.append(Gtk.SeparatorMenuItem())
             
             if "drupal7" not in ptype:
                 add_menu_item(drush_menu, "📤 Exportar Configuración (drush cex)", "cex", proj)
@@ -1020,6 +1023,14 @@ class DDEVManagerWindow(Gtk.Window):
         
         if action_key == "ssh":
             self.open_terminal(approot, "ddev ssh")
+            return
+
+        if action_key == "import_db":
+            self.on_import_db(None, proj)
+            return
+
+        if action_key == "export_db":
+            self.on_export_db(None, proj)
             return
             
         cfg = drush_configs.get(action_key)
@@ -1651,6 +1662,9 @@ class DDEVManagerWindow(Gtk.Window):
         add_item(drush_menu, "⚡ Limpiar / Reconstruir Caché (drush cr)", "cr", subsite["name"], subsite_url)
         add_item(drush_menu, "🔄 Actualizar Base de Datos (drush updb)", "updb", subsite["name"], subsite_url)
         drush_menu.append(Gtk.SeparatorMenuItem())
+        add_item(drush_menu, "📥 Importar Base de Datos (.sql / .sql.gz)", "import_db", subsite["name"], subsite_url)
+        add_item(drush_menu, "📤 Exportar Base de Datos (.sql.gz)", "export_db", subsite["name"], subsite_url)
+        drush_menu.append(Gtk.SeparatorMenuItem())
         add_item(drush_menu, "📤 Exportar Configuración (drush cex)", "cex", subsite["name"], subsite_url)
         add_item(drush_menu, "📥 Importar Configuración (drush cim)", "cim", subsite["name"], subsite_url)
         drush_menu.append(Gtk.SeparatorMenuItem())
@@ -1761,6 +1775,97 @@ class DDEVManagerWindow(Gtk.Window):
     def execute_subsite_drush_action(self, action_key, subsite_name, subsite_url, base_dir):
         if action_key == "ssh":
             self.open_terminal(base_dir, f"ddev drush --uri={subsite_url} status; ddev ssh")
+            return
+
+        if action_key == "import_db":
+            dialog = Gtk.FileChooserDialog(
+                title=f"Seleccionar archivo SQL para importar en {subsite_name}",
+                parent=self,
+                action=Gtk.FileChooserAction.OPEN
+            )
+            dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+            
+            filter_sql = Gtk.FileFilter()
+            filter_sql.set_name("Archivos SQL (*.sql, *.sql.gz, *.tar.gz, *.zip)")
+            filter_sql.add_pattern("*.sql")
+            filter_sql.add_pattern("*.sql.gz")
+            filter_sql.add_pattern("*.tar.gz")
+            filter_sql.add_pattern("*.zip")
+            filter_sql.add_pattern("*.gz")
+            dialog.add_filter(filter_sql)
+            
+            filter_all = Gtk.FileFilter()
+            filter_all.set_name("Todos los archivos")
+            filter_all.add_pattern("*")
+            dialog.add_filter(filter_all)
+            
+            if dialog.run() == Gtk.ResponseType.OK:
+                src_file = dialog.get_filename()
+                dialog.destroy()
+                
+                prog_dialog = ProgressDialog(self, title=f"Importando BD: {subsite_name}")
+                prog_dialog.set_status(f"Importando {os.path.basename(src_file)} en base de datos '{subsite_name}'...")
+                
+                def task():
+                    try:
+                        GLib.idle_add(prog_dialog.append_log, f"Importando '{src_file}' en base de datos '{subsite_name}'...\n")
+                        cmd = ["ddev", "import-db", f"--database={subsite_name}", f"--src={src_file}"]
+                        self.run_subproc(cmd, base_dir, prog_dialog)
+                        
+                        GLib.idle_add(prog_dialog.append_log, f"\nReconstruyendo caché de {subsite_name} (drush cr)...\n")
+                        subprocess.run(["ddev", "drush", f"--uri={subsite_url}", "cr"], cwd=base_dir, capture_output=True)
+                        
+                        GLib.idle_add(prog_dialog.finish, True, f"Base de datos '{subsite_name}' importada con éxito", subsite_url, base_dir)
+                    except Exception as ex:
+                        GLib.idle_add(prog_dialog.finish, False, f"Error importando BD: {ex}", "", base_dir)
+                        
+                threading.Thread(target=task, daemon=True).start()
+            else:
+                dialog.destroy()
+            return
+
+        if action_key == "export_db":
+            from datetime import datetime
+            now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            default_filename = f"{subsite_name}_db_{now_str}.sql.gz"
+            
+            dialog = Gtk.FileChooserDialog(
+                title=f"Guardar respaldo de base de datos de {subsite_name}",
+                parent=self,
+                action=Gtk.FileChooserAction.SAVE
+            )
+            dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
+            dialog.set_current_name(default_filename)
+            dialog.set_do_overwrite_confirmation(True)
+            
+            downloads_dir = os.path.expanduser("~/Descargas")
+            if not os.path.exists(downloads_dir):
+                downloads_dir = os.path.expanduser("~/Downloads")
+            if os.path.exists(downloads_dir):
+                dialog.set_current_folder(downloads_dir)
+            else:
+                dialog.set_current_folder(base_dir)
+                
+            if dialog.run() == Gtk.ResponseType.OK:
+                out_file = dialog.get_filename()
+                dialog.destroy()
+                
+                prog_dialog = ProgressDialog(self, title=f"Exportando BD: {subsite_name}")
+                prog_dialog.set_status(f"Exportando base de datos '{subsite_name}' a {os.path.basename(out_file)}...")
+                
+                def task():
+                    try:
+                        GLib.idle_add(prog_dialog.append_log, f"Exportando base de datos '{subsite_name}' a '{out_file}'...\n")
+                        cmd = ["ddev", "export-db", f"--database={subsite_name}", f"--file={out_file}"]
+                        self.run_subproc(cmd, base_dir, prog_dialog)
+                        
+                        GLib.idle_add(prog_dialog.finish, True, f"Base de datos '{subsite_name}' exportada con éxito", "", os.path.dirname(out_file))
+                    except Exception as ex:
+                        GLib.idle_add(prog_dialog.finish, False, f"Error exportando BD: {ex}", "", base_dir)
+                        
+                threading.Thread(target=task, daemon=True).start()
+            else:
+                dialog.destroy()
             return
             
         drush_map = {
