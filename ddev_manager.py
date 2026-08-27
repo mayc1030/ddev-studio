@@ -1519,28 +1519,29 @@ if (!file_exists('/var/acquia')) {
 
 
 class InstallDBClientDialog(Gtk.Dialog):
-    def __init__(self, parent, approot, proj_name, primary_url):
-        super().__init__(title="Gestor de Bases de Datos", transient_for=parent, modal=True)
-        self.set_default_size(520, 420)
+    def __init__(self, parent_view, approot, proj_name, primary_url):
+        # transient_for must be a Gtk.Window (parent_view.main_app)
+        super().__init__(title="Gestor de Bases de Datos", transient_for=parent_view.main_app, modal=True)
+        self.set_default_size(560, 480)
         self.approot = approot
         self.proj_name = proj_name
         self.primary_url = primary_url
-        self.parent_win = parent
+        self.parent_view = parent_view
         
         box = self.get_content_area()
-        box.set_spacing(14)
+        box.set_spacing(12)
         box.set_margin_start(20)
         box.set_margin_end(20)
         box.set_margin_top(16)
         box.set_margin_bottom(16)
         
         lbl_title = Gtk.Label()
-        lbl_title.set_markup("<big><b>Clientes Visuales de Base de Datos</b></big>")
+        lbl_title.set_markup("<big><b>Gestores Visuales de Base de Datos</b></big>")
         lbl_title.set_halign(Gtk.Align.START)
         box.pack_start(lbl_title, False, False, 0)
         
         lbl_desc = Gtk.Label()
-        lbl_desc.set_markup(f"<small><span color='#94a3b8'>No se detectó ningún cliente gráfico de bases de datos instalado en tu sistema.\\nElige una de las siguientes opciones para conectarte a <b>{proj_name}</b>:</span></small>")
+        lbl_desc.set_markup(f"<small><span color='#94a3b8'>No se detectó DBeaver ni TablePlus instalados en tu sistema.\\nElige una de las siguientes opciones para conectarte a <b>{proj_name}</b>:</span></small>")
         lbl_desc.set_halign(Gtk.Align.START)
         lbl_desc.set_line_wrap(True)
         box.pack_start(lbl_desc, False, False, 0)
@@ -1552,12 +1553,12 @@ class InstallDBClientDialog(Gtk.Dialog):
         row_db1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         row_db1.pack_start(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic", Gtk.IconSize.MENU), False, False, 0)
         lbl_c1 = Gtk.Label(use_markup=True)
-        lbl_c1.set_markup("<b>🐬 DBeaver Community Edition</b> <span color='#10b981'><b>(Recomendado)</b></span>")
+        lbl_c1.set_markup("<b>🐬 DBeaver Community Edition</b> <span color='#10b981'><b>(Recomendado / 100% Gratis)</b></span>")
         row_db1.pack_start(lbl_c1, False, False, 0)
         card_dbeaver.pack_start(row_db1, False, False, 0)
         
         lbl_c1_desc = Gtk.Label()
-        lbl_c1_desc.set_markup("<small>Gestor de base de datos gratuito, open-source y universal (MariaDB, PostgreSQL, MySQL).</small>")
+        lbl_c1_desc.set_markup("<small>Gestor de base de datos universal, gratuito y potente para Linux (MariaDB, PostgreSQL, MySQL).</small>")
         lbl_c1_desc.set_line_wrap(True)
         lbl_c1_desc.set_halign(Gtk.Align.START)
         card_dbeaver.pack_start(lbl_c1_desc, False, False, 0)
@@ -1565,26 +1566,63 @@ class InstallDBClientDialog(Gtk.Dialog):
         btn_inst_dbeaver = Gtk.Button()
         b_d = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         b_d.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
-        b_d.pack_start(Gtk.Label(label="Instalar DBeaver CE (APT / Snap)"), False, False, 0)
+        b_d.pack_start(Gtk.Label(label="Instalar DBeaver CE Automáticamente (APT / Snap)"), False, False, 0)
         btn_inst_dbeaver.add(b_d)
         btn_inst_dbeaver.get_style_context().add_class("btn-primary")
         btn_inst_dbeaver.connect("clicked", self.on_install_dbeaver)
         card_dbeaver.pack_start(btn_inst_dbeaver, False, False, 0)
         box.pack_start(card_dbeaver, False, False, 0)
         
-        # Option 2: phpMyAdmin in DDEV
+        # Option 2: TablePlus for Linux
+        card_tp = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        card_tp.get_style_context().add_class("project-card")
+        
+        row_tp1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        row_tp1.pack_start(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        lbl_tp = Gtk.Label(use_markup=True)
+        lbl_tp.set_markup("<b>🐘 TablePlus para Linux</b> <span color='#38bdf8'><b>(Rápido &amp; Moderno)</b></span>")
+        row_tp1.pack_start(lbl_tp, False, False, 0)
+        card_tp.pack_start(row_tp1, False, False, 0)
+        
+        lbl_tp_desc = Gtk.Label()
+        lbl_tp_desc.set_markup("<small>Cliente visual ultrarrápido y minimalista. Se instala mediante el repositorio oficial de Ubuntu.</small>")
+        lbl_tp_desc.set_line_wrap(True)
+        lbl_tp_desc.set_halign(Gtk.Align.START)
+        card_tp.pack_start(lbl_tp_desc, False, False, 0)
+        
+        tp_btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        btn_inst_tp = Gtk.Button()
+        b_itp = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_itp.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_itp.pack_start(Gtk.Label(label="Instalar TablePlus en Ubuntu"), False, False, 0)
+        btn_inst_tp.add(b_itp)
+        btn_inst_tp.get_style_context().add_class("btn-quick")
+        btn_inst_tp.connect("clicked", self.on_install_tableplus)
+        tp_btns.pack_start(btn_inst_tp, False, False, 0)
+        
+        btn_web_tp = Gtk.Button()
+        b_wtp = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_wtp.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_wtp.pack_start(Gtk.Label(label="Web Oficial de TablePlus"), False, False, 0)
+        btn_web_tp.add(b_wtp)
+        btn_web_tp.connect("clicked", lambda b: webbrowser.open("https://tableplus.com/linux"))
+        tp_btns.pack_start(btn_web_tp, False, False, 0)
+        card_tp.pack_start(tp_btns, False, False, 0)
+        box.pack_start(card_tp, False, False, 0)
+        
+        # Option 3: phpMyAdmin in DDEV
         card_pma = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         card_pma.get_style_context().add_class("project-card")
         
         row_pma1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         row_pma1.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
         lbl_c2 = Gtk.Label(use_markup=True)
-        lbl_c2.set_markup("<b>🌐 phpMyAdmin en DDEV</b> <span color='#38bdf8'><b>(Web / Docker)</b></span>")
+        lbl_c2.set_markup("<b>🌐 phpMyAdmin en DDEV</b> <span color='#f59e0b'><b>(Web / Sin Instalar Software)</b></span>")
         row_pma1.pack_start(lbl_c2, False, False, 0)
         card_pma.pack_start(row_pma1, False, False, 0)
         
         lbl_c2_desc = Gtk.Label()
-        lbl_c2_desc.set_markup("<small>Sin instalar programas en tu equipo. Corre phpMyAdmin dentro de Docker en tu navegador.</small>")
+        lbl_c2_desc.set_markup("<small>Sin instalar programas pesados en tu equipo. Corre phpMyAdmin dentro de Docker en tu navegador.</small>")
         lbl_c2_desc.set_line_wrap(True)
         lbl_c2_desc.set_halign(Gtk.Align.START)
         card_pma.pack_start(lbl_c2_desc, False, False, 0)
@@ -1598,28 +1636,6 @@ class InstallDBClientDialog(Gtk.Dialog):
         card_pma.pack_start(btn_inst_pma, False, False, 0)
         box.pack_start(card_pma, False, False, 0)
         
-        # Option 3: TablePlus & Beekeeper
-        card_other = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        card_other.set_margin_top(4)
-        
-        btn_tableplus = Gtk.Button()
-        b_tp = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        b_tp.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
-        b_tp.pack_start(Gtk.Label(label="Sitio de TablePlus"), False, False, 0)
-        btn_tableplus.add(b_tp)
-        btn_tableplus.connect("clicked", lambda b: webbrowser.open("https://tableplus.com/linux"))
-        card_other.pack_start(btn_tableplus, True, True, 0)
-        
-        btn_beekeeper = Gtk.Button()
-        b_bk = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        b_bk.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
-        b_bk.pack_start(Gtk.Label(label="Sitio de Beekeeper"), False, False, 0)
-        btn_beekeeper.add(b_bk)
-        btn_beekeeper.connect("clicked", lambda b: webbrowser.open("https://www.beekeeperstudio.io/"))
-        card_other.pack_start(btn_beekeeper, True, True, 0)
-        
-        box.pack_start(card_other, False, False, 0)
-        
         # Close button
         btn_close = Gtk.Button(label="Cerrar")
         btn_close.connect("clicked", lambda b: self.destroy())
@@ -1629,13 +1645,17 @@ class InstallDBClientDialog(Gtk.Dialog):
 
     def on_install_dbeaver(self, widget):
         self.destroy()
-        # Launch terminal with installation commands
-        inst_cmd = "echo '🚀 Instalando DBeaver Community Edition en Ubuntu...'; sudo snap install dbeaver-ce || (echo 'Descargando paquete deb...' && wget -O /tmp/dbeaver.deb https://dbeaver.io/files/dbeaver-ce_latest_amd64.deb && sudo apt update && sudo apt install -y /tmp/dbeaver.deb); echo '¡Instalación finalizada!'; read -p 'Presiona Enter para cerrar...'"
-        self.parent_win.main_app.open_terminal("/tmp", inst_cmd)
+        inst_cmd = "echo '🚀 Instalando DBeaver Community Edition en Ubuntu...'; sudo snap install dbeaver-ce || (echo 'Descargando paquete deb oficial...' && wget -O /tmp/dbeaver.deb https://dbeaver.io/files/dbeaver-ce_latest_amd64.deb && sudo apt update && sudo apt install -y /tmp/dbeaver.deb); echo '¡Instalación finalizada!'; read -p 'Presiona Enter para cerrar...'"
+        self.parent_view.main_app.open_terminal("/tmp", inst_cmd)
+
+    def on_install_tableplus(self, widget):
+        self.destroy()
+        tp_cmd = "echo '🚀 Instalando TablePlus en Ubuntu...'; sudo wget -qO - https://deb.tableplus.com/apt.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/tableplus-archive.gpg > /dev/null && sudo add-apt-repository -y \"deb [arch=amd64] https://deb.tableplus.com/debian/public $(lsb_release -cs) main\" && sudo apt update && sudo apt install -y tableplus; echo '¡Instalación de TablePlus finalizada!'; read -p 'Presiona Enter para cerrar...'"
+        self.parent_view.main_app.open_terminal("/tmp", tp_cmd)
 
     def on_install_phpmyadmin(self, widget):
         self.destroy()
-        dialog = ProgressDialog(self.parent_win.main_app, title=f"Habilitando phpMyAdmin: {self.proj_name}")
+        dialog = ProgressDialog(self.parent_view.main_app, title=f"Habilitando phpMyAdmin: {self.proj_name}")
         dialog.set_status("Descargando complemento ddev/ddev-phpmyadmin...")
         
         def task():
@@ -1659,7 +1679,7 @@ class InstallDBClientDialog(Gtk.Dialog):
                 
                 pma_url = f"{self.primary_url}:8037"
                 GLib.idle_add(dialog.finish, True, "phpMyAdmin habilitado con éxito", pma_url, self.approot)
-                GLib.idle_add(self.parent_win.refresh_details)
+                GLib.idle_add(self.parent_view.refresh_details)
             except Exception as ex:
                 GLib.idle_add(dialog.finish, False, f"Error: {ex}", "", self.approot)
                 
@@ -1776,6 +1796,7 @@ class ProjectDetailsView(Gtk.Box):
     def show_install_db_dialog(self, approot, proj_name, primary_url):
         dialog = InstallDBClientDialog(self, approot, proj_name, primary_url)
         dialog.run()
+        dialog.destroy()
 
 
 
@@ -2017,10 +2038,10 @@ class ProjectDetailsView(Gtk.Box):
             btn_inst_db = Gtk.Button()
             b_idb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
             b_idb.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
-            b_idb.pack_start(Gtk.Label(label="Instalar Cliente Visual (DBeaver / phpMyAdmin)"), False, False, 0)
+            b_idb.pack_start(Gtk.Label(label="Conectar Gestor Visual (DBeaver / TablePlus / phpMyAdmin)"), False, False, 0)
             btn_inst_db.add(b_idb)
             btn_inst_db.get_style_context().add_class("btn-primary")
-            btn_inst_db.set_tooltip_text("No tienes DBeaver o TablePlus instalado. Pulsa para ver opciones de instalación.")
+            btn_inst_db.set_tooltip_text("Pulsa para abrir el asistente de conexión o instalación de DBeaver, TablePlus o phpMyAdmin")
             btn_inst_db.connect("clicked", lambda b: self.show_install_db_dialog(approot, pname, primary_url))
             db_btn_row.pack_start(btn_inst_db, False, False, 0)
             
