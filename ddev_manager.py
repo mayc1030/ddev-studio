@@ -1522,8 +1522,12 @@ class DDEVManagerWindow(Gtk.Window):
         if self.btn_mode_import.get_active():
             self.stack_new_project.set_visible_child_name("import")
             self.on_import_path_changed(self.entry_import_path)
+            self.on_import_type_changed(self.combo_import_type)
         else:
             self.stack_new_project.set_visible_child_name("create")
+            fc = self.flowbox_fw.get_child_at_index(0)
+            if fc:
+                self.on_framework_selected(self.flowbox_fw, fc)
 
     def build_tab_new_project(self):
         scrolled = Gtk.ScrolledWindow()
@@ -1887,7 +1891,7 @@ class DDEVManagerWindow(Gtk.Window):
         self.btn_import_submit.connect("clicked", self.on_import_project_clicked)
         btn_box.pack_start(self.btn_import_submit, False, False, 0)
         box.pack_start(btn_box, False, False, 0)
-        
+        self.on_import_type_changed(self.combo_import_type)
         return box
 
     def create_framework_card(self, fw):
