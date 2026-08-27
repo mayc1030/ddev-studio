@@ -1991,6 +1991,133 @@ class ProjectDetailsView(Gtk.Box):
 
 
 
+    def export_db(self, approot, proj_name, target_file):
+        dialog = ProgressDialog(self.main_app, title=f"Exportar Base de Datos: {proj_name}")
+        dialog.set_status(f"Exportando base de datos a {os.path.basename(target_file)}...")
+        
+        def task():
+            try:
+                def log(t):
+                    GLib.idle_add(dialog.append_log, t)
+                
+                log(f"📦 Ejecutando 'ddev export-db --file={target_file}'...\n")
+                p = subprocess.Popen(["ddev", "export-db", f"--file={target_file}"], cwd=approot, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in iter(p.stdout.readline, ''):
+                    log(line)
+                p.stdout.close()
+                p.wait()
+                
+                success = (p.returncode == 0)
+                msg = f"Base de datos exportada con éxito en:\n{target_file}" if success else "Error al exportar la base de datos"
+                GLib.idle_add(dialog.finish, success, msg)
+            except Exception as ex:
+                GLib.idle_add(dialog.finish, False, f"Error: {ex}")
+                
+        threading.Thread(target=task, daemon=True).start()
+
+    def import_db(self, approot, proj_name, source_file):
+        dialog = ProgressDialog(self.main_app, title=f"Importar Base de Datos: {proj_name}")
+        dialog.set_status(f"Importando {os.path.basename(source_file)} en {proj_name}...")
+        
+        def task():
+            try:
+                def log(t):
+                    GLib.idle_add(dialog.append_log, t)
+                
+                log(f"📥 Ejecutando 'ddev import-db --file={source_file}'...\n")
+                p = subprocess.Popen(["ddev", "import-db", f"--file={source_file}"], cwd=approot, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in iter(p.stdout.readline, ''):
+                    log(line)
+                p.stdout.close()
+                p.wait()
+                
+                success = (p.returncode == 0)
+                msg = f"Base de datos importada con éxito desde:\n{source_file}" if success else "Error al importar la base de datos"
+                GLib.idle_add(dialog.finish, success, msg)
+                GLib.idle_add(self.refresh_details)
+            except Exception as ex:
+                GLib.idle_add(dialog.finish, False, f"Error: {ex}")
+                
+        threading.Thread(target=task, daemon=True).start()
+
+    def on_export_db_clicked(self, approot, pname):
+        import datetime
+        chooser = Gtk.FileChooserDialog(
+            title=f"Exportar Base de Datos ({pname})",
+            parent=self.main_app,
+            action=Gtk.FileChooserAction.SAVE
+        )
+        chooser.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        chooser.add_button("Exportar", Gtk.ResponseType.OK)
+        chooser.set_do_overwrite_confirmation(True)
+        
+        default_filename = f"{pname}_db_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.sql.gz"
+        chooser.set_current_name(default_filename)
+        chooser.set_current_folder(os.path.expanduser("~"))
+        
+        filter_sql_gz = Gtk.FileFilter()
+        filter_sql_gz.set_name("SQL Comprimido (*.sql.gz)")
+        filter_sql_gz.add_pattern("*.sql.gz")
+        chooser.add_filter(filter_sql_gz)
+        
+        filter_sql = Gtk.FileFilter()
+        filter_sql.set_name("Archivos SQL (*.sql)")
+        filter_sql.add_pattern("*.sql")
+        chooser.add_filter(filter_sql)
+        
+        filter_all = Gtk.FileFilter()
+        filter_all.set_name("Todos los archivos (*.*)")
+        filter_all.add_pattern("*")
+        chooser.add_filter(filter_all)
+        
+        resp = chooser.run()
+        target_path = chooser.get_filename()
+        chooser.destroy()
+        
+        if resp == Gtk.ResponseType.OK and target_path:
+            self.export_db(approot, pname, target_path)
+
+    def on_import_db_clicked(self, approot, pname):
+        chooser = Gtk.FileChooserDialog(
+            title=f"Importar Base de Datos en {pname}",
+            parent=self.main_app,
+            action=Gtk.FileChooserAction.OPEN
+        )
+        chooser.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        chooser.add_button("Importar", Gtk.ResponseType.OK)
+        chooser.set_current_folder(os.path.expanduser("~"))
+        
+        filter_db = Gtk.FileFilter()
+        filter_db.set_name("Respaldos de Base de Datos (*.sql, *.sql.gz, *.tar.gz, *.zip)")
+        filter_db.add_pattern("*.sql")
+        filter_db.add_pattern("*.sql.gz")
+        filter_db.add_pattern("*.tar.gz")
+        filter_db.add_pattern("*.zip")
+        chooser.add_filter(filter_db)
+        
+        filter_all = Gtk.FileFilter()
+        filter_all.set_name("Todos los archivos (*.*)")
+        filter_all.add_pattern("*")
+        chooser.add_filter(filter_all)
+        
+        resp = chooser.run()
+        source_path = chooser.get_filename()
+        chooser.destroy()
+        
+        if resp == Gtk.ResponseType.OK and source_path:
+            confirm = Gtk.MessageDialog(
+                transient_for=self.main_app,
+                flags=0,
+                message_type=Gtk.MessageType.WARNING,
+                buttons=Gtk.ButtonsType.OK_CANCEL,
+                text=f"¿Confirmas la importación en '{pname}'?"
+            )
+            confirm.format_secondary_text(f"Se importará el archivo:\n{os.path.basename(source_path)}\n\n⚠️ ADVERTENCIA: Esta acción sobreescribirá las tablas existentes en la base de datos de '{pname}'.")
+            c_resp = confirm.run()
+            confirm.destroy()
+            if c_resp == Gtk.ResponseType.OK:
+                self.import_db(approot, pname, source_path)
+
     def load_project_details(self, proj):
         self.proj = proj
         self.proj_name = proj.get("name", "")
@@ -2199,9 +2326,24 @@ class ProjectDetailsView(Gtk.Box):
         
         db_card.pack_start(grid_db, False, False, 0)
         
+        # Dynamic Xdebug Real Status Check
+        if is_running and approot and os.path.exists(approot):
+            try:
+                xd_res = subprocess.run(["ddev", "xdebug", "status"], cwd=approot, capture_output=True, text=True, timeout=4)
+                xd_out = xd_res.stdout.lower()
+                if "xdebug enabled" in xd_out or ("enabled" in xd_out and "disabled" not in xd_out):
+                    is_xdebug = True
+                elif "xdebug disabled" in xd_out or "disabled" in xd_out:
+                    is_xdebug = False
+            except Exception:
+                pass
+
         # DB Buttons and Container Addons
-        db_btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        db_btn_row.set_margin_top(4)
+        db_btn_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        db_btn_box.set_margin_top(6)
+        
+        # Row 1: Core Database Actions (Copy credentials, Export DB, Import DB, CLI)
+        db_row1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         
         raw_db_creds = f"Host: 127.0.0.1\\nPort: {ext_port_str}\\nDatabase: {db_name}\\nUsername: {db_user}\\nPassword: {db_pass}\\nURL: {db_type}://{db_user}:{db_pass}@127.0.0.1:{ext_port_str}/{db_name}"
         
@@ -2211,7 +2353,39 @@ class ProjectDetailsView(Gtk.Box):
         b_c.pack_start(Gtk.Label(label="Copiar Credenciales"), False, False, 0)
         btn_copy_db.add(b_c)
         btn_copy_db.connect("clicked", lambda b, text=raw_db_creds: self.copy_to_clipboard(text, "Credenciales copiadas al portapapeles"))
-        db_btn_row.pack_start(btn_copy_db, False, False, 0)
+        db_row1.pack_start(btn_copy_db, False, False, 0)
+        
+        if is_running:
+            btn_export_db = Gtk.Button()
+            b_exp = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_exp.pack_start(Gtk.Image.new_from_icon_name("document-save-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_exp.pack_start(Gtk.Label(label="Exportar Base de Datos (.sql.gz)"), False, False, 0)
+            btn_export_db.add(b_exp)
+            btn_export_db.set_tooltip_text("Exportar un volcado completo de la base de datos (ddev export-db)")
+            btn_export_db.connect("clicked", lambda b: self.on_export_db_clicked(approot, pname))
+            db_row1.pack_start(btn_export_db, False, False, 0)
+            
+            btn_import_db = Gtk.Button()
+            b_imp = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_imp.pack_start(Gtk.Image.new_from_icon_name("document-open-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_imp.pack_start(Gtk.Label(label="Importar Base de Datos (.sql)"), False, False, 0)
+            btn_import_db.add(b_imp)
+            btn_import_db.set_tooltip_text("Importar un archivo de volcado a la base de datos (ddev import-db)")
+            btn_import_db.connect("clicked", lambda b: self.on_import_db_clicked(approot, pname))
+            db_row1.pack_start(btn_import_db, False, False, 0)
+            
+            btn_launch_db = Gtk.Button()
+            b_ld = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_ld.pack_start(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_ld.pack_start(Gtk.Label(label="Consola CLI (ddev mysql)"), False, False, 0)
+            btn_launch_db.add(b_ld)
+            btn_launch_db.connect("clicked", lambda b: self.main_app.open_terminal(approot, "ddev mysql" if "postgres" not in db_type else "ddev psql"))
+            db_row1.pack_start(btn_launch_db, False, False, 0)
+            
+        db_btn_box.pack_start(db_row1, False, False, 0)
+        
+        # Row 2: Visual Managers in Containers (phpMyAdmin, Adminer, DBeaver)
+        db_row2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         
         active_addons = self.get_project_db_addons(approot, services)
         
@@ -2225,32 +2399,24 @@ class ProjectDetailsView(Gtk.Box):
                 btn_ad.get_style_context().add_class("btn-primary" if "DBeaver" in ad['name'] else "btn-quick")
                 target_port = ad["port"]
                 ad_url = ad.get("url") or f"{primary_url}:{target_port}"
-                btn_ad.set_tooltip_text(f"Abrir interfaz de {ad['name']} ({ad_url})")
+                btn_ad.set_tooltip_text(f"Abrir interfaz web de {ad['name']} ({ad_url})")
                 btn_ad.connect("clicked", lambda b, u=ad_url: webbrowser.open(u))
-                db_btn_row.pack_start(btn_ad, False, False, 0)
+                db_row2.pack_start(btn_ad, False, False, 0)
                 
         btn_manage_db = Gtk.Button()
         b_mdb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         b_mdb.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
-        b_label_txt = "Gestores en Docker (DBeaver / phpMyAdmin / Adminer)" if not active_addons else "Gestionar Gestores Web"
+        b_label_txt = "Gestores en Docker (phpMyAdmin / Adminer / DBeaver)" if not active_addons else "Gestionar Gestores Web"
         b_mdb.pack_start(Gtk.Label(label=b_label_txt), False, False, 0)
         btn_manage_db.add(b_mdb)
         if not active_addons:
             btn_manage_db.get_style_context().add_class("btn-primary")
-        btn_manage_db.set_tooltip_text("Habilitar o gestionar DBeaver, phpMyAdmin o Adminer corriendo dentro de Docker")
+        btn_manage_db.set_tooltip_text("Habilitar o gestionar phpMyAdmin, Adminer o DBeaver en contenedores Docker")
         btn_manage_db.connect("clicked", lambda b: self.show_db_containers_dialog(approot, pname, primary_url))
-        db_btn_row.pack_start(btn_manage_db, False, False, 0)
-            
-        if is_running:
-            btn_launch_db = Gtk.Button()
-            b_ld = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            b_ld.pack_start(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic", Gtk.IconSize.MENU), False, False, 0)
-            b_ld.pack_start(Gtk.Label(label="Consola CLI (ddev mysql)"), False, False, 0)
-            btn_launch_db.add(b_ld)
-            btn_launch_db.connect("clicked", lambda b: self.main_app.open_terminal(approot, "ddev mysql" if "postgres" not in db_type else "ddev psql"))
-            db_btn_row.pack_start(btn_launch_db, False, False, 0)
-            
-        db_card.pack_start(db_btn_row, False, False, 0)
+        db_row2.pack_start(btn_manage_db, False, False, 0)
+        
+        db_btn_box.pack_start(db_row2, False, False, 0)
+        db_card.pack_start(db_btn_box, False, False, 0)
         self.content_box.pack_start(db_card, False, False, 0)
         
         # 3. Environment & Runtime Card (Webserver, PHP, Node.js, Xdebug)
@@ -2360,18 +2526,30 @@ class ProjectDetailsView(Gtk.Box):
         dialog.destroy()
 
     def toggle_xdebug(self, enable):
-        cmd = ["ddev", "xdebug", "on"] if enable else ["ddev", "xdebug", "off"]
         pname = self.proj_name
+        approot = self.raw_data.get("approot") or self.base_dir or self.proj.get("approot", "")
+        cmd = ["ddev", "xdebug", "on"] if enable else ["ddev", "xdebug", "off"]
         dialog = ProgressDialog(self.main_app, title=f"Xdebug: {pname}")
-        dialog.set_status(f"Cambiando Xdebug a {'ON' if enable else 'OFF'}...")
+        dialog.set_status(f"Cambiando Xdebug a {'ON (Habilitado)' if enable else 'OFF (Desactivado)'}...")
+        
         def task():
-            p = subprocess.Popen(cmd, cwd=self.base_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-            for line in iter(p.stdout.readline, ''):
-                GLib.idle_add(dialog.append_log, line)
-            p.stdout.close()
-            p.wait()
-            GLib.idle_add(dialog.finish, p.returncode == 0, f"Xdebug {'activado' if enable else 'desactivado'}")
-            GLib.idle_add(self.refresh_details)
+            try:
+                def log(t):
+                    GLib.idle_add(dialog.append_log, t)
+                
+                log(f"⚡ Ejecutando 'ddev xdebug {'on' if enable else 'off'}'...\\n")
+                p = subprocess.Popen(cmd, cwd=approot, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in iter(p.stdout.readline, ''):
+                    log(line)
+                p.stdout.close()
+                p.wait()
+                
+                success = (p.returncode == 0)
+                GLib.idle_add(dialog.finish, success, f"Xdebug {'activado con éxito' if enable else 'desactivado con éxito'}")
+                GLib.idle_add(self.refresh_details)
+            except Exception as ex:
+                GLib.idle_add(dialog.finish, False, f"Error: {ex}")
+                
         threading.Thread(target=task, daemon=True).start()
 
     def execute_action_and_refresh(self, action):
