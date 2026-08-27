@@ -47,6 +47,16 @@ CUSTOM_CSS = b"""
     border-color: @theme_selected_bg_color;
     background: alpha(@theme_selected_bg_color, 0.18);
 }
+.segmented-btn {
+    border-radius: 8px;
+    padding: 6px 16px;
+    font-weight: bold;
+}
+.segmented-btn:checked {
+    background-color: #0284c7;
+    color: white;
+}
+
 .badge {
     border-radius: 6px;
     padding: 2px 8px;
@@ -351,6 +361,118 @@ class ProgressDialog(Gtk.Dialog):
     def on_open_folder(self, widget):
         if self.project_path and os.path.exists(self.project_path):
             subprocess.Popen(["xdg-open", self.project_path])
+
+
+
+def detect_project_details(folder_path):
+    """
+    Analyzes a directory and detects framework type, docroot, php version, and database.
+    """
+    if not folder_path or not os.path.exists(folder_path):
+        return {
+            "name": "",
+            "type": "drupal10",
+            "docroot": "docroot",
+            "php": "8.3",
+            "db": "mariadb:10.11",
+            "is_drupal": True,
+            "is_multisite": True,
+            "summary": "Directorio no encontrado",
+            "valid": False
+        }
+        
+    pname = os.path.basename(folder_path.rstrip("/"))
+    slug = re.sub(r'[^a-zA-Z0-9_-]', '-', pname).lower()
+    
+    # 1. Detect Docroot
+    docroot = "."
+    for dr in ["docroot", "web", "public"]:
+        if os.path.isdir(os.path.join(folder_path, dr)):
+            docroot = dr
+            break
+            
+    # 2. Check if .ddev/config.yaml exists
+    ddev_cfg = os.path.join(folder_path, ".ddev", "config.yaml")
+    if os.path.exists(ddev_cfg):
+        try:
+            with open(ddev_cfg, "r") as f:
+                content = f.read()
+            m_name = re.search(r'^name:\s*([^\s]+)', content, re.MULTILINE)
+            m_type = re.search(r'^type:\s*([^\s]+)', content, re.MULTILINE)
+            m_docroot = re.search(r'^docroot:\s*([^\s]+)', content, re.MULTILINE)
+            m_php = re.search(r'^php_version:\s*([^\s]+)', content, re.MULTILINE)
+            
+            p_type = m_type.group(1).strip().strip('"\'') if m_type else "drupal10"
+            if m_name:
+                slug = m_name.group(1).strip().strip('"\'')
+            if m_docroot:
+                docroot = m_docroot.group(1).strip().strip('"\'')
+            php_v = m_php.group(1).strip().strip('"\'') if m_php else "8.3"
+            
+            is_dr = "drupal" in p_type
+            return {
+                "name": slug,
+                "type": p_type,
+                "docroot": docroot,
+                "php": php_v,
+                "db": "mariadb:10.11",
+                "is_drupal": is_dr,
+                "is_multisite": is_dr,
+                "summary": f"Configuración DDEV detectada ({p_type}, docroot: {docroot})",
+                "valid": True
+            }
+        except Exception:
+            pass
+
+    # 3. Check composer.json
+    composer_file = os.path.join(folder_path, "composer.json")
+    if os.path.exists(composer_file):
+        try:
+            with open(composer_file, "r") as f:
+                cdata = json.load(f)
+            req = cdata.get("require", {})
+            req_dev = cdata.get("require-dev", {})
+            all_req = {**req, **req_dev}
+            
+            for k, v in all_req.items():
+                if "drupal/core" in k:
+                    if "11" in str(v):
+                        return {"name": slug, "type": "drupal11", "docroot": docroot, "php": "8.3", "db": "mariadb:10.11", "is_drupal": True, "is_multisite": True, "summary": f"Drupal 11 detectado (docroot: {docroot})", "valid": True}
+                    elif "9" in str(v):
+                        return {"name": slug, "type": "drupal9", "docroot": docroot, "php": "8.1", "db": "mariadb:10.11", "is_drupal": True, "is_multisite": True, "summary": f"Drupal 9 detectado (docroot: {docroot})", "valid": True}
+                    elif "8" in str(v):
+                        return {"name": slug, "type": "drupal8", "docroot": docroot, "php": "7.4", "db": "mariadb:10.11", "is_drupal": True, "is_multisite": True, "summary": f"Drupal 8 detectado (docroot: {docroot})", "valid": True}
+                    else:
+                        return {"name": slug, "type": "drupal10", "docroot": docroot, "php": "8.3", "db": "mariadb:10.11", "is_drupal": True, "is_multisite": True, "summary": f"Drupal 10 detectado (docroot: {docroot})", "valid": True}
+                        
+            if "laravel/framework" in all_req:
+                return {"name": slug, "type": "laravel", "docroot": "public" if os.path.exists(os.path.join(folder_path, "public")) else docroot, "php": "8.3", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Laravel detectado", "valid": True}
+            if "roots/bedrock" in all_req or "wordpress" in str(all_req):
+                return {"name": slug, "type": "wordpress", "docroot": docroot, "php": "8.2", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "WordPress detectado", "valid": True}
+        except Exception:
+            pass
+
+    # 4. Check filesystem structures
+    if os.path.exists(os.path.join(folder_path, docroot, "sites")) or os.path.exists(os.path.join(folder_path, "sites", "default")):
+        return {"name": slug, "type": "drupal10", "docroot": docroot, "php": "8.3", "db": "mariadb:10.11", "is_drupal": True, "is_multisite": True, "summary": f"Estructura Drupal detectada (docroot: {docroot})", "valid": True}
+    if os.path.exists(os.path.join(folder_path, "wp-config.php")) or os.path.exists(os.path.join(folder_path, "wp-content")):
+        return {"name": slug, "type": "wordpress", "docroot": ".", "php": "8.2", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "WordPress detectado", "valid": True}
+    if os.path.exists(os.path.join(folder_path, "artisan")):
+        return {"name": slug, "type": "laravel", "docroot": "public", "php": "8.3", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Laravel detectado", "valid": True}
+    if os.path.exists(os.path.join(folder_path, "package.json")) and not os.path.exists(os.path.join(folder_path, "composer.json")):
+        return {"name": slug, "type": "generic", "docroot": ".", "php": "8.3", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Proyecto JS / Node detectado", "valid": True}
+
+    return {
+        "name": slug,
+        "type": "php",
+        "docroot": docroot,
+        "php": "8.3",
+        "db": "mariadb:10.11",
+        "is_drupal": False,
+        "is_multisite": False,
+        "summary": f"Proyecto PHP estándar (docroot: {docroot})",
+        "valid": True
+    }
 
 
 class SubsitesManagerDialog(Gtk.Dialog):
@@ -1349,16 +1471,70 @@ class DDEVManagerWindow(Gtk.Window):
         lbl_tools.show_all()
         self.notebook.append_page(tab_tools, lbl_tools)
 
+    def switch_to_new_project_tab(self, mode="create"):
+        self.notebook.set_current_page(1)
+        if mode == "import":
+            self.btn_mode_import.set_active(True)
+        else:
+            self.btn_mode_create.set_active(True)
+
+    def on_project_mode_toggled(self, btn):
+        if self.btn_mode_import.get_active():
+            self.stack_new_project.set_visible_child_name("import")
+            self.on_import_path_changed(self.entry_import_path)
+        else:
+            self.stack_new_project.set_visible_child_name("create")
+
     def build_tab_new_project(self):
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         
+        main_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        main_vbox.set_margin_start(24)
+        main_vbox.set_margin_end(24)
+        main_vbox.set_margin_top(16)
+        main_vbox.set_margin_bottom(24)
+        scrolled.add(main_vbox)
+        
+        # --- Mode Selector (Segmented buttons) ---
+        mode_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        mode_box.set_halign(Gtk.Align.CENTER)
+        mode_box.set_margin_bottom(6)
+        
+        self.btn_mode_create = Gtk.RadioButton.new_with_label(None, "📦 Descargar Proyecto Nuevo")
+        self.btn_mode_create.set_mode(False)
+        self.btn_mode_create.get_style_context().add_class("segmented-btn")
+        self.btn_mode_create.connect("toggled", self.on_project_mode_toggled)
+        mode_box.pack_start(self.btn_mode_create, False, False, 0)
+        
+        self.btn_mode_import = Gtk.RadioButton.new_with_label_from_widget(self.btn_mode_create, "📁 Importar Carpeta / Proyecto Existente")
+        self.btn_mode_import.set_mode(False)
+        self.btn_mode_import.get_style_context().add_class("segmented-btn")
+        self.btn_mode_import.connect("toggled", self.on_project_mode_toggled)
+        mode_box.pack_start(self.btn_mode_import, False, False, 0)
+        
+        main_vbox.pack_start(mode_box, False, False, 0)
+        
+        # --- Stack to switch between Create and Import forms ---
+        self.stack_new_project = Gtk.Stack()
+        self.stack_new_project.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.stack_new_project.set_transition_duration(150)
+        
+        # View 1: Create Form
+        self.box_create_view = self.build_create_project_view()
+        self.stack_new_project.add_named(self.box_create_view, "create")
+        
+        # View 2: Import Form
+        self.box_import_view = self.build_import_project_view()
+        self.stack_new_project.add_named(self.box_import_view, "import")
+        
+        main_vbox.pack_start(self.stack_new_project, True, True, 0)
+        
+        self.btn_mode_create.set_active(True)
+        return scrolled
+
+    def build_create_project_view(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        box.set_margin_start(24)
-        box.set_margin_end(24)
-        box.set_margin_top(20)
-        box.set_margin_bottom(24)
-        scrolled.add(box)
         
         sec_title = Gtk.Label()
         sec_title.set_markup("<b>1. Información del Proyecto</b>")
@@ -1423,7 +1599,7 @@ class DDEVManagerWindow(Gtk.Window):
             
         box.pack_start(self.flowbox_fw, False, False, 0)
         
-        # DEDICATED DRUPAL VERSION SELECTOR BOX (appears when Drupal is selected)
+        # DEDICATED DRUPAL VERSION SELECTOR BOX
         self.drupal_version_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         self.drupal_version_box.get_style_context().add_class("option-highlight-box")
         
@@ -1505,7 +1681,127 @@ class DDEVManagerWindow(Gtk.Window):
             self.selected_framework = FRAMEWORKS[0]
             self.drupal_version_box.show()
             
-        return scrolled
+        return box
+
+    def build_import_project_view(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        
+        lbl_info = Gtk.Label()
+        lbl_info.set_markup("<b>1. Selecciona la Carpeta de tu Proyecto Existente</b>\n<small><span color='#94a3b8'>Vincula un proyecto o repositorio ya descargado en tu disco para que DDEV Studio lo configure y active.</span></small>")
+        lbl_info.set_halign(Gtk.Align.START)
+        box.pack_start(lbl_info, False, False, 0)
+        
+        grid_folder = Gtk.Grid()
+        grid_folder.set_column_spacing(16)
+        grid_folder.set_row_spacing(10)
+        box.pack_start(grid_folder, False, False, 0)
+        
+        grid_folder.attach(Gtk.Label(label="Carpeta en disco:", halign=Gtk.Align.END), 0, 0, 1, 1)
+        
+        dir_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        default_import = "/home/maycol/sites/base-drupal" if os.path.exists("/home/maycol/sites/base-drupal") else DEFAULT_SITES_DIR
+        self.entry_import_path = Gtk.Entry()
+        self.entry_import_path.set_text(default_import)
+        self.entry_import_path.set_hexpand(True)
+        self.entry_import_path.connect("changed", self.on_import_path_changed)
+        dir_box.pack_start(self.entry_import_path, True, True, 0)
+        
+        btn_browse = Gtk.Button(label="Examinar...")
+        btn_browse.connect("clicked", self.on_browse_import_folder)
+        dir_box.pack_start(btn_browse, False, False, 0)
+        grid_folder.attach(dir_box, 1, 0, 1, 1)
+        
+        sec_det = Gtk.Label()
+        sec_det.set_markup("<b>2. Detección Automática y Configuración DDEV</b>")
+        sec_det.set_halign(Gtk.Align.START)
+        sec_det.set_margin_top(8)
+        box.pack_start(sec_det, False, False, 0)
+        
+        self.card_import_details = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.card_import_details.get_style_context().add_class("option-highlight-box")
+        
+        self.lbl_import_status_badge = Gtk.Label()
+        self.lbl_import_status_badge.set_halign(Gtk.Align.START)
+        self.card_import_details.pack_start(self.lbl_import_status_badge, False, False, 0)
+        
+        grid_cfg = Gtk.Grid()
+        grid_cfg.set_column_spacing(16)
+        grid_cfg.set_row_spacing(10)
+        self.card_import_details.pack_start(grid_cfg, False, False, 0)
+        
+        grid_cfg.attach(Gtk.Label(label="Nombre en DDEV:", halign=Gtk.Align.END), 0, 0, 1, 1)
+        self.entry_import_name = Gtk.Entry()
+        self.entry_import_name.set_hexpand(True)
+        grid_cfg.attach(self.entry_import_name, 1, 0, 1, 1)
+        
+        grid_cfg.attach(Gtk.Label(label="Tecnología detectada:", halign=Gtk.Align.END), 0, 1, 1, 1)
+        self.combo_import_type = Gtk.ComboBoxText()
+        for t_id, t_lbl in [
+            ("drupal11", "Drupal 11"),
+            ("drupal10", "Drupal 10"),
+            ("drupal9", "Drupal 9"),
+            ("drupal8", "Drupal 8"),
+            ("drupal7", "Drupal 7"),
+            ("wordpress", "WordPress"),
+            ("laravel", "Laravel"),
+            ("php", "PHP Estándar / Symfony"),
+            ("generic", "Generic / Node / React / Vue")
+        ]:
+            self.combo_import_type.append(t_id, t_lbl)
+        self.combo_import_type.set_active_id("drupal10")
+        self.combo_import_type.connect("changed", self.on_import_type_changed)
+        grid_cfg.attach(self.combo_import_type, 1, 1, 1, 1)
+        
+        grid_cfg.attach(Gtk.Label(label="Directorio Web (Docroot):", halign=Gtk.Align.END), 0, 2, 1, 1)
+        self.combo_import_docroot = Gtk.ComboBoxText()
+        for dr in ["docroot", "web", "public", "."]:
+            self.combo_import_docroot.append_text(dr)
+        self.combo_import_docroot.set_active(0)
+        grid_cfg.attach(self.combo_import_docroot, 1, 2, 1, 1)
+        
+        grid_cfg.attach(Gtk.Label(label="Versión de PHP:", halign=Gtk.Align.END), 0, 3, 1, 1)
+        self.combo_import_php = Gtk.ComboBoxText()
+        for v in ["8.3", "8.2", "8.1", "8.4", "8.0", "7.4"]:
+            self.combo_import_php.append_text(v)
+        self.combo_import_php.set_active(0)
+        grid_cfg.attach(self.combo_import_php, 1, 3, 1, 1)
+        
+        grid_cfg.attach(Gtk.Label(label="Base de Datos:", halign=Gtk.Align.END), 0, 4, 1, 1)
+        self.combo_import_db = Gtk.ComboBoxText()
+        for db in ["mariadb:10.11", "mysql:8.0", "postgres:16", "mariadb:10.5"]:
+            self.combo_import_db.append_text(db)
+        self.combo_import_db.set_active(0)
+        grid_cfg.attach(self.combo_import_db, 1, 4, 1, 1)
+        
+        # Options box
+        self.box_import_drupal_options = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self.chk_import_multisite = Gtk.CheckButton(label="Habilitar arquitectura Drupal Multisite (Configurar sites.php dinámico)")
+        self.chk_import_multisite.set_active(True)
+        self.box_import_drupal_options.pack_start(self.chk_import_multisite, False, False, 0)
+        
+        lbl_ms_hint = Gtk.Label()
+        lbl_ms_hint.set_markup("<small><span color='#94a3b8'>Permite crear múltiples marcas y subsitios con bases de datos y dominios independientes en este proyecto.</span></small>")
+        lbl_ms_hint.set_halign(Gtk.Align.START)
+        self.box_import_drupal_options.pack_start(lbl_ms_hint, False, False, 0)
+        self.card_import_details.pack_start(self.box_import_drupal_options, False, False, 0)
+        
+        self.chk_import_composer = Gtk.CheckButton(label="Ejecutar 'ddev composer install' si faltan dependencias o Drush")
+        self.chk_import_composer.set_active(True)
+        self.card_import_details.pack_start(self.chk_import_composer, False, False, 0)
+        
+        box.pack_start(self.card_import_details, False, False, 0)
+        
+        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        btn_box.set_margin_top(12)
+        btn_box.set_halign(Gtk.Align.END)
+        
+        self.btn_import_submit = Gtk.Button(label="🚀 Importar y Activar Proyecto en DDEV")
+        self.btn_import_submit.get_style_context().add_class("btn-primary")
+        self.btn_import_submit.connect("clicked", self.on_import_project_clicked)
+        btn_box.pack_start(self.btn_import_submit, False, False, 0)
+        box.pack_start(btn_box, False, False, 0)
+        
+        return box
 
     def create_framework_card(self, fw):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -1604,6 +1900,17 @@ class DDEVManagerWindow(Gtk.Window):
         self.search_entry.set_hexpand(True)
         self.search_entry.connect("search-changed", self.on_search_changed)
         search_box.pack_start(self.search_entry, True, True, 0)
+        
+        btn_import_shortcut = Gtk.Button(label="📁 Importar Carpeta...")
+        btn_import_shortcut.set_tooltip_text("Vincular un proyecto o repositorio existente en tu disco a DDEV")
+        btn_import_shortcut.connect("clicked", lambda b: self.switch_to_new_project_tab("import"))
+        search_box.pack_start(btn_import_shortcut, False, False, 0)
+        
+        btn_new_shortcut = Gtk.Button(label="➕ Nuevo...")
+        btn_new_shortcut.set_tooltip_text("Crear un nuevo proyecto desde cero")
+        btn_new_shortcut.connect("clicked", lambda b: self.switch_to_new_project_tab("create"))
+        search_box.pack_start(btn_new_shortcut, False, False, 0)
+        
         vbox.pack_start(search_box, False, False, 0)
         
         self.projects_scrolled = Gtk.ScrolledWindow()
@@ -1652,9 +1959,24 @@ class DDEVManagerWindow(Gtk.Window):
             empty_box.pack_start(icon, False, False, 0)
             
             lbl_empty = Gtk.Label()
-            lbl_empty.set_markup("<b>No hay proyectos de DDEV activos</b>\nCrea uno nuevo desde la pestaña <i>'Nuevo Proyecto'</i>.")
+            lbl_empty.set_markup("<b>No hay proyectos de DDEV activos</b>\nCrea uno nuevo desde cero o importa una carpeta que ya tengas en tu disco.")
             lbl_empty.set_justify(Gtk.Justification.CENTER)
             empty_box.pack_start(lbl_empty, False, False, 0)
+            
+            btn_actions_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+            btn_actions_box.set_halign(Gtk.Align.CENTER)
+            btn_actions_box.set_margin_top(10)
+            
+            btn_create = Gtk.Button(label="➕ Crear Proyecto Nuevo")
+            btn_create.get_style_context().add_class("btn-primary")
+            btn_create.connect("clicked", lambda b: self.switch_to_new_project_tab("create"))
+            btn_actions_box.pack_start(btn_create, False, False, 0)
+            
+            btn_import = Gtk.Button(label="📁 Importar Carpeta Existente")
+            btn_import.connect("clicked", lambda b: self.switch_to_new_project_tab("import"))
+            btn_actions_box.pack_start(btn_import, False, False, 0)
+            
+            empty_box.pack_start(btn_actions_box, False, False, 0)
             
             self.projects_list_box.pack_start(empty_box, True, True, 0)
             self.projects_list_box.show_all()
@@ -2262,6 +2584,174 @@ class DDEVManagerWindow(Gtk.Window):
             about.set_logo(ddev_icon)
         about.run()
         about.destroy()
+
+    def on_browse_import_folder(self, widget):
+        dialog = Gtk.FileChooserDialog(
+            title="Seleccionar carpeta de proyecto existente",
+            parent=self,
+            action=Gtk.FileChooserAction.SELECT_FOLDER
+        )
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+        curr = self.entry_import_path.get_text().strip()
+        if os.path.exists(curr):
+            dialog.set_current_folder(curr)
+        if dialog.run() == Gtk.ResponseType.OK:
+            self.entry_import_path.set_text(dialog.get_filename())
+            self.on_import_path_changed(self.entry_import_path)
+        dialog.destroy()
+
+    def on_import_path_changed(self, entry):
+        p = entry.get_text().strip()
+        if not hasattr(self, "card_import_details"):
+            return
+            
+        det = detect_project_details(p)
+        if not det["valid"]:
+            self.lbl_import_status_badge.set_markup("<span color='#ef4444'><b>✗ Carpeta no encontrada o inaccesible</b></span>")
+            self.btn_import_submit.set_sensitive(False)
+            return
+            
+        self.btn_import_submit.set_sensitive(True)
+        self.lbl_import_status_badge.set_markup(f"<span color='#10b981'><b>✓ {det['summary']}</b></span>")
+        self.entry_import_name.set_text(det["name"])
+        
+        # Set type combo
+        self.combo_import_type.set_active_id(det["type"])
+        
+        # Set docroot combo
+        for idx, text in enumerate(["docroot", "web", "public", "."]):
+            if text == det["docroot"]:
+                self.combo_import_docroot.set_active(idx)
+                break
+                
+        # Set php combo
+        for idx, text in enumerate(["8.3", "8.2", "8.1", "8.4", "8.0", "7.4"]):
+            if text == det["php"]:
+                self.combo_import_php.set_active(idx)
+                break
+                
+        self.on_import_type_changed(self.combo_import_type)
+
+    def on_import_type_changed(self, combo):
+        t_id = combo.get_active_id() or ""
+        is_dr = "drupal" in t_id
+        if hasattr(self, "box_import_drupal_options"):
+            self.box_import_drupal_options.set_visible(is_dr)
+
+    def on_import_project_clicked(self, widget):
+        target_dir = self.entry_import_path.get_text().strip()
+        if not os.path.exists(target_dir) or not os.path.isdir(target_dir):
+            msg_diag = Gtk.MessageDialog(
+                transient_for=self,
+                flags=0,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.OK,
+                text="La carpeta seleccionada no existe o no es válida."
+            )
+            msg_diag.run()
+            msg_diag.destroy()
+            return
+            
+        raw_name = self.entry_import_name.get_text().strip()
+        slug = re.sub(r'[^a-zA-Z0-9_-]', '-', raw_name).lower()
+        if not slug:
+            slug = os.path.basename(target_dir.rstrip("/"))
+            
+        p_type = self.combo_import_type.get_active_id() or "drupal10"
+        docroot = self.combo_import_docroot.get_active_text() or "docroot"
+        php_ver = self.combo_import_php.get_active_text() or "8.3"
+        db_type = self.combo_import_db.get_active_text() or "mariadb:10.11"
+        is_multisite = ("drupal" in p_type) and self.chk_import_multisite.get_active()
+        do_composer = self.chk_import_composer.get_active()
+        
+        dialog = ProgressDialog(self, title=f"Importando Proyecto: {slug}")
+        dialog.set_status(f"Configurando DDEV en {target_dir}...")
+        
+        def run_import():
+            try:
+                def log(text):
+                    GLib.idle_add(dialog.append_log, text + "\n")
+                def set_st(st):
+                    GLib.idle_add(dialog.set_status, st)
+                    
+                log(f"📁 Directorio base: {target_dir}")
+                log(f"🚀 Tecnología: {p_type} | Docroot: {docroot}")
+                log(f"🐘 PHP: {php_ver} | BD: {db_type}")
+                log("="*50)
+                
+                # 1. ddev config
+                set_st("Configurando DDEV en el proyecto...")
+                cfg_cmd = [
+                    "ddev", "config",
+                    f"--project-name={slug}",
+                    f"--project-type={p_type}",
+                    f"--docroot={docroot}",
+                    f"--php-version={php_ver}",
+                    f"--database={db_type}"
+                ]
+                self.run_subproc(cfg_cmd, target_dir, dialog)
+                
+                # 2. Dynamic sites.php if Drupal Multisite
+                if is_multisite:
+                    set_st("Configurando enrutador dinámico Drupal Multisite...")
+                    sites_dir = os.path.join(target_dir, docroot, "sites") if docroot != "." else os.path.join(target_dir, "sites")
+                    os.makedirs(sites_dir, exist_ok=True)
+                    sites_php_file = os.path.join(sites_dir, "sites.php")
+                    if not os.path.exists(sites_php_file):
+                        with open(sites_php_file, "w") as sf:
+                            sf.write("""<?php
+/**
+ * @file
+ * Drupal multi-site configuration file for DDEV.
+ */
+
+// Dynamic DDEV multisite mapping
+$sites_base = __DIR__;
+if (is_dir($sites_base)) {
+  $entries = scandir($sites_base);
+  foreach ($entries as $entry) {
+    if ($entry !== '.' && $entry !== '..' && $entry !== 'default' && $entry !== 'all' && $entry !== 'g' && $entry !== 'settings' && is_dir($sites_base . '/' . $entry)) {
+      $sites[$entry . '.ddev.site'] = $entry;
+      if (!empty($_ENV['DDEV_PROJECT'])) {
+        $sites[$entry . '.' . $_ENV['DDEV_PROJECT'] . '.ddev.site'] = $entry;
+      }
+      $sites['local.' . $entry . '.com'] = $entry;
+    }
+  }
+}
+""")
+                        log("✓ Archivo sites.php con mapeo dinámico multisite creado.")
+                    else:
+                        log("✓ Archivo sites.php ya presente en el proyecto.")
+
+                # 3. Start containers
+                set_st("Iniciando contenedores DDEV...")
+                self.run_subproc(["ddev", "start", "-y"], target_dir, dialog)
+                
+                # 4. Composer install if requested and needed
+                if do_composer:
+                    vendor_dir = os.path.join(target_dir, "vendor")
+                    composer_json = os.path.join(target_dir, "composer.json")
+                    if os.path.exists(composer_json) and not os.path.exists(vendor_dir):
+                        set_st("Instalando dependencias de Composer...")
+                        log("📦 Ejecutando 'ddev composer install'...")
+                        self.run_subproc(["ddev", "composer", "install"], target_dir, dialog)
+                        log("✓ Dependencias de Composer instaladas.")
+                        
+                primary_url = f"https://{slug}.ddev.site"
+                log("\n" + "="*50)
+                log(f"¡Proyecto '{slug}' importado y activado con éxito!")
+                log(f"🌐 URL: {primary_url}")
+                
+                GLib.idle_add(dialog.finish, True, f"¡Proyecto '{slug}' listo!", primary_url, target_dir)
+                GLib.idle_add(self.refresh_projects)
+                GLib.idle_add(lambda: self.notebook.set_current_page(0))
+                
+            except Exception as ex:
+                log(f"\n❌ ERROR: {str(ex)}")
+                GLib.idle_add(dialog.finish, False, f"Error importando proyecto: {str(ex)}", "", target_dir)
+                
+        threading.Thread(target=run_import, daemon=True).start()
 
     def on_create_project_clicked(self, widget):
         raw_name = self.entry_name.get_text().strip()
