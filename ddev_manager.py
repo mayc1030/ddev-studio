@@ -56,6 +56,29 @@ CUSTOM_CSS = b"""
     background-color: #0284c7;
     color: white;
 }
+.segmented-mode-container {
+    background: alpha(@theme_base_color, 0.6);
+    border: 1px solid rgba(128, 128, 128, 0.25);
+    border-radius: 12px;
+    padding: 4px;
+}
+.segmented-mode-btn {
+    border-radius: 8px;
+    padding: 8px 22px;
+    font-weight: 600;
+    font-size: 13px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: @theme_text_color;
+}
+.segmented-mode-btn:checked {
+    background-color: #0284c7;
+    color: white;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);
+}
+.segmented-mode-btn:hover:not(:checked) {
+    background-color: alpha(@theme_selected_bg_color, 0.18);
+}
 
 .badge {
     border-radius: 6px;
@@ -1607,24 +1630,37 @@ class DDEVManagerWindow(Gtk.Window):
         main_vbox.set_margin_bottom(24)
         scrolled.add(main_vbox)
         
-        # --- Mode Selector (Segmented buttons) ---
-        mode_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        mode_box.set_halign(Gtk.Align.CENTER)
-        mode_box.set_margin_bottom(6)
+        # --- Mode Selector (Segmented Capsule Switcher) ---
+        mode_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        mode_container.set_halign(Gtk.Align.CENTER)
+        mode_container.set_margin_bottom(8)
         
-        self.btn_mode_create = Gtk.RadioButton.new_with_label(None, "📦 Descargar Proyecto Nuevo")
+        mode_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        mode_box.get_style_context().add_class("segmented-mode-container")
+        mode_box.set_halign(Gtk.Align.CENTER)
+        
+        self.btn_mode_create = Gtk.RadioButton()
         self.btn_mode_create.set_mode(False)
-        self.btn_mode_create.get_style_context().add_class("segmented-btn")
+        self.btn_mode_create.get_style_context().add_class("segmented-mode-btn")
+        b_create_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        b_create_box.pack_start(Gtk.Image.new_from_icon_name("list-add-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+        b_create_box.pack_start(Gtk.Label(label="Descargar Proyecto Nuevo"), False, False, 0)
+        self.btn_mode_create.add(b_create_box)
         self.btn_mode_create.connect("toggled", self.on_project_mode_toggled)
         mode_box.pack_start(self.btn_mode_create, False, False, 0)
         
-        self.btn_mode_import = Gtk.RadioButton.new_with_label_from_widget(self.btn_mode_create, "📁 Importar Carpeta / Proyecto Existente")
+        self.btn_mode_import = Gtk.RadioButton(group=self.btn_mode_create)
         self.btn_mode_import.set_mode(False)
-        self.btn_mode_import.get_style_context().add_class("segmented-btn")
+        self.btn_mode_import.get_style_context().add_class("segmented-mode-btn")
+        b_import_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        b_import_box.pack_start(Gtk.Image.new_from_icon_name("folder-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+        b_import_box.pack_start(Gtk.Label(label="Importar Carpeta Existente"), False, False, 0)
+        self.btn_mode_import.add(b_import_box)
         self.btn_mode_import.connect("toggled", self.on_project_mode_toggled)
         mode_box.pack_start(self.btn_mode_import, False, False, 0)
         
-        main_vbox.pack_start(mode_box, False, False, 0)
+        mode_container.pack_start(mode_box, False, False, 0)
+        main_vbox.pack_start(mode_container, False, False, 0)
         
         # --- Stack to switch between Create and Import forms ---
         self.stack_new_project = Gtk.Stack()
