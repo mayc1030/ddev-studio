@@ -286,6 +286,19 @@ DRUPAL_VERSIONS = [
 ]
 
 
+def create_icon_menu_item(icon_name, label_text, callback=None):
+    item = Gtk.MenuItem()
+    hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+    icon = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.MENU)
+    lbl = Gtk.Label(label=label_text, halign=Gtk.Align.START)
+    lbl.set_hexpand(True)
+    hbox.pack_start(icon, False, False, 0)
+    hbox.pack_start(lbl, True, True, 0)
+    item.add(hbox)
+    if callback:
+        item.connect("activate", callback)
+    return item
+
 def load_icon(name, size=48):
     path = os.path.join(ICONS_DIR, name)
     if os.path.exists(path):
@@ -627,16 +640,28 @@ class SubsitesManagerView(Gtk.Box):
         self.lbl_base_info.set_hexpand(True)
         ctrl_row.pack_start(self.lbl_base_info, True, True, 0)
         
-        self.btn_base_start = Gtk.Button(label="▶ Iniciar DDEV")
+        self.btn_base_start = Gtk.Button()
+        b_start_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_start_box.pack_start(Gtk.Image.new_from_icon_name("media-playback-start-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_start_box.pack_start(Gtk.Label(label="Iniciar DDEV"), False, False, 0)
+        self.btn_base_start.add(b_start_box)
         self.btn_base_start.get_style_context().add_class("btn-primary")
         self.btn_base_start.connect("clicked", lambda b: self.execute_base_ddev_action("start"))
         ctrl_row.pack_start(self.btn_base_start, False, False, 0)
         
-        self.btn_base_stop = Gtk.Button(label="⏹ Detener DDEV")
+        self.btn_base_stop = Gtk.Button()
+        b_stop_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_stop_box.pack_start(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_stop_box.pack_start(Gtk.Label(label="Detener DDEV"), False, False, 0)
+        self.btn_base_stop.add(b_stop_box)
         self.btn_base_stop.connect("clicked", lambda b: self.execute_base_ddev_action("stop"))
         ctrl_row.pack_start(self.btn_base_stop, False, False, 0)
         
-        btn_base_composer = Gtk.Button(label="📦 Composer Install")
+        btn_base_composer = Gtk.Button()
+        b_comp_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_comp_box.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_comp_box.pack_start(Gtk.Label(label="Composer Install"), False, False, 0)
+        btn_base_composer.add(b_comp_box)
         btn_base_composer.set_tooltip_text("Instalar o actualizar dependencias de Composer (Drupal Core y Drush)")
         btn_base_composer.connect("clicked", lambda b: self.execute_base_composer_install())
         ctrl_row.pack_start(btn_base_composer, False, False, 0)
@@ -921,14 +946,22 @@ class SubsitesManagerView(Gtk.Box):
         btn_web.connect("clicked", lambda b, u=subsite_url: webbrowser.open(u))
         actions_box.pack_start(btn_web, False, False, 0)
         
-        btn_quick_cr = Gtk.Button(label="⚡ Caché")
+        btn_quick_cr = Gtk.Button()
+        b_cr_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        b_cr_box.pack_start(Gtk.Image.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_cr_box.pack_start(Gtk.Label(label="Caché"), False, False, 0)
+        btn_quick_cr.add(b_cr_box)
         btn_quick_cr.get_style_context().add_class("btn-quick")
         btn_quick_cr.get_style_context().add_class("btn-quick-cache")
         btn_quick_cr.set_tooltip_text(f"Reconstruir caché de {subsite['name']} (drush cr)")
         btn_quick_cr.connect("clicked", lambda b, sn=subsite["name"], su=subsite_url: self.execute_subsite_drush_action("cr", sn, su, base_dir))
         actions_box.pack_start(btn_quick_cr, False, False, 0)
         
-        btn_quick_uli = Gtk.Button(label="🔑 Login")
+        btn_quick_uli = Gtk.Button()
+        b_uli_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        b_uli_box.pack_start(Gtk.Image.new_from_icon_name("dialog-password-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_uli_box.pack_start(Gtk.Label(label="Login"), False, False, 0)
+        btn_quick_uli.add(b_uli_box)
         btn_quick_uli.get_style_context().add_class("btn-quick")
         btn_quick_uli.get_style_context().add_class("btn-quick-login")
         btn_quick_uli.set_tooltip_text(f"Iniciar sesión como Admin en {subsite['name']} (drush uli)")
@@ -938,30 +971,27 @@ class SubsitesManagerView(Gtk.Box):
         menu_btn_drush = Gtk.MenuButton()
         menu_btn_drush.set_tooltip_text(f"Herramientas Drush para {subsite['name']}")
         menu_btn_drush.get_style_context().add_class("btn-drupal")
-        menu_btn_drush.add(Gtk.Label(label="💧 Drush ▾"))
+        b_drush_lbl = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        b_drush_lbl.pack_start(Gtk.Label(label="Drush"), False, False, 0)
+        b_drush_lbl.pack_start(Gtk.Image.new_from_icon_name("pan-down-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        menu_btn_drush.add(b_drush_lbl)
         
         drush_menu = Gtk.Menu()
-        def add_item(menu, label, a_key, s_name, s_url):
-            it = Gtk.MenuItem(label=label)
-            it.connect("activate", lambda w, ak=a_key, sn=s_name, su=s_url: self.execute_subsite_drush_action(ak, sn, su, base_dir))
-            menu.append(it)
-            return it
-            
-        add_item(drush_menu, "🔑 Iniciar Sesión Admin (drush uli)", "uli", subsite["name"], subsite_url)
-        add_item(drush_menu, "⚡ Limpiar / Reconstruir Caché (drush cr)", "cr", subsite["name"], subsite_url)
-        add_item(drush_menu, "🔄 Actualizar Base de Datos (drush updb)", "updb", subsite["name"], subsite_url)
+        drush_menu.append(create_icon_menu_item("dialog-password-symbolic", "Iniciar Sesión Admin (drush uli)", lambda w: self.execute_subsite_drush_action("uli", subsite["name"], subsite_url, base_dir)))
+        drush_menu.append(create_icon_menu_item("view-refresh-symbolic", "Limpiar / Reconstruir Caché (drush cr)", lambda w: self.execute_subsite_drush_action("cr", subsite["name"], subsite_url, base_dir)))
+        drush_menu.append(create_icon_menu_item("software-update-available-symbolic", "Actualizar Base de Datos (drush updb)", lambda w: self.execute_subsite_drush_action("updb", subsite["name"], subsite_url, base_dir)))
         drush_menu.append(Gtk.SeparatorMenuItem())
-        add_item(drush_menu, "📥 Importar Base de Datos (.sql / .sql.gz)", "import_db", subsite["name"], subsite_url)
-        add_item(drush_menu, "📤 Exportar Base de Datos (.sql.gz)", "export_db", subsite["name"], subsite_url)
+        drush_menu.append(create_icon_menu_item("go-down-symbolic", "Importar Base de Datos (.sql / .sql.gz)", lambda w: self.execute_subsite_drush_action("import_db", subsite["name"], subsite_url, base_dir)))
+        drush_menu.append(create_icon_menu_item("go-up-symbolic", "Exportar Base de Datos (.sql.gz)", lambda w: self.execute_subsite_drush_action("export_db", subsite["name"], subsite_url, base_dir)))
         drush_menu.append(Gtk.SeparatorMenuItem())
-        add_item(drush_menu, "📤 Exportar Configuración (drush cex)", "cex", subsite["name"], subsite_url)
-        add_item(drush_menu, "📥 Importar Configuración (drush cim)", "cim", subsite["name"], subsite_url)
+        drush_menu.append(create_icon_menu_item("document-save-symbolic", "Exportar Configuración (drush cex)", lambda w: self.execute_subsite_drush_action("cex", subsite["name"], subsite_url, base_dir)))
+        drush_menu.append(create_icon_menu_item("document-open-symbolic", "Importar Configuración (drush cim)", lambda w: self.execute_subsite_drush_action("cim", subsite["name"], subsite_url, base_dir)))
         drush_menu.append(Gtk.SeparatorMenuItem())
-        add_item(drush_menu, "⏰ Ejecutar Cron (drush cron)", "cron", subsite["name"], subsite_url)
-        add_item(drush_menu, "📊 Estado del Subsitio (drush status)", "status", subsite["name"], subsite_url)
-        add_item(drush_menu, "📋 Ver Logs Recientes (drush watchdog)", "watchdog", subsite["name"], subsite_url)
+        drush_menu.append(create_icon_menu_item("alarm-symbolic", "Ejecutar Cron (drush cron)", lambda w: self.execute_subsite_drush_action("cron", subsite["name"], subsite_url, base_dir)))
+        drush_menu.append(create_icon_menu_item("dialog-information-symbolic", "Estado del Subsitio (drush status)", lambda w: self.execute_subsite_drush_action("status", subsite["name"], subsite_url, base_dir)))
+        drush_menu.append(create_icon_menu_item("text-x-generic-symbolic", "Ver Logs Recientes (drush watchdog)", lambda w: self.execute_subsite_drush_action("watchdog", subsite["name"], subsite_url, base_dir)))
         drush_menu.append(Gtk.SeparatorMenuItem())
-        add_item(drush_menu, "💻 Abrir SSH en este Subsitio", "ssh", subsite["name"], subsite_url)
+        drush_menu.append(create_icon_menu_item("utilities-terminal-symbolic", "Abrir SSH en este Subsitio", lambda w: self.execute_subsite_drush_action("ssh", subsite["name"], subsite_url, base_dir)))
         
         drush_menu.show_all()
         menu_btn_drush.set_popup(drush_menu)
@@ -2280,7 +2310,7 @@ class DDEVManagerWindow(Gtk.Window):
                 lbl_drupal_mode.get_style_context().add_class("badge-multisite")
                 lbl_drupal_mode.set_tooltip_text(f"Drupal Multisite con {subsite_count} subsitio(s) configurado(s)")
             else:
-                lbl_drupal_mode.set_label("💧 SITE")
+                lbl_drupal_mode.set_label("DRUPAL SITE")
                 lbl_drupal_mode.get_style_context().add_class("badge-single-site")
                 lbl_drupal_mode.set_tooltip_text("Drupal Single Site (Sitio estándar individual)")
             title_row.pack_start(lbl_drupal_mode, False, False, 0)
@@ -2312,12 +2342,17 @@ class DDEVManagerWindow(Gtk.Window):
         is_running = "running" in status or "ok" in status
         
         btn_toggle = Gtk.Button()
+        btn_t_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         if is_running:
-            btn_toggle.set_label("⏹ Detener")
+            btn_t_box.pack_start(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            btn_t_box.pack_start(Gtk.Label(label="Detener"), False, False, 0)
+            btn_toggle.add(btn_t_box)
             btn_toggle.set_tooltip_text("Detener proyecto (ddev stop)")
             btn_toggle.connect("clicked", lambda b, p=proj: self.execute_simple_action("stop", p))
         else:
-            btn_toggle.set_label("▶ Iniciar")
+            btn_t_box.pack_start(Gtk.Image.new_from_icon_name("media-playback-start-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            btn_t_box.pack_start(Gtk.Label(label="Iniciar"), False, False, 0)
+            btn_toggle.add(btn_t_box)
             btn_toggle.get_style_context().add_class("btn-primary")
             btn_toggle.set_tooltip_text("Iniciar proyecto (ddev start)")
             btn_toggle.connect("clicked", lambda b, p=proj: self.execute_simple_action("start", p))
@@ -2334,17 +2369,24 @@ class DDEVManagerWindow(Gtk.Window):
         if is_drupal:
             btn_subsites = Gtk.Button()
             btn_subsites.get_style_context().add_class("btn-drupal")
+            b_sub_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+            b_sub_box.pack_start(Gtk.Image.new_from_icon_name("network-server-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            sub_txt = f"Subsitios ({subsite_count})" if is_multisite and subsite_count > 0 else "Subsitios"
+            b_sub_box.pack_start(Gtk.Label(label=sub_txt), False, False, 0)
+            btn_subsites.add(b_sub_box)
             if is_multisite and subsite_count > 0:
-                btn_subsites.set_label(f"💧 Subsitios ({subsite_count})")
                 btn_subsites.set_tooltip_text(f"Gestionar los {subsite_count} subsitios de este Drupal Multisite")
             else:
-                btn_subsites.set_label("💧 Subsitios")
                 btn_subsites.set_tooltip_text("Gestionar o aprovisionar subsitios multisite para este proyecto")
             btn_subsites.connect("clicked", lambda b, p=proj: self.open_subsites_manager(p))
             actions_box.pack_start(btn_subsites, False, False, 0)
             
             # 1. Botón rápido Reconstruir/Limpiar Caché (cr / cc all)
-            btn_quick_cr = Gtk.Button(label="⚡ Caché")
+            btn_quick_cr = Gtk.Button()
+            b_cr_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+            b_cr_box.pack_start(Gtk.Image.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_cr_box.pack_start(Gtk.Label(label="Caché"), False, False, 0)
+            btn_quick_cr.add(b_cr_box)
             btn_quick_cr.get_style_context().add_class("btn-quick")
             btn_quick_cr.get_style_context().add_class("btn-quick-cache")
             btn_quick_cr.set_tooltip_text("Reconstruir caché de Drupal (ddev drush cr)")
@@ -2352,7 +2394,11 @@ class DDEVManagerWindow(Gtk.Window):
             actions_box.pack_start(btn_quick_cr, False, False, 0)
             
             # 2. Botón rápido One-Time Login (drush uli)
-            btn_quick_uli = Gtk.Button(label="🔑 Login")
+            btn_quick_uli = Gtk.Button()
+            b_uli_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+            b_uli_box.pack_start(Gtk.Image.new_from_icon_name("dialog-password-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_uli_box.pack_start(Gtk.Label(label="Login"), False, False, 0)
+            btn_quick_uli.add(b_uli_box)
             btn_quick_uli.get_style_context().add_class("btn-quick")
             btn_quick_uli.get_style_context().add_class("btn-quick-login")
             btn_quick_uli.set_tooltip_text("Iniciar sesión como Administrador (ddev drush uli)")
@@ -2363,40 +2409,35 @@ class DDEVManagerWindow(Gtk.Window):
             menu_btn_drush = Gtk.MenuButton()
             menu_btn_drush.set_tooltip_text("Menú de comandos de Drupal / Drush")
             menu_btn_drush.get_style_context().add_class("btn-drupal")
-            
-            lbl_drush_menu = Gtk.Label(label="💧 Drush ▾")
-            menu_btn_drush.add(lbl_drush_menu)
+            b_drush_lbl = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+            b_drush_lbl.pack_start(Gtk.Label(label="Drush"), False, False, 0)
+            b_drush_lbl.pack_start(Gtk.Image.new_from_icon_name("pan-down-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            menu_btn_drush.add(b_drush_lbl)
             
             drush_menu = Gtk.Menu()
             
-            def add_menu_item(menu, label, action_key, p):
-                item = Gtk.MenuItem(label=label)
-                item.connect("activate", lambda w, ak=action_key, pr=p: self.execute_drush_action(ak, pr))
-                menu.append(item)
-                return item
-                
-            add_menu_item(drush_menu, "🔑 Iniciar Sesión Admin (drush uli)", "uli", proj)
-            add_menu_item(drush_menu, "⚡ Limpiar / Reconstruir Caché (drush cr)", "cr", proj)
-            add_menu_item(drush_menu, "🔄 Actualizar Base de Datos (drush updb)", "updb", proj)
+            drush_menu.append(create_icon_menu_item("dialog-password-symbolic", "Iniciar Sesión Admin (drush uli)", lambda w, pr=proj: self.execute_drush_action("uli", pr)))
+            drush_menu.append(create_icon_menu_item("view-refresh-symbolic", "Limpiar / Reconstruir Caché (drush cr)", lambda w, pr=proj: self.execute_drush_action("cr", pr)))
+            drush_menu.append(create_icon_menu_item("software-update-available-symbolic", "Actualizar Base de Datos (drush updb)", lambda w, pr=proj: self.execute_drush_action("updb", pr)))
             
             drush_menu.append(Gtk.SeparatorMenuItem())
-            add_menu_item(drush_menu, "📥 Importar Base de Datos (.sql / .sql.gz)", "import_db", proj)
-            add_menu_item(drush_menu, "📤 Exportar Base de Datos (.sql.gz)", "export_db", proj)
+            drush_menu.append(create_icon_menu_item("go-down-symbolic", "Importar Base de Datos (.sql / .sql.gz)", lambda w, pr=proj: self.execute_drush_action("import_db", pr)))
+            drush_menu.append(create_icon_menu_item("go-up-symbolic", "Exportar Base de Datos (.sql.gz)", lambda w, pr=proj: self.execute_drush_action("export_db", pr)))
             drush_menu.append(Gtk.SeparatorMenuItem())
             
             if "drupal7" not in ptype:
-                add_menu_item(drush_menu, "📤 Exportar Configuración (drush cex)", "cex", proj)
-                add_menu_item(drush_menu, "📥 Importar Configuración (drush cim)", "cim", proj)
+                drush_menu.append(create_icon_menu_item("document-save-symbolic", "Exportar Configuración (drush cex)", lambda w, pr=proj: self.execute_drush_action("cex", pr)))
+                drush_menu.append(create_icon_menu_item("document-open-symbolic", "Importar Configuración (drush cim)", lambda w, pr=proj: self.execute_drush_action("cim", pr)))
                 drush_menu.append(Gtk.SeparatorMenuItem())
                 
-            add_menu_item(drush_menu, "⏰ Ejecutar Cron (drush cron)", "cron", proj)
-            add_menu_item(drush_menu, "📊 Estado del Sitio (drush status)", "status", proj)
-            add_menu_item(drush_menu, "📋 Ver Logs Recientes (drush watchdog)", "watchdog", proj)
-            add_menu_item(drush_menu, "🧩 Módulos Habilitados (drush pm:list)", "pm_list", proj)
+            drush_menu.append(create_icon_menu_item("alarm-symbolic", "Ejecutar Cron (drush cron)", lambda w, pr=proj: self.execute_drush_action("cron", pr)))
+            drush_menu.append(create_icon_menu_item("dialog-information-symbolic", "Estado del Sitio (drush status)", lambda w, pr=proj: self.execute_drush_action("status", pr)))
+            drush_menu.append(create_icon_menu_item("text-x-generic-symbolic", "Ver Logs Recientes (drush watchdog)", lambda w, pr=proj: self.execute_drush_action("watchdog", pr)))
+            drush_menu.append(create_icon_menu_item("application-x-addon-symbolic", "Módulos Habilitados (drush pm:list)", lambda w, pr=proj: self.execute_drush_action("pm_list", pr)))
             
             drush_menu.append(Gtk.SeparatorMenuItem())
-            add_menu_item(drush_menu, "💻 Abrir SSH en Contenedor (ddev ssh)", "ssh", proj)
-            add_menu_item(drush_menu, "🚀 Instalar Drush si falta (composer require)", "install_drush", proj)
+            drush_menu.append(create_icon_menu_item("utilities-terminal-symbolic", "Abrir SSH en Contenedor (ddev ssh)", lambda w, pr=proj: self.execute_drush_action("ssh", pr)))
+            drush_menu.append(create_icon_menu_item("system-software-install-symbolic", "Instalar Drush si falta (composer require)", lambda w, pr=proj: self.execute_drush_action("install_drush", pr)))
             
             drush_menu.show_all()
             menu_btn_drush.set_popup(drush_menu)
