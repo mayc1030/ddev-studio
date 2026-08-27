@@ -182,6 +182,27 @@ CUSTOM_CSS = b"""
     background-color: alpha(#f59e0b, 0.3);
     border-color: #f59e0b;
 }
+.loader-card {
+    border-radius: 14px;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+    padding: 28px 24px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+}
+.loader-spinner {
+    min-width: 32px;
+    min-height: 32px;
+}
+.loader-pbar progress {
+    background-color: #0284c7;
+    border-radius: 4px;
+}
+.loader-pbar trough {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    min-height: 4px;
+}
+
 .nav-bar-box {
     padding: 4px 2px;
     margin-bottom: 2px;
@@ -2265,13 +2286,63 @@ class ProjectDetailsView(Gtk.Box):
         for child in self.content_box.get_children():
             self.content_box.remove(child)
             
-        loading_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        loading_box.set_margin_top(30)
-        loading_lbl = Gtk.Label()
-        loading_lbl.set_markup(f"<b>Obteniendo radiografía en vivo de <i>{self.proj_name}</i> (ddev describe)...</b>")
-        loading_box.pack_start(loading_lbl, True, True, 0)
-        self.content_box.pack_start(loading_box, True, True, 0)
+        loader_outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        loader_outer.set_halign(Gtk.Align.CENTER)
+        loader_outer.set_valign(Gtk.Align.CENTER)
+        loader_outer.set_margin_top(50)
+        loader_outer.set_margin_bottom(50)
+        
+        loader_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        loader_card.get_style_context().add_class("loader-card")
+        loader_card.set_size_request(480, -1)
+        
+        # Header Icon & Active Spinner Row
+        spin_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+        spin_row.set_halign(Gtk.Align.CENTER)
+        
+        spinner = Gtk.Spinner()
+        spinner.get_style_context().add_class("loader-spinner")
+        spinner.start()
+        spin_row.pack_start(spinner, False, False, 0)
+        
+        ddev_icon = load_icon("ddev.svg", 36)
+        if ddev_icon:
+            spin_row.pack_start(Gtk.Image.new_from_pixbuf(ddev_icon), False, False, 0)
+            
+        loader_card.pack_start(spin_row, False, False, 0)
+        
+        # Texts
+        lbl_title = Gtk.Label()
+        lbl_title.set_markup("<span size='large' weight='bold'>Obteniendo radiografía en vivo</span>")
+        lbl_title.set_halign(Gtk.Align.CENTER)
+        loader_card.pack_start(lbl_title, False, False, 0)
+        
+        lbl_sub = Gtk.Label()
+        lbl_sub.set_markup(f"<span color='#94a3b8'>Consultando contenedores Docker, puertos y servicios de</span>\n<span color='#38bdf8' weight='bold'>{self.proj_name}</span>")
+        lbl_sub.set_justify(Gtk.Justification.CENTER)
+        lbl_sub.set_halign(Gtk.Align.CENTER)
+        loader_card.pack_start(lbl_sub, False, False, 0)
+        
+        # Pulse Progress Bar
+        pbar = Gtk.ProgressBar()
+        pbar.get_style_context().add_class("loader-pbar")
+        pbar.set_margin_top(4)
+        pbar.set_margin_start(24)
+        pbar.set_margin_end(24)
+        loader_card.pack_start(pbar, False, False, 0)
+        
+        loader_outer.pack_start(loader_card, False, False, 0)
+        self.content_box.pack_start(loader_outer, True, True, 0)
         self.content_box.show_all()
+        
+        # Continuous Pulse Animation
+        is_loading = [True]
+        def pulse_tick():
+            if is_loading[0] and pbar.get_parent():
+                pbar.pulse()
+                return True
+            return False
+        GLib.timeout_add(80, pulse_tick)
         
         def fetch():
             try:
@@ -2305,7 +2376,11 @@ class ProjectDetailsView(Gtk.Box):
                 except Exception:
                     pass
                     
-            GLib.idle_add(self.render_details_ui, raw_data)
+            def on_ready():
+                is_loading[0] = False
+                self.render_details_ui(raw_data)
+                
+            GLib.idle_add(on_ready)
             
         threading.Thread(target=fetch, daemon=True).start()
 
