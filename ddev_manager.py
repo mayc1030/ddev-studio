@@ -2740,19 +2740,39 @@ class DDEVManagerWindow(Gtk.Window):
         grid.set_row_spacing(12)
         box.pack_start(grid, False, False, 0)
         
-        btn_stop_all = Gtk.Button(label="⏹ Detener Todos los Proyectos (Poweroff)")
+        # 1. Poweroff all
+        btn_stop_all = Gtk.Button()
+        b_stop = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        b_stop.pack_start(Gtk.Image.new_from_icon_name("system-shutdown-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+        b_stop.pack_start(Gtk.Label(label="Detener Todos los Proyectos (Poweroff)"), False, False, 0)
+        btn_stop_all.add(b_stop)
         btn_stop_all.connect("clicked", self.on_global_poweroff)
         grid.attach(btn_stop_all, 0, 0, 1, 1)
         
-        btn_start_all = Gtk.Button(label="▶ Iniciar Todos los Proyectos")
+        # 2. Start all
+        btn_start_all = Gtk.Button()
+        b_start = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        b_start.pack_start(Gtk.Image.new_from_icon_name("media-playback-start-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+        b_start.pack_start(Gtk.Label(label="Iniciar Todos los Proyectos"), False, False, 0)
+        btn_start_all.add(b_start)
         btn_start_all.connect("clicked", self.on_global_start_all)
         grid.attach(btn_start_all, 1, 0, 1, 1)
         
-        btn_clean = Gtk.Button(label="🧹 Limpiar Caché e Imágenes Huérfanas")
+        # 3. Clean
+        btn_clean = Gtk.Button()
+        b_clean = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        b_clean.pack_start(Gtk.Image.new_from_icon_name("edit-clear-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+        b_clean.pack_start(Gtk.Label(label="Limpiar Caché e Imágenes (ddev clean)"), False, False, 0)
+        btn_clean.add(b_clean)
         btn_clean.connect("clicked", self.on_clean_ddev)
         grid.attach(btn_clean, 0, 1, 1, 1)
         
-        btn_router = Gtk.Button(label="🌐 Abrir Panel Traefik Router")
+        # 4. Traefik Router
+        btn_router = Gtk.Button()
+        b_router = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        b_router.pack_start(Gtk.Image.new_from_icon_name("network-server-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+        b_router.pack_start(Gtk.Label(label="Abrir Panel Traefik Router"), False, False, 0)
+        btn_router.add(b_router)
         btn_router.connect("clicked", lambda b: webbrowser.open("http://127.0.0.1:10999"))
         grid.attach(btn_router, 1, 1, 1, 1)
         
