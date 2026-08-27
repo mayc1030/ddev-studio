@@ -1945,27 +1945,46 @@ def inspect_project_stack(approot, raw_data, proj_dict):
             except Exception:
                 pass
                 
-        # 3. Check Python indicators
+        # 3. Check Python indicators (Django, Flask, FastAPI)
         if os.path.exists(os.path.join(approot, "manage.py")):
             tech_type = "django"
-        elif os.path.exists(os.path.join(approot, "app.py")) or os.path.exists(os.path.join(approot, "requirements.txt")):
+        else:
+            py_candidates = ["app.py", "main.py", "wsgi.py", "server.py", "application.py"]
+            for py_f in py_candidates:
+                py_path = os.path.join(approot, py_f)
+                if os.path.exists(py_path):
+                    try:
+                        with open(py_path, "r", encoding="utf-8", errors="ignore") as f:
+                            py_code = f.read(4096).lower()
+                        if "flask" in py_code:
+                            tech_type = "flask"
+                            break
+                        elif "fastapi" in py_code:
+                            tech_type = "fastapi"
+                            break
+                        elif "django" in py_code:
+                            tech_type = "django"
+                            break
+                        else:
+                            tech_type = "python"
+                    except Exception:
+                        tech_type = "python"
+                        
             req_file = os.path.join(approot, "requirements.txt")
             if os.path.exists(req_file):
                 try:
-                    with open(req_file, "r", encoding="utf-8") as f:
+                    with open(req_file, "r", encoding="utf-8", errors="ignore") as f:
                         req_text = f.read().lower()
-                    if "django" in req_text:
-                        tech_type = "django"
-                    elif "flask" in req_text:
+                    if "flask" in req_text:
                         tech_type = "flask"
                     elif "fastapi" in req_text:
                         tech_type = "fastapi"
-                    else:
+                    elif "django" in req_text:
+                        tech_type = "django"
+                    elif tech_type == ddev_type:
                         tech_type = "python"
                 except Exception:
-                    tech_type = "python"
-            else:
-                tech_type = "python"
+                    pass
                 
         # 4. Check composer.json for PHP frameworks
         composer_file = os.path.join(approot, "composer.json")
@@ -1988,7 +2007,7 @@ def inspect_project_stack(approot, raw_data, proj_dict):
     # Name-based fallback for created projects
     pname_lower = pname.lower()
     for cand in ["angular", "react", "vue", "nextjs", "nuxt", "svelte", "django", "flask", "fastapi", "laravel", "symfony", "wordpress", "drupal"]:
-        if cand in pname_lower and tech_type in ["generic", "php", "default"]:
+        if cand in pname_lower and tech_type in ["generic", "php", "default", "python"]:
             tech_type = cand
             break
             
@@ -2319,7 +2338,7 @@ class ProjectDetailsView(Gtk.Box):
         
         # Find icon based on accurate tech_type
         icon_file = "ddev.svg"
-        for fw_cand in ["drupal", "wordpress", "laravel", "django", "flask", "angular", "react", "vue", "php", "symfony", "python", "node"]:
+        for fw_cand in ["drupal", "wordpress", "laravel", "django", "flask", "angular", "react", "vue", "symfony", "python", "php", "node"]:
             if fw_cand in tech_type:
                 icon_file = f"{fw_cand}.svg"
                 break
