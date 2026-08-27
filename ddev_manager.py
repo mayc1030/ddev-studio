@@ -193,6 +193,36 @@ FRAMEWORKS = [
         "db": "mysql:8.0",
     },
     {
+        "id": "django",
+        "name": "Django",
+        "category": "Python Framework",
+        "desc": "Framework web de alto nivel en Python con ORM, admin y base de datos.",
+        "icon": "django.svg",
+        "php": "8.3",
+        "docroot": ".",
+        "db": "postgres:16",
+    },
+    {
+        "id": "flask",
+        "name": "Flask",
+        "category": "Python Microframework",
+        "desc": "Microframework ligero y flexible en Python para APIs y aplicaciones web.",
+        "icon": "flask.svg",
+        "php": "8.3",
+        "docroot": ".",
+        "db": "mariadb:10.11",
+    },
+    {
+        "id": "angular",
+        "name": "Angular",
+        "category": "Frontend SPA",
+        "desc": "Plataforma y framework TypeScript de Google para aplicaciones web escalables.",
+        "icon": "angular.svg",
+        "php": "8.2",
+        "docroot": "dist",
+        "db": "mariadb:10.11",
+    },
+    {
         "id": "react",
         "name": "React (Vite)",
         "category": "Frontend SPA",
@@ -461,6 +491,13 @@ def detect_project_details(folder_path):
         return {"name": slug, "type": "laravel", "docroot": "public", "php": "8.3", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Laravel detectado", "valid": True}
     if os.path.exists(os.path.join(folder_path, "package.json")) and not os.path.exists(os.path.join(folder_path, "composer.json")):
         return {"name": slug, "type": "generic", "docroot": ".", "php": "8.3", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Proyecto JS / Node detectado", "valid": True}
+
+    if os.path.exists(os.path.join(folder_path, "manage.py")):
+        return {"name": slug, "type": "generic", "docroot": ".", "php": "8.3", "db": "postgres:16", "is_drupal": False, "is_multisite": False, "summary": "Proyecto Django detectado (Python)", "valid": True}
+    if os.path.exists(os.path.join(folder_path, "app.py")) or os.path.exists(os.path.join(folder_path, "wsgi.py")):
+        return {"name": slug, "type": "generic", "docroot": ".", "php": "8.3", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Proyecto Flask detectado (Python)", "valid": True}
+    if os.path.exists(os.path.join(folder_path, "angular.json")):
+        return {"name": slug, "type": "generic", "docroot": "dist", "php": "8.2", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Proyecto Angular detectado (TypeScript/Node)", "valid": True}
 
     return {
         "name": slug,
@@ -1976,6 +2013,7 @@ class DDEVManagerWindow(Gtk.Window):
         card.project_data = proj
         
         ptype = proj.get("type", "").lower()
+        approot = proj.get("approot", "")
         icon_name = "php.svg"
         if "wordpress" in ptype:
             icon_name = "wordpress.svg"
@@ -1983,12 +2021,20 @@ class DDEVManagerWindow(Gtk.Window):
             icon_name = "drupal.svg"
         elif "laravel" in ptype:
             icon_name = "laravel.svg"
-        elif "react" in ptype or "vite" in ptype or "generic" in ptype:
+        elif "django" in ptype or (approot and os.path.exists(os.path.join(approot, "manage.py"))):
+            icon_name = "django.svg"
+        elif "flask" in ptype or (approot and (os.path.exists(os.path.join(approot, "app.py")) or os.path.exists(os.path.join(approot, "wsgi.py")))):
+            icon_name = "flask.svg"
+        elif "angular" in ptype or (approot and os.path.exists(os.path.join(approot, "angular.json"))):
+            icon_name = "angular.svg"
+        elif "react" in ptype:
             icon_name = "react.svg"
         elif "vue" in ptype:
             icon_name = "vue.svg"
         elif "symfony" in ptype:
             icon_name = "symfony.svg"
+        elif "generic" in ptype or "vite" in ptype:
+            icon_name = "react.svg"
             
         pixbuf = load_icon(icon_name, 40)
         if pixbuf:
@@ -3062,6 +3108,198 @@ if (is_dir($sites_base)) {
                     set_st("Compilando versión inicial...")
                     self.run_subproc(["ddev", "npm", "run", "build"], target_dir, dialog)
                     log("\n🎉 Proyecto Vue listo!")
+
+                elif fw_id == "django":
+                    set_st("Configurando DDEV para Django...")
+                    cfg_cmd = [
+                        "ddev", "config",
+                        f"--project-name={slug}",
+                        "--project-type=generic",
+                        "--docroot=.",
+                        f"--database={db_type}"
+                    ]
+                    self.run_subproc(cfg_cmd, target_dir, dialog)
+                    
+                    ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
+                    if os.path.exists(ddev_cfg_path):
+                        with open(ddev_cfg_path, "a") as cf:
+                            cf.write('''
+web_extra_daemons:
+  - name: django
+    command: "python3 manage.py runserver 0.0.0.0:8000"
+    directory: /var/www/html
+web_extra_exposed_ports:
+  - name: django
+    container_port: 8000
+    http_port: 80
+    https_port: 443
+''')
+                    set_st("Iniciando contenedores DDEV...")
+                    self.run_subproc(["ddev", "start", "-y"], target_dir, dialog)
+                    
+                    set_st("Instalando Django y librerías de base de datos...")
+                    self.run_subproc(["ddev", "exec", "pip install django PyMySQL psycopg2-binary cryptography"], target_dir, dialog)
+                    
+                    set_st("Generando estructura inicial de Django...")
+                    self.run_subproc(["ddev", "exec", "django-admin startproject app ."], target_dir, dialog)
+                    
+                    set_st("Configurando base de datos y ALLOWED_HOSTS...")
+                    settings_py_path = os.path.join(target_dir, "app", "settings.py")
+                    if os.path.exists(settings_py_path):
+                        try:
+                            with open(settings_py_path, "r") as sf:
+                                s_code = sf.read()
+                            s_code = s_code.replace("ALLOWED_HOSTS = []", "ALLOWED_HOSTS = ['*']")
+                            if "postgres" in db_type:
+                                db_block = '''DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'db',
+        'USER': 'db',
+        'PASSWORD': 'db',
+        'HOST': 'db',
+        'PORT': '5432',
+    }
+}'''
+                            else:
+                                db_block = '''import pymysql
+pymysql.install_as_MySQLdb()
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'db',
+        'USER': 'db',
+        'PASSWORD': 'db',
+        'HOST': 'db',
+        'PORT': '3306',
+    }
+}'''
+                            s_code = re.sub(r'DATABASES\s*=\s*\{.*?\n\}', db_block, s_code, flags=re.DOTALL)
+                            with open(settings_py_path, "w") as sf:
+                                sf.write(s_code)
+                        except Exception as ex:
+                            log(f"Nota en settings.py: {ex}")
+                            
+                    set_st("Ejecutando migraciones de base de datos...")
+                    self.run_subproc(["ddev", "exec", "python3 manage.py migrate"], target_dir, dialog)
+                    
+                    if auto_install:
+                        set_st("Creando superusuario administrador (admin / admin)...")
+                        superuser_script = "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').exists() or User.objects.create_superuser('admin', 'admin@example.com', 'admin')"
+                        self.run_subproc(["ddev", "exec", f'python3 manage.py shell -c "{superuser_script}"'], target_dir, dialog)
+                        log("\n👑 Superusuario creado: admin / admin (Panel en /admin)")
+                        
+                    set_st("Reiniciando servidor DDEV para activar Django...")
+                    self.run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
+                    log("\n🎉 Proyecto Django listo y corriendo!")
+
+                elif fw_id == "flask":
+                    set_st("Configurando DDEV para Flask...")
+                    cfg_cmd = [
+                        "ddev", "config",
+                        f"--project-name={slug}",
+                        "--project-type=generic",
+                        "--docroot=.",
+                        f"--database={db_type}"
+                    ]
+                    self.run_subproc(cfg_cmd, target_dir, dialog)
+                    
+                    ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
+                    if os.path.exists(ddev_cfg_path):
+                        with open(ddev_cfg_path, "a") as cf:
+                            cf.write('''
+web_extra_daemons:
+  - name: flask
+    command: "python3 app.py"
+    directory: /var/www/html
+web_extra_exposed_ports:
+  - name: flask
+    container_port: 5000
+    http_port: 80
+    https_port: 443
+''')
+                    set_st("Iniciando contenedores DDEV...")
+                    self.run_subproc(["ddev", "start", "-y"], target_dir, dialog)
+                    
+                    set_st("Instalando Flask y conectores...")
+                    self.run_subproc(["ddev", "exec", "pip install flask pymysql psycopg2-binary cryptography python-dotenv"], target_dir, dialog)
+                    
+                    set_st("Creando aplicación inicial app.py...")
+                    app_py_path = os.path.join(target_dir, "app.py")
+                    with open(app_py_path, "w") as f:
+                        f.write(f'''from flask import Flask, render_template_string
+
+app = Flask(__name__)
+
+HTML_TEMPLATE = """<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{slug} - Flask en DDEV</title>
+    <style>
+        body {{ font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
+        .card {{ background: #1e293b; padding: 2.5rem; border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; max-width: 500px; border: 1px solid rgba(255,255,255,0.1); }}
+        h1 {{ color: #38bdf8; margin-top: 0; }}
+        .badge {{ background: #0284c7; padding: 4px 12px; border-radius: 9999px; font-size: 0.85rem; font-weight: bold; display: inline-block; margin-top: 10px; }}
+        p {{ color: #94a3b8; line-height: 1.5; }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>¡Flask en DDEV Studio! 🚀</h1>
+        <p>Tu aplicación <b>{slug}</b> con microframework Flask está corriendo exitosamente en Ubuntu MATE.</p>
+        <span class="badge">Python 3 + Flask + DDEV</span>
+    </div>
+</body>
+</html>"""
+
+@app.route('/')
+def home():
+    return render_template_string(HTML_TEMPLATE)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+''')
+                    set_st("Reiniciando servidor DDEV para activar Flask...")
+                    self.run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
+                    log("\n🎉 Proyecto Flask listo y corriendo!")
+
+                elif fw_id == "angular":
+                    set_st("Configurando DDEV para Angular...")
+                    cfg_cmd = [
+                        "ddev", "config",
+                        f"--project-name={slug}",
+                        "--project-type=generic",
+                        "--docroot=dist",
+                        f"--nodejs-version={node_version}"
+                    ]
+                    self.run_subproc(cfg_cmd, target_dir, dialog)
+                    
+                    ddev_cfg_path = os.path.join(target_dir, ".ddev", "config.yaml")
+                    if os.path.exists(ddev_cfg_path):
+                        with open(ddev_cfg_path, "a") as cf:
+                            cf.write('''
+web_extra_daemons:
+  - name: angular
+    command: "npm start -- --host 0.0.0.0 --port 4200 --disable-host-check"
+    directory: /var/www/html
+web_extra_exposed_ports:
+  - name: angular
+    container_port: 4200
+    http_port: 80
+    https_port: 443
+''')
+                    set_st("Iniciando contenedores DDEV...")
+                    self.run_subproc(["ddev", "start", "-y"], target_dir, dialog)
+                    
+                    set_st("Creando proyecto Angular con @angular/cli...")
+                    self.run_subproc(["ddev", "exec", "npx -y @angular/cli new app --directory=. --routing --style=css --skip-git --defaults"], target_dir, dialog)
+                    
+                    set_st("Reiniciando DDEV para activar Angular Live Dev Server...")
+                    self.run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
+                    log("\n🎉 Proyecto Angular listo y corriendo!")
 
                 elif fw_id == "symfony":
                     set_st("Configurando DDEV para Symfony...")
