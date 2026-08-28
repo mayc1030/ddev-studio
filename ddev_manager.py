@@ -1227,12 +1227,7 @@ class SubsitesManagerView(Gtk.Box):
         menu_btn_drush.set_popup(drush_menu)
         actions_box.pack_start(menu_btn_drush, False, False, 0)
         
-        btn_folder = Gtk.Button()
-        btn_folder.add(Gtk.Image.new_from_icon_name("folder-symbolic", Gtk.IconSize.BUTTON))
-        btn_folder.set_tooltip_text("Abrir carpeta de este subsitio")
-        btn_folder.connect("clicked", lambda b, p=subsite["path"]: subprocess.Popen(["xdg-open", p]))
-        actions_box.pack_start(btn_folder, False, False, 0)
-        
+
         btn_del = Gtk.Button()
         btn_del.add(Gtk.Image.new_from_icon_name("user-trash-symbolic", Gtk.IconSize.BUTTON))
         btn_del.set_tooltip_text("Eliminar este subsitio del multisite")
