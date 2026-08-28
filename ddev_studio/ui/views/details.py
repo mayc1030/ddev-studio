@@ -108,7 +108,8 @@ class ProjectDetailsView(Gtk.Box):
     def show_ci_dialog(self, approot, proj_name, tech_type):
         dialog = CIDialog(self.main_app, approot, proj_name, tech_type)
         dialog.run()
-        self.render_project_details(self.raw_data)
+        dialog.destroy()
+        self.refresh_details()
 
     def export_db(self, approot, proj_name, target_file):
         dialog = ProgressDialog(self.main_app, title=f"Exportar Base de Datos: {proj_name}")

@@ -57,6 +57,10 @@ class CIDialog(Gtk.Dialog):
         else:
             git_desc += " | ⚠️ <i>Sin repositorio Git local</i>"
             
+        if self.existing_wf:
+            wf_names = ", ".join([w["filename"] for w in self.existing_wf])
+            git_desc += f"<br/><span color='#22c55e'>✔ Flujos de trabajo activos detectados: <b>{wf_names}</b></span>"
+            
         lbl_sub = Gtk.Label()
         lbl_sub.set_markup(f"<small>{git_desc}</small>")
         lbl_sub.set_halign(Gtk.Align.START)
@@ -99,7 +103,8 @@ class CIDialog(Gtk.Dialog):
         
         # 3. YAML Preview Frame
         lbl_prev_title = Gtk.Label()
-        lbl_prev_title.set_markup("<b>Vista Previa del Archivo (.github/workflows/ci.yml):</b>")
+        status_suffix = " <span color='#22c55e'>(Ya existe en el proyecto)</span>" if self.existing_wf else " <span color='#38bdf8'>(Nuevo)</span>"
+        lbl_prev_title.set_markup(f"<b>Archivo de Configuración (.github/workflows/ci.yml):</b>{status_suffix}")
         lbl_prev_title.set_halign(Gtk.Align.START)
         box.pack_start(lbl_prev_title, False, False, 0)
         
@@ -127,7 +132,8 @@ class CIDialog(Gtk.Dialog):
         btn_generate = Gtk.Button()
         b_gen = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         b_gen.pack_start(Gtk.Image.new_from_icon_name("document-save-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
-        b_gen.pack_start(Gtk.Label(label="Generar e Instalar en .github/"), False, False, 0)
+        btn_action_text = "Guardar / Actualizar en .github/" if self.existing_wf else "Generar e Instalar en .github/"
+        b_gen.pack_start(Gtk.Label(label=btn_action_text), False, False, 0)
         btn_generate.add(b_gen)
         btn_generate.get_style_context().add_class("btn-primary")
         btn_generate.connect("clicked", self.on_generate_clicked)
@@ -135,7 +141,20 @@ class CIDialog(Gtk.Dialog):
         
         box.pack_start(btn_box, False, False, 0)
         
-        self.refresh_preview()
+        if self.existing_wf:
+            ci_file = os.path.join(self.approot, ".github", "workflows", "ci.yml")
+            if os.path.exists(ci_file):
+                try:
+                    with open(ci_file, "r", encoding="utf-8") as f:
+                        buf = self.txt_preview.get_buffer()
+                        buf.set_text(f.read())
+                except Exception:
+                    self.refresh_preview()
+            else:
+                self.refresh_preview()
+        else:
+            self.refresh_preview()
+            
         self.show_all()
         
     def get_options(self):
