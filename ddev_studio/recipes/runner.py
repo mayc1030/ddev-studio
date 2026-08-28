@@ -111,7 +111,15 @@ def run_create_project(parent_window, raw_name, base_dir, clean_target_before, f
             
             log(f"📁 Directorio del proyecto: {target_dir}")
             log(f"🚀 Tecnología: {fw['name']}" + (f" (Versión {drupal_ver_info['id']})" if fw_id == 'drupal' else ""))
-            log(f"🐘 Versión de PHP: {php_version} | DB: {db_type}\n" + "="*50)
+            
+            if fw_id in ["nextjs", "react", "vue", "angular"]:
+                log(f"📦 Entorno: Node.js (v{node_version}) | DB: {db_type}\n" + "="*50)
+            elif fw_id in ["django", "flask"]:
+                log(f"🐍 Entorno: Python 3 (Virtualenv) | DB: {db_type}\n" + "="*50)
+            elif fw_id == "html":
+                log(f"🌐 Entorno: HTML5 Estático (Nginx)\n" + "="*50)
+            else:
+                log(f"🐘 Versión de PHP: {php_version} | DB: {db_type}\n" + "="*50)
             
             primary_url = f"https://{slug}.ddev.site"
             
@@ -576,7 +584,7 @@ HTML_TEMPLATE = \"\"\"<!DOCTYPE html>
 <body>
     <div class="card">
         <h1>¡Flask en DDEV Studio! 🚀</h1>
-        <p>Tu aplicación <b>{slug}</b> con microframework Flask está corriendo exitosamente en Ubuntu MATE.</p>
+        <p>Tu aplicación <b>{slug}</b> con microframework Flask está corriendo exitosamente.</p>
         <span class="badge">Python 3 + Flask + DDEV</span>
     </div>
 </body>
