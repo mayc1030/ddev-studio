@@ -894,7 +894,7 @@ class SubsitesManagerView(Gtk.Box):
         b_exp.pack_start(Gtk.Label(label="Exportar BD"), False, False, 0)
         btn_exp.add(b_exp)
         btn_exp.set_tooltip_text(f"Exportar base de datos '{subsite['db']}'")
-        btn_exp.connect("clicked", lambda b: [dialog.destroy(), self.execute_subsite_drush_action("export_db", subsite["name"], subsite["url"], self.base_dir)])
+        btn_exp.connect("clicked", lambda b: [dialog.response(Gtk.ResponseType.OK), self.execute_subsite_drush_action("export_db", subsite["name"], subsite["url"], self.base_dir)])
         btn_box1.pack_start(btn_exp, False, False, 0)
         
         btn_imp = Gtk.Button()
@@ -903,7 +903,7 @@ class SubsitesManagerView(Gtk.Box):
         b_imp.pack_start(Gtk.Label(label="Importar BD"), False, False, 0)
         btn_imp.add(b_imp)
         btn_imp.set_tooltip_text(f"Importar base de datos en '{subsite['db']}'")
-        btn_imp.connect("clicked", lambda b: [dialog.destroy(), self.execute_subsite_drush_action("import_db", subsite["name"], subsite["url"], self.base_dir)])
+        btn_imp.connect("clicked", lambda b: [dialog.response(Gtk.ResponseType.OK), self.execute_subsite_drush_action("import_db", subsite["name"], subsite["url"], self.base_dir)])
         btn_box1.pack_start(btn_imp, False, False, 0)
         
         btn_cli = Gtk.Button()
@@ -924,7 +924,7 @@ class SubsitesManagerView(Gtk.Box):
         btn_full_details.add(b_fd)
         btn_full_details.get_style_context().add_class("btn-primary")
         btn_full_details.set_margin_top(6)
-        btn_full_details.connect("clicked", lambda b: [dialog.destroy(), self.open_base_project_details()])
+        btn_full_details.connect("clicked", lambda b: [dialog.response(Gtk.ResponseType.OK), self.open_base_project_details()])
         card.pack_start(btn_full_details, False, False, 0)
         
         box.pack_start(card, True, True, 0)
@@ -1274,6 +1274,25 @@ class SubsitesManagerView(Gtk.Box):
             self.main_app.open_terminal(base_dir, f"ddev drush --uri={subsite_url} status; ddev ssh")
             return
 
+        st = (self.proj.get("status", "") if self.proj else "").lower()
+        is_running = "running" in st or "ok" in st
+
+        if not is_running:
+            confirm = Gtk.MessageDialog(
+                transient_for=self.main_app,
+                flags=0,
+                message_type=Gtk.MessageType.QUESTION,
+                buttons=Gtk.ButtonsType.OK_CANCEL,
+                text=f"El proyecto base '{self.base_name}' está detenido."
+            )
+            confirm.format_secondary_text(
+                f"Para realizar esta operación en el subsitio '{subsite_name}', es necesario iniciar el entorno DDEV.\n\n¿Deseas iniciar el proyecto ahora y continuar con la acción?"
+            )
+            res = confirm.run()
+            confirm.destroy()
+            if res != Gtk.ResponseType.OK:
+                return
+
         if action_key == "import_db":
             dialog = Gtk.FileChooserDialog(
                 title=f"Seleccionar archivo SQL para importar en {subsite_name}",
@@ -1296,29 +1315,47 @@ class SubsitesManagerView(Gtk.Box):
             filter_all.add_pattern("*")
             dialog.add_filter(filter_all)
             
-            if dialog.run() == Gtk.ResponseType.OK:
-                src_file = dialog.get_filename()
-                dialog.destroy()
+            resp = dialog.run()
+            src_file = dialog.get_filename()
+            dialog.destroy()
+            
+            if resp == Gtk.ResponseType.OK and src_file:
+                confirm = Gtk.MessageDialog(
+                    transient_for=self.main_app,
+                    flags=0,
+                    message_type=Gtk.MessageType.WARNING,
+                    buttons=Gtk.ButtonsType.OK_CANCEL,
+                    text=f"¿Confirmas la importación en '{subsite_name}'?"
+                )
+                confirm.format_secondary_text(f"Se importará el archivo:\n{os.path.basename(src_file)}\n\n⚠️ ADVERTENCIA: Esta acción sobreescribirá las tablas existentes en la base de datos '{subsite_name}'.")
+                c_resp = confirm.run()
+                confirm.destroy()
                 
-                prog_dialog = ProgressDialog(self.main_app, title=f"Importando BD: {subsite_name}")
-                prog_dialog.set_status(f"Importando {os.path.basename(src_file)} en base de datos '{subsite_name}'...")
-                
-                def task():
-                    try:
-                        GLib.idle_add(prog_dialog.append_log, f"Importando '{src_file}' en base de datos '{subsite_name}'...\n")
-                        cmd = ["ddev", "import-db", f"--database={subsite_name}", f"--src={src_file}"]
-                        self.run_subproc(cmd, base_dir, prog_dialog)
-                        
-                        GLib.idle_add(prog_dialog.append_log, f"\nReconstruyendo caché de {subsite_name} (drush cr)...\n")
-                        subprocess.run(["ddev", "drush", f"--uri={subsite_url}", "cr"], cwd=base_dir, capture_output=True)
-                        
-                        GLib.idle_add(prog_dialog.finish, True, f"Base de datos '{subsite_name}' importada con éxito", subsite_url, base_dir)
-                    except Exception as ex:
-                        GLib.idle_add(prog_dialog.finish, False, f"Error importando BD: {ex}", "", base_dir)
-                        
-                threading.Thread(target=task, daemon=True).start()
-            else:
-                dialog.destroy()
+                if c_resp == Gtk.ResponseType.OK:
+                    prog_dialog = ProgressDialog(self.main_app, title=f"Importando BD: {subsite_name}")
+                    prog_dialog.set_status(f"Importando {os.path.basename(src_file)} en base de datos '{subsite_name}'...")
+                    
+                    def task():
+                        try:
+                            def log(t):
+                                GLib.idle_add(prog_dialog.append_log, t)
+                            log(f"📥 Ejecutando 'ddev import-db --database={subsite_name} --file={src_file}'...\n")
+                            proc = subprocess.Popen(["ddev", "import-db", f"--database={subsite_name}", f"--file={src_file}"], cwd=base_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                            for line in iter(proc.stdout.readline, ''):
+                                log(line)
+                            proc.stdout.close()
+                            proc.wait()
+                            
+                            if proc.returncode == 0:
+                                log(f"\n⚡ Reconstruyendo caché de {subsite_name} (drush cr)...\n")
+                                subprocess.run(["ddev", "drush", f"--uri={subsite_url}", "cr"], cwd=base_dir, capture_output=True)
+                                GLib.idle_add(prog_dialog.finish, True, f"Base de datos '{subsite_name}' importada con éxito", subsite_url, base_dir)
+                            else:
+                                GLib.idle_add(prog_dialog.finish, False, f"Error al importar base de datos en '{subsite_name}'", "", base_dir)
+                        except Exception as ex:
+                            GLib.idle_add(prog_dialog.finish, False, f"Error: {ex}", "", base_dir)
+                            
+                    threading.Thread(target=task, daemon=True).start()
             return
 
         if action_key == "export_db":
@@ -1342,26 +1379,32 @@ class SubsitesManagerView(Gtk.Box):
             else:
                 dialog.set_current_folder(base_dir)
                 
-            if dialog.run() == Gtk.ResponseType.OK:
-                out_file = dialog.get_filename()
-                dialog.destroy()
-                
+            resp = dialog.run()
+            out_file = dialog.get_filename()
+            dialog.destroy()
+            
+            if resp == Gtk.ResponseType.OK and out_file:
                 prog_dialog = ProgressDialog(self.main_app, title=f"Exportando BD: {subsite_name}")
-                prog_dialog.set_status(f"Exportando base de datos '{subsite_name}' a {os.path.basename(out_file)}...")
+                prog_dialog.set_status(f"Exportando base de datos '{subsite_name}'...")
                 
                 def task():
                     try:
-                        GLib.idle_add(prog_dialog.append_log, f"Exportando base de datos '{subsite_name}' a '{out_file}'...\n")
-                        cmd = ["ddev", "export-db", f"--database={subsite_name}", f"--file={out_file}"]
-                        self.run_subproc(cmd, base_dir, prog_dialog)
+                        def log(t):
+                            GLib.idle_add(prog_dialog.append_log, t)
+                        log(f"📦 Ejecutando 'ddev export-db --database={subsite_name} --file={out_file}'...\n")
+                        proc = subprocess.Popen(["ddev", "export-db", f"--database={subsite_name}", f"--file={out_file}"], cwd=base_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                        for line in iter(proc.stdout.readline, ''):
+                            log(line)
+                        proc.stdout.close()
+                        proc.wait()
                         
-                        GLib.idle_add(prog_dialog.finish, True, f"Base de datos '{subsite_name}' exportada con éxito", "", os.path.dirname(out_file))
+                        success = (proc.returncode == 0)
+                        msg = f"Base de datos '{subsite_name}' exportada con éxito en:\n{out_file}" if success else f"Error al exportar la base de datos '{subsite_name}'"
+                        GLib.idle_add(prog_dialog.finish, success, msg, "", os.path.dirname(out_file))
                     except Exception as ex:
-                        GLib.idle_add(prog_dialog.finish, False, f"Error exportando BD: {ex}", "", base_dir)
+                        GLib.idle_add(prog_dialog.finish, False, f"Error: {ex}", "", base_dir)
                         
                 threading.Thread(target=task, daemon=True).start()
-            else:
-                dialog.destroy()
             return
             
         drush_map = {
@@ -1388,12 +1431,14 @@ class SubsitesManagerView(Gtk.Box):
         
         def task():
             try:
-                GLib.idle_add(dialog.append_log, f"$ {cmd_str}\n")
+                def log(t):
+                    GLib.idle_add(dialog.append_log, t)
+                log(f"$ {cmd_str}\n\n")
                 proc = subprocess.Popen(cmd, cwd=base_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 output_lines = []
                 for line in iter(proc.stdout.readline, ''):
                     output_lines.append(line)
-                    GLib.idle_add(dialog.append_log, line)
+                    log(line)
                 proc.stdout.close()
                 proc.wait()
                 
