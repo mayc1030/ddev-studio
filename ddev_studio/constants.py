@@ -118,6 +118,46 @@ CUSTOM_CSS = b"""
     background: alpha(@theme_selected_bg_color, 0.08);
     padding: 12px 16px;
 }
+.category-chips-scroller {
+    background: transparent;
+    padding: 2px 0px;
+}
+.category-chip {
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid alpha(@theme_text_color, 0.15);
+    background: alpha(@theme_base_color, 0.5);
+    color: @theme_text_color;
+    transition: all 150ms ease-in-out;
+}
+.category-chip:hover {
+    background: alpha(@theme_selected_bg_color, 0.15);
+    border-color: alpha(@theme_selected_bg_color, 0.4);
+}
+.category-chip-active {
+    background: @theme_selected_bg_color;
+    color: @theme_selected_fg_color;
+    border-color: @theme_selected_bg_color;
+    font-weight: bold;
+}
+.category-chip-active:hover {
+    background: @theme_selected_bg_color;
+    color: @theme_selected_fg_color;
+}
+.category-chip-count {
+    border-radius: 10px;
+    padding: 1px 6px;
+    font-size: 10px;
+    font-weight: bold;
+    background: alpha(@theme_text_color, 0.12);
+    color: inherit;
+}
+.category-chip-active .category-chip-count {
+    background: alpha(@theme_selected_fg_color, 0.25);
+    color: @theme_selected_fg_color;
+}
 .btn-primary {
     background-color: #0284c7;
     color: white;
@@ -345,4 +385,91 @@ DRUPAL_VERSIONS = [
     {"id": "9", "label": "Drupal 9 (PHP 8.1)", "php": "8.1", "docroot": "web", "type": "drupal9"},
     {"id": "8", "label": "Drupal 8 (PHP 7.4)", "php": "7.4", "docroot": "web", "type": "drupal8"},
     {"id": "7", "label": "Drupal 7 (Legacy - PHP 7.4)", "php": "7.4", "docroot": ".", "type": "drupal7"},
+]
+
+TECH_CATEGORIES = [
+    {
+        "id": "all",
+        "name": "Todos",
+        "icon": "ddev.svg",
+        "match_keys": []
+    },
+    {
+        "id": "drupal",
+        "name": "Drupal",
+        "icon": "drupal.svg",
+        "match_keys": ["drupal", "drupal7", "drupal8", "drupal9", "drupal10", "drupal11"]
+    },
+    {
+        "id": "wordpress",
+        "name": "WordPress",
+        "icon": "wordpress.svg",
+        "match_keys": ["wordpress", "wp"]
+    },
+    {
+        "id": "laravel",
+        "name": "Laravel",
+        "icon": "laravel.svg",
+        "match_keys": ["laravel"]
+    },
+    {
+        "id": "symfony",
+        "name": "Symfony",
+        "icon": "symfony.svg",
+        "match_keys": ["symfony"]
+    },
+    {
+        "id": "nextjs",
+        "name": "Next.js",
+        "icon": "nextjs.svg",
+        "match_keys": ["next", "nextjs"]
+    },
+    {
+        "id": "react",
+        "name": "React",
+        "icon": "react.svg",
+        "match_keys": ["react", "react-ts"]
+    },
+    {
+        "id": "vue",
+        "name": "Vue",
+        "icon": "vue.svg",
+        "match_keys": ["vue", "vue-ts", "vue3"]
+    },
+    {
+        "id": "angular",
+        "name": "Angular",
+        "icon": "angular.svg",
+        "match_keys": ["angular"]
+    },
+    {
+        "id": "django",
+        "name": "Django",
+        "icon": "django.svg",
+        "match_keys": ["django"]
+    },
+    {
+        "id": "flask",
+        "name": "Flask",
+        "icon": "flask.svg",
+        "match_keys": ["flask"]
+    },
+    {
+        "id": "php",
+        "name": "PHP",
+        "icon": "php.svg",
+        "match_keys": ["php"]
+    },
+    {
+        "id": "python",
+        "name": "Python",
+        "icon": "python.svg",
+        "match_keys": ["python"]
+    },
+    {
+        "id": "html",
+        "name": "HTML",
+        "icon": "php.svg",
+        "match_keys": ["html", "static"]
+    }
 ]

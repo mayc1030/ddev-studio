@@ -18,7 +18,8 @@ from ddev_studio.constants import (
     DEFAULT_SITES_DIR,
     CUSTOM_CSS,
     FRAMEWORKS,
-    DRUPAL_VERSIONS
+    DRUPAL_VERSIONS,
+    TECH_CATEGORIES
 )
 from ddev_studio.core.detector import detect_project_details, inspect_project_stack, sanitize_project_name
 from ddev_studio.core.process import run_subproc
@@ -40,6 +41,9 @@ class DDEVManagerWindow(Gtk.Window):
         if ddev_icon:
             self.set_icon(ddev_icon)
             
+        self.active_category = "all"
+        self.category_buttons = {}
+        
         css_provider = Gtk.CssProvider()
         css_provider.load_from_data(CUSTOM_CSS)
         Gtk.StyleContext.add_provider_for_screen(
@@ -689,6 +693,16 @@ class DDEVManagerWindow(Gtk.Window):
         
         self.box_projects_list_view.pack_start(search_box, False, False, 0)
         
+        # Barra horizontal de chips de categorías con iconos SVG
+        self.categories_scroller = Gtk.ScrolledWindow()
+        self.categories_scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
+        self.categories_scroller.get_style_context().add_class("category-chips-scroller")
+        self.categories_scroller.set_min_content_height(38)
+        
+        self.categories_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.categories_scroller.add(self.categories_box)
+        self.box_projects_list_view.pack_start(self.categories_scroller, False, False, 0)
+        
         self.projects_scrolled = Gtk.ScrolledWindow()
         self.projects_scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         
@@ -752,13 +766,86 @@ class DDEVManagerWindow(Gtk.Window):
             
         threading.Thread(target=run_list, daemon=True).start()
 
+    def determine_project_category(self, proj, tech_type=""):
+        if not tech_type:
+            approot = proj.get("approot", "")
+            tech_type, _, _, _, _, _ = inspect_project_stack(approot, proj, proj)
+        ptype = str(tech_type).lower()
+        ddev_type = str(proj.get("type", "")).lower()
+        
+        for cat in TECH_CATEGORIES:
+            if cat["id"] == "all":
+                continue
+            for k in cat["match_keys"]:
+                if k in ptype or k in ddev_type:
+                    return cat["id"]
+        return "php"
+
+    def set_active_category(self, cat_id):
+        self.active_category = cat_id
+        for cid, btn in self.category_buttons.items():
+            if cid == cat_id:
+                btn.get_style_context().add_class("category-chip-active")
+            else:
+                btn.get_style_context().remove_class("category-chip-active")
+        self.apply_project_filters()
+
     def update_projects_ui(self, projects):
         for child in self.projects_list_box.get_children():
             self.projects_list_box.remove(child)
             
         self.lbl_proj_title.set_text(f"Mis Proyectos ({len(projects)})")
         
-        if not projects:
+        # Calcular conteos por categoría de tecnología
+        cat_counts = {"all": len(projects)}
+        for p in projects:
+            approot = p.get("approot", "")
+            tech_type, _, _, _, _, _ = inspect_project_stack(approot, p, p)
+            p["_tech_type"] = tech_type
+            cat_id = self.determine_project_category(p, tech_type)
+            p["_tech_family"] = cat_id
+            cat_counts[cat_id] = cat_counts.get(cat_id, 0) + 1
+            
+        # Reconstruir botones de chip con iconos SVG
+        for child in self.categories_box.get_children():
+            self.categories_box.remove(child)
+        self.category_buttons = {}
+        
+        if self.active_category != "all" and cat_counts.get(self.active_category, 0) == 0:
+            self.active_category = "all"
+            
+        if projects:
+            self.categories_scroller.show()
+            for cat in TECH_CATEGORIES:
+                cat_id = cat["id"]
+                count = cat_counts.get(cat_id, 0)
+                if cat_id != "all" and count == 0:
+                    continue
+                    
+                btn = Gtk.Button()
+                btn.get_style_context().add_class("category-chip")
+                if self.active_category == cat_id:
+                    btn.get_style_context().add_class("category-chip-active")
+                    
+                btn_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                
+                icon_pixbuf = load_icon(cat["icon"], 16)
+                if icon_pixbuf:
+                    btn_content.pack_start(Gtk.Image.new_from_pixbuf(icon_pixbuf), False, False, 0)
+                    
+                btn_content.pack_start(Gtk.Label(label=cat["name"]), False, False, 0)
+                
+                lbl_cnt = Gtk.Label(label=str(count))
+                lbl_cnt.get_style_context().add_class("category-chip-count")
+                btn_content.pack_start(lbl_cnt, False, False, 0)
+                
+                btn.add(btn_content)
+                btn.connect("clicked", lambda b, c=cat_id: self.set_active_category(c))
+                self.categories_box.pack_start(btn, False, False, 0)
+                self.category_buttons[cat_id] = btn
+            self.categories_box.show_all()
+        else:
+            self.categories_scroller.hide()
             empty_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
             empty_box.set_margin_top(40)
             
@@ -794,6 +881,7 @@ class DDEVManagerWindow(Gtk.Window):
             self.projects_list_box.pack_start(card, False, False, 0)
             
         self.projects_list_box.show_all()
+        self.apply_project_filters()
 
     def create_project_item(self, proj):
         card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
@@ -803,6 +891,8 @@ class DDEVManagerWindow(Gtk.Window):
         approot = proj.get("approot", "")
         tech_type, has_db, is_php, is_python, is_js, is_static = inspect_project_stack(approot, proj, proj)
         ptype = tech_type.lower()
+        
+        card.tech_family = proj.get("_tech_family") or self.determine_project_category(proj, tech_type)
         
         icon_name = "php.svg"
         if "next" in ptype:
@@ -1077,15 +1167,26 @@ class DDEVManagerWindow(Gtk.Window):
         open_terminal(path, command)
 
     def on_search_changed(self, entry):
-        query = entry.get_text().strip().lower()
+        self.apply_project_filters()
+
+    def apply_project_filters(self):
+        query = self.search_entry.get_text().strip().lower()
         for child in self.projects_list_box.get_children():
             if hasattr(child, "project_data"):
                 p = child.project_data
                 name = p.get("name", "").lower()
-                ptype = p.get("type", "").lower()
-                url = p.get("primary_url", "").lower()
-                match = (query in name) or (query in ptype) or (query in url)
-                child.set_visible(match)
+                ptype = str(p.get("type", "")).lower()
+                tech_type = str(p.get("_tech_type", "")).lower()
+                url = str(p.get("primary_url", "")).lower()
+                
+                # Category filter
+                family = getattr(child, "tech_family", "all")
+                match_cat = (self.active_category == "all") or (family == self.active_category)
+                
+                # Search query filter
+                match_query = not query or (query in name) or (query in ptype) or (query in tech_type) or (query in url)
+                
+                child.set_visible(match_cat and match_query)
 
     def execute_drush_action(self, action_key, proj):
         approot = proj.get("approot", "")
