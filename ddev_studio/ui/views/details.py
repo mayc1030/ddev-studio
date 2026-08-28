@@ -15,9 +15,11 @@ gi.require_version('Gdk', '3.0')
 from gi.repository import Gtk, Gdk, GLib
 
 from ddev_studio.core.detector import inspect_project_stack, detect_sqlite_database
+from ddev_studio.core.ci_templates import detect_git_repo, detect_existing_workflows
 from ddev_studio.ui.helpers import load_icon
 from ddev_studio.ui.dialogs.progress import ProgressDialog
 from ddev_studio.ui.dialogs.db_containers import DBContainersDialog
+from ddev_studio.ui.dialogs.ci_dialog import CIDialog
 
 
 class ProjectDetailsView(Gtk.Box):
@@ -102,6 +104,11 @@ class ProjectDetailsView(Gtk.Box):
         dialog = DBContainersDialog(self, approot, proj_name, primary_url)
         dialog.run()
         dialog.destroy()
+
+    def show_ci_dialog(self, approot, proj_name, tech_type):
+        dialog = CIDialog(self.main_app, approot, proj_name, tech_type)
+        dialog.run()
+        self.render_project_details(self.raw_data)
 
     def export_db(self, approot, proj_name, target_file):
         dialog = ProgressDialog(self.main_app, title=f"Exportar Base de Datos: {proj_name}")
@@ -789,6 +796,84 @@ class ProjectDetailsView(Gtk.Box):
             
         urls_card.pack_start(grid_urls, False, False, 0)
         self.content_box.pack_start(urls_card, False, False, 0)
+        
+        # 5. Continuous Integration (GitHub Actions) Card
+        ci_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        ci_card.get_style_context().add_class("project-card")
+        
+        ci_title_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        ci_title_row.pack_start(Gtk.Image.new_from_icon_name("system-run-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        lbl_ci_title = Gtk.Label()
+        lbl_ci_title.set_markup("<b>Integración Continua (CI/CD - GitHub Actions)</b>")
+        ci_title_row.pack_start(lbl_ci_title, False, False, 0)
+        
+        git_info = detect_git_repo(approot)
+        existing_wfs = detect_existing_workflows(approot)
+        
+        if existing_wfs:
+            lbl_ci_badge = Gtk.Label(label=f"ACTIVO ({len(existing_wfs)} WORKFLOWS)")
+            lbl_ci_badge.get_style_context().add_class("badge")
+            lbl_ci_badge.get_style_context().add_class("badge-running")
+            ci_title_row.pack_start(lbl_ci_badge, False, False, 0)
+        else:
+            lbl_ci_badge = Gtk.Label(label="SIN CONFIGURAR")
+            lbl_ci_badge.get_style_context().add_class("badge")
+            ci_title_row.pack_start(lbl_ci_badge, False, False, 0)
+            
+        ci_card.pack_start(ci_title_row, False, False, 0)
+        
+        ci_content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        if existing_wfs:
+            wf_list_str = ", ".join([w["filename"] for w in existing_wfs])
+            lbl_wf_info = Gtk.Label()
+            lbl_wf_info.set_markup(f"Flujos de trabajo detectados en <tt>.github/workflows/</tt>: <b>{wf_list_str}</b>")
+            lbl_wf_info.set_halign(Gtk.Align.START)
+            ci_content_box.pack_start(lbl_wf_info, False, False, 0)
+        else:
+            lbl_wf_info = Gtk.Label()
+            lbl_wf_info.set_markup("Automatiza pruebas unitarias, validación de código (linter) y auditoría de seguridad en cada <tt>git push</tt>.")
+            lbl_wf_info.set_halign(Gtk.Align.START)
+            ci_content_box.pack_start(lbl_wf_info, False, False, 0)
+            
+        ci_btns_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        ci_btns_row.set_margin_top(4)
+        
+        btn_ci_modal = Gtk.Button()
+        b_cim = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_cim.pack_start(Gtk.Image.new_from_icon_name("document-edit-symbolic" if existing_wfs else "list-add-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_cim.pack_start(Gtk.Label(label="Configurar / Generar GitHub Actions" if not existing_wfs else "Gestionar / Regenerar Workflows"), False, False, 0)
+        btn_ci_modal.add(b_cim)
+        if not existing_wfs:
+            btn_ci_modal.get_style_context().add_class("btn-primary")
+        else:
+            btn_ci_modal.get_style_context().add_class("btn-quick")
+        btn_ci_modal.connect("clicked", lambda b, a=approot, p=pname, t=tech_type: self.show_ci_dialog(a, p, t))
+        ci_btns_row.pack_start(btn_ci_modal, False, False, 0)
+        
+        if existing_wfs:
+            btn_open_wf = Gtk.Button()
+            b_owf = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_owf.pack_start(Gtk.Image.new_from_icon_name("folder-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_owf.pack_start(Gtk.Label(label="Abrir Carpeta .github"), False, False, 0)
+            btn_open_wf.add(b_owf)
+            wf_folder = os.path.join(approot, ".github", "workflows")
+            btn_open_wf.connect("clicked", lambda b, p=wf_folder: subprocess.Popen(["xdg-open", p]))
+            ci_btns_row.pack_start(btn_open_wf, False, False, 0)
+            
+        if git_info.get("github_url"):
+            actions_url = f"{git_info['github_url']}/actions"
+            btn_gh = Gtk.Button()
+            b_gh = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_gh.pack_start(Gtk.Image.new_from_icon_name("web-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_gh.pack_start(Gtk.Label(label="Ver en GitHub Actions"), False, False, 0)
+            btn_gh.add(b_gh)
+            btn_gh.connect("clicked", lambda b, u=actions_url: webbrowser.open(u))
+            ci_btns_row.pack_start(btn_gh, False, False, 0)
+            
+        ci_content_box.pack_start(ci_btns_row, False, False, 0)
+        ci_card.pack_start(ci_content_box, False, False, 0)
+        
+        self.content_box.pack_start(ci_card, False, False, 0)
         self.content_box.show_all()
 
     def copy_to_clipboard(self, text, message="Copiado al portapapeles"):

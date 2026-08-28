@@ -1,0 +1,35 @@
+name: Release - DDEV Studio
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Release Tarball
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          ARCHIVE_NAME="ddev-studio-${VERSION}.tar.gz"
+          echo "Packaging ${ARCHIVE_NAME}..."
+          tar --exclude='.git' --exclude='.github' --exclude='__pycache__' -czvf "${ARCHIVE_NAME}" .
+          echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ARCHIVE_NAME }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false

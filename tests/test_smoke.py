@@ -172,6 +172,48 @@ class TestTerminal(unittest.TestCase):
         self.assertTrue(term is None or isinstance(term, str))
 
 
+class TestCITemplates(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_git_repo_detection(self):
+        from ddev_studio.core.ci_templates import detect_git_repo
+        info = detect_git_repo(self.test_dir)
+        self.assertFalse(info["has_git"])
+
+    def test_workflow_generation(self):
+        from ddev_studio.core.ci_templates import generate_ci_workflow, save_ci_workflow, detect_existing_workflows
+        
+        # 1. Drupal
+        drupal_yml = generate_ci_workflow("drupal")
+        self.assertIn("ddev/github-action", drupal_yml)
+        
+        # 2. Laravel
+        laravel_yml = generate_ci_workflow("laravel")
+        self.assertIn("artisan test", laravel_yml)
+        
+        # 3. Django
+        django_yml = generate_ci_workflow("django")
+        self.assertIn("pytest", django_yml)
+        
+        # 4. Next.js
+        next_yml = generate_ci_workflow("nextjs")
+        self.assertIn("npm", next_yml)
+        
+        # 5. Save workflow
+        ok, path = save_ci_workflow(self.test_dir, drupal_yml, "ci.yml")
+        self.assertTrue(ok)
+        self.assertTrue(os.path.exists(path))
+        
+        # 6. Detect existing
+        wfs = detect_existing_workflows(self.test_dir)
+        self.assertEqual(len(wfs), 1)
+        self.assertEqual(wfs[0]["filename"], "ci.yml")
+
+
 class TestImports(unittest.TestCase):
     def test_all_modules_importable(self):
         import ddev_studio
@@ -180,12 +222,14 @@ class TestImports(unittest.TestCase):
         import ddev_studio.core.terminal
         import ddev_studio.core.process
         import ddev_studio.core.detector
+        import ddev_studio.core.ci_templates
         import ddev_studio.recipes
         import ddev_studio.recipes.runner
         import ddev_studio.ui
         import ddev_studio.ui.helpers
         import ddev_studio.ui.dialogs.progress
         import ddev_studio.ui.dialogs.db_containers
+        import ddev_studio.ui.dialogs.ci_dialog
         import ddev_studio.ui.views.details
         import ddev_studio.ui.views.subsites
         import ddev_studio.ui.window
