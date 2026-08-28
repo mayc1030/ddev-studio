@@ -109,10 +109,15 @@ def generate_ci_workflow(tech_type, options=None):
         uses: ddev/github-action-setup-ddev@v1
         with:
           autostart: true
+      - name: Install Composer Dependencies
+        run: ddev composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Install Drupal Site
+        run: ddev drush site:install standard --yes --account-name=admin --account-pass=admin || true
 """
             if include_tests:
                 steps += """
-      - name: Run Drupal Tests & Status Checks
+      - name: Run Drupal Status & Tests
         run: |
           ddev drush status
           if [ -f vendor/bin/phpunit ]; then
