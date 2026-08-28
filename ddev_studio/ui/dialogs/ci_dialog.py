@@ -68,6 +68,18 @@ class CIDialog(Gtk.Dialog):
         header.pack_start(v_h, True, True, 0)
         box.pack_start(header, False, False, 0)
         
+        # Warning if no git repository exists
+        if not self.git_info["has_git"]:
+            warn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            warn_box.get_style_context().add_class("warning-box")
+            warn_box.pack_start(Gtk.Image.new_from_icon_name("dialog-warning-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            lbl_w = Gtk.Label()
+            lbl_w.set_markup("<b>⚠️ Proyecto sin Git:</b> El archivo se guardará en tu disco local, pero para que GitHub Actions se ejecute en internet debes inicializar Git (<tt>git init</tt>) y vincularlo a un repositorio de GitHub.")
+            lbl_w.set_line_wrap(True)
+            lbl_w.set_halign(Gtk.Align.START)
+            warn_box.pack_start(lbl_w, True, True, 0)
+            box.pack_start(warn_box, False, False, 0)
+        
         # 2. Options Grid
         frame_opts = Gtk.Frame(label=" Opciones del Pipeline ")
         box_opts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -184,15 +196,29 @@ class CIDialog(Gtk.Dialog):
                 buttons=Gtk.ButtonsType.OK,
                 text="¡Pipeline de GitHub Actions Creado con Éxito!"
             )
-            msg_dialog.format_secondary_markup(
-                f"El archivo se guardó en:<br/><tt><b>{res}</b></tt><br/><br/>"
-                "<b>¿Cómo activarlo en GitHub?</b><br/>"
-                "Ejecuta estos comandos en la terminal de tu proyecto:<br/>"
-                "<tt><b>git add .github/</b></tt><br/>"
-                "<tt><b>git commit -m \"ci: agregar GitHub Actions\"</b></tt><br/>"
-                "<tt><b>git push</b></tt><br/><br/>"
-                "<i>GitHub lo activará automáticamente en cuanto reciba el push.</i>"
-            )
+            
+            if not self.git_info["has_git"]:
+                steps_markup = (
+                    "<b>⚠️ Aviso: Tu proyecto aún no tiene un repositorio Git.</b><br/><br/>"
+                    "El archivo se guardó localmente en:<br/><tt><b>" + res + "</b></tt><br/><br/>"
+                    "<b>Para subirlo a GitHub y activar las pruebas automáticas:</b><br/>"
+                    "<tt><b>git init</b></tt><br/>"
+                    "<tt><b>git add .</b></tt><br/>"
+                    "<tt><b>git commit -m \"ci: inicializar proyecto y GitHub Actions\"</b></tt><br/>"
+                    "<tt><b>git remote add origin https://github.com/TU-USUARIO/TU-REPO.git</b></tt><br/>"
+                    "<tt><b>git push -u origin main</b></tt>"
+                )
+            else:
+                steps_markup = (
+                    "El archivo se guardó en:<br/><tt><b>" + res + "</b></tt><br/><br/>"
+                    "<b>¿Cómo activarlo en GitHub?</b><br/>"
+                    "Ejecuta estos comandos en la terminal de tu proyecto:<br/>"
+                    "<tt><b>git add .github/</b></tt><br/>"
+                    "<tt><b>git commit -m \"ci: agregar GitHub Actions\"</b></tt><br/>"
+                    "<tt><b>git push</b></tt><br/><br/>"
+                    "<i>GitHub lo activará automáticamente en cuanto reciba el push.</i>"
+                )
+            msg_dialog.format_secondary_markup(steps_markup)
             msg_dialog.run()
             msg_dialog.destroy()
             self.destroy()

@@ -836,6 +836,17 @@ class ProjectDetailsView(Gtk.Box):
             lbl_wf_info.set_halign(Gtk.Align.START)
             ci_content_box.pack_start(lbl_wf_info, False, False, 0)
             
+        # Git Repo Status / Warning Box
+        lbl_git_status = Gtk.Label()
+        if not git_info["has_git"]:
+            lbl_git_status.set_markup("<small><span color='#eab308'>⚠️ <b>Sin repositorio Git local:</b> Este proyecto aún no tiene Git inicializado (<tt>git init</tt>). Para que GitHub Actions se ejecute en la nube, debes conectar el proyecto a un repositorio en GitHub.</span></small>")
+        elif not git_info.get("github_url"):
+            lbl_git_status.set_markup(f"<small><span color='#38bdf8'>ℹ️ <b>Git local activo (rama: <tt>{git_info['branch']}</tt>):</b> Aún no tiene un origen remoto de GitHub vinculado (<tt>git remote add origin ...</tt>).</span></small>")
+        else:
+            lbl_git_status.set_markup(f"<small><span color='#22c55e'>✔ <b>Conectado a GitHub:</b> <a href='{git_info['github_url']}'>{git_info['github_url']}</a> (Rama: <tt>{git_info['branch']}</tt>)</span></small>")
+        lbl_git_status.set_halign(Gtk.Align.START)
+        ci_content_box.pack_start(lbl_git_status, False, False, 0)
+            
         ci_btns_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         ci_btns_row.set_margin_top(4)
         
