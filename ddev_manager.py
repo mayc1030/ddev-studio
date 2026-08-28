@@ -714,12 +714,6 @@ class SubsitesManagerView(Gtk.Box):
         btn_base_composer.connect("clicked", lambda b: self.execute_base_composer_install())
         ctrl_row.pack_start(btn_base_composer, False, False, 0)
         
-        btn_base_folder = Gtk.Button()
-        btn_base_folder.add(Gtk.Image.new_from_icon_name("folder-symbolic", Gtk.IconSize.BUTTON))
-        btn_base_folder.set_tooltip_text("Abrir carpeta del proyecto base")
-        btn_base_folder.connect("clicked", lambda b: subprocess.Popen(["xdg-open", self.base_dir]))
-        ctrl_row.pack_start(btn_base_folder, False, False, 0)
-        
         btn_base_details = Gtk.Button()
         b_det_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         b_det_box.pack_start(Gtk.Image.new_from_icon_name("dialog-information-symbolic", Gtk.IconSize.MENU), False, False, 0)
@@ -1228,6 +1222,12 @@ class SubsitesManagerView(Gtk.Box):
         actions_box.pack_start(menu_btn_drush, False, False, 0)
         
 
+        btn_folder = Gtk.Button()
+        btn_folder.add(Gtk.Image.new_from_icon_name("folder-symbolic", Gtk.IconSize.BUTTON))
+        btn_folder.set_tooltip_text("Abrir carpeta de este subsitio")
+        btn_folder.connect("clicked", lambda b, p=subsite["path"]: subprocess.Popen(["xdg-open", p]))
+        actions_box.pack_start(btn_folder, False, False, 0)
+        
         btn_del = Gtk.Button()
         btn_del.add(Gtk.Image.new_from_icon_name("user-trash-symbolic", Gtk.IconSize.BUTTON))
         btn_del.set_tooltip_text("Eliminar este subsitio del multisite")
