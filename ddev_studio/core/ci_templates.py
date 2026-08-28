@@ -112,6 +112,9 @@ def generate_ci_workflow(tech_type, options=None):
       - name: Install Composer Dependencies
         run: |
           if [ -f composer.json ]; then
+            ddev composer config --no-plugins allow-plugins.symfony/runtime true || true
+            ddev composer config --no-plugins allow-plugins.php-http/discovery true || true
+            ddev composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true || true
             ddev composer install --no-interaction --prefer-dist --optimize-autoloader
           fi
 
