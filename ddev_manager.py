@@ -720,6 +720,22 @@ class SubsitesManagerView(Gtk.Box):
         btn_base_folder.connect("clicked", lambda b: subprocess.Popen(["xdg-open", self.base_dir]))
         ctrl_row.pack_start(btn_base_folder, False, False, 0)
         
+        btn_base_details = Gtk.Button()
+        b_det_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_det_box.pack_start(Gtk.Image.new_from_icon_name("dialog-information-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_det_box.pack_start(Gtk.Label(label="Detalles & Servicios"), False, False, 0)
+        btn_base_details.add(b_det_box)
+        btn_base_details.get_style_context().add_class("btn-quick")
+        btn_base_details.set_tooltip_text("Ver detalles técnicos, base de datos, PHP, Xdebug y servicios de este proyecto")
+        btn_base_details.connect("clicked", lambda b: self.open_base_project_details())
+        ctrl_row.pack_start(btn_base_details, False, False, 0)
+        
+        btn_base_folder = Gtk.Button()
+        btn_base_folder.add(Gtk.Image.new_from_icon_name("folder-symbolic", Gtk.IconSize.BUTTON))
+        btn_base_folder.set_tooltip_text("Abrir carpeta del proyecto base")
+        btn_base_folder.connect("clicked", lambda b: subprocess.Popen(["xdg-open", self.base_dir]))
+        ctrl_row.pack_start(btn_base_folder, False, False, 0)
+        
         btn_base_term = Gtk.Button()
         btn_base_term.add(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic", Gtk.IconSize.BUTTON))
         btn_base_term.set_tooltip_text("Abrir terminal en el proyecto base")
@@ -786,6 +802,141 @@ class SubsitesManagerView(Gtk.Box):
         
         self.subsites_list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         content_box.pack_start(self.subsites_list_box, False, False, 0)
+
+    def open_base_project_details(self):
+        p = self.proj or {"name": self.base_name, "approot": self.base_dir, "type": "drupal9", "status": "running"}
+        self.main_app.open_project_details(p)
+
+    def copy_to_clipboard(self, text, message="Copiado al portapapeles"):
+        clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        clipboard.set_text(text, -1)
+        clipboard.store()
+        dialog = Gtk.MessageDialog(
+            transient_for=self.main_app,
+            flags=0,
+            message_type=Gtk.MessageType.INFO,
+            buttons=Gtk.ButtonsType.OK,
+            text=message
+        )
+        dialog.format_secondary_text(f"Contenido:\n{text}")
+        dialog.run()
+        dialog.destroy()
+
+    def show_subsite_details_dialog(self, subsite):
+        dialog = Gtk.Dialog(
+            title=f"Detalles del Subsitio: {subsite['name']}",
+            parent=self.main_app,
+            flags=0
+        )
+        dialog.set_default_size(540, -1)
+        dialog.add_button("Cerrar", Gtk.ResponseType.CLOSE)
+        
+        box = dialog.get_content_area()
+        box.set_spacing(12)
+        box.set_margin_start(16)
+        box.set_margin_end(16)
+        box.set_margin_top(12)
+        box.set_margin_bottom(12)
+        
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        card.get_style_context().add_class("project-card")
+        
+        h_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        pix_dp = load_icon("drupal.svg", 32)
+        if pix_dp:
+            h_row.pack_start(Gtk.Image.new_from_pixbuf(pix_dp), False, False, 0)
+            
+        lbl_title = Gtk.Label()
+        lbl_title.set_markup(f"<big><b>Subsitio: {subsite['name']}</b></big>")
+        h_row.pack_start(lbl_title, False, False, 0)
+        
+        lbl_badge = Gtk.Label(label="MULTISITE")
+        lbl_badge.get_style_context().add_class("badge")
+        lbl_badge.get_style_context().add_class("badge-multisite")
+        h_row.pack_start(lbl_badge, False, False, 0)
+        
+        card.pack_start(h_row, False, False, 0)
+        
+        grid = Gtk.Grid()
+        grid.set_column_spacing(16)
+        grid.set_row_spacing(8)
+        grid.set_margin_top(6)
+        
+        grid.attach(Gtk.Label(label="URL del Subsitio:", halign=Gtk.Align.END), 0, 0, 1, 1)
+        lbl_u = Gtk.Label()
+        lbl_u.set_markup(f"🌐 <a href='{subsite['url']}'><b>{subsite['url']}</b></a>")
+        lbl_u.set_halign(Gtk.Align.START)
+        grid.attach(lbl_u, 1, 0, 1, 1)
+        
+        grid.attach(Gtk.Label(label="Base de Datos:", halign=Gtk.Align.END), 0, 1, 1, 1)
+        lbl_db = Gtk.Label()
+        lbl_db.set_markup(f"<tt><b>{subsite['db']}</b></tt> (Usuario: <tt>db</tt> / Clave: <tt>db</tt>)")
+        lbl_db.set_halign(Gtk.Align.START)
+        grid.attach(lbl_db, 1, 1, 1, 1)
+        
+        grid.attach(Gtk.Label(label="Directorio:", halign=Gtk.Align.END), 0, 2, 1, 1)
+        lbl_dir = Gtk.Label()
+        lbl_dir.set_markup(f"<small><tt>{subsite['path']}</tt></small>")
+        lbl_dir.set_halign(Gtk.Align.START)
+        grid.attach(lbl_dir, 1, 2, 1, 1)
+        
+        card.pack_start(grid, False, False, 0)
+        
+        btn_box1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        btn_box1.set_margin_top(8)
+        
+        raw_db_creds = f"Host: 127.0.0.1\nDatabase: {subsite['db']}\nUsername: db\nPassword: db\nURL: mysql://db:db@127.0.0.1/{subsite['db']}"
+        btn_copy = Gtk.Button()
+        b_c = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        b_c.pack_start(Gtk.Image.new_from_icon_name("edit-copy-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_c.pack_start(Gtk.Label(label="Copiar Credenciales"), False, False, 0)
+        btn_copy.add(b_c)
+        btn_copy.connect("clicked", lambda b: self.copy_to_clipboard(raw_db_creds, f"Credenciales de {subsite['name']} copiadas"))
+        btn_box1.pack_start(btn_copy, False, False, 0)
+        
+        btn_exp = Gtk.Button()
+        b_exp = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        b_exp.pack_start(Gtk.Image.new_from_icon_name("document-save-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_exp.pack_start(Gtk.Label(label="Exportar BD"), False, False, 0)
+        btn_exp.add(b_exp)
+        btn_exp.set_tooltip_text(f"Exportar base de datos '{subsite['db']}'")
+        btn_exp.connect("clicked", lambda b: [dialog.destroy(), self.execute_subsite_drush_action("export_db", subsite["name"], subsite["url"], self.base_dir)])
+        btn_box1.pack_start(btn_exp, False, False, 0)
+        
+        btn_imp = Gtk.Button()
+        b_imp = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        b_imp.pack_start(Gtk.Image.new_from_icon_name("document-open-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_imp.pack_start(Gtk.Label(label="Importar BD"), False, False, 0)
+        btn_imp.add(b_imp)
+        btn_imp.set_tooltip_text(f"Importar base de datos en '{subsite['db']}'")
+        btn_imp.connect("clicked", lambda b: [dialog.destroy(), self.execute_subsite_drush_action("import_db", subsite["name"], subsite["url"], self.base_dir)])
+        btn_box1.pack_start(btn_imp, False, False, 0)
+        
+        btn_cli = Gtk.Button()
+        b_cli = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        b_cli.pack_start(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_cli.pack_start(Gtk.Label(label="Consola SQL"), False, False, 0)
+        btn_cli.add(b_cli)
+        btn_cli.set_tooltip_text(f"Abrir consola MySQL en la base de datos '{subsite['db']}'")
+        btn_cli.connect("clicked", lambda b: self.main_app.open_terminal(self.base_dir, f"ddev mysql --database={subsite['db']}"))
+        btn_box1.pack_start(btn_cli, False, False, 0)
+        
+        card.pack_start(btn_box1, False, False, 0)
+        
+        btn_full_details = Gtk.Button()
+        b_fd = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        b_fd.pack_start(Gtk.Image.new_from_icon_name("preferences-system-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_fd.pack_start(Gtk.Label(label="Ver Detalles y Servicios del Contenedor DDEV Principal"), False, False, 0)
+        btn_full_details.add(b_fd)
+        btn_full_details.get_style_context().add_class("btn-primary")
+        btn_full_details.set_margin_top(6)
+        btn_full_details.connect("clicked", lambda b: [dialog.destroy(), self.open_base_project_details()])
+        card.pack_start(btn_full_details, False, False, 0)
+        
+        box.pack_start(card, True, True, 0)
+        dialog.show_all()
+        dialog.run()
+        dialog.destroy()
 
     def load_project(self, proj):
         self.proj = proj
@@ -1036,6 +1187,16 @@ class SubsitesManagerView(Gtk.Box):
         btn_quick_uli.set_tooltip_text(f"Iniciar sesión como Admin en {subsite['name']} (drush uli)")
         btn_quick_uli.connect("clicked", lambda b, sn=subsite["name"], su=subsite_url: self.execute_subsite_drush_action("uli", sn, su, base_dir))
         actions_box.pack_start(btn_quick_uli, False, False, 0)
+        
+        btn_sub_details = Gtk.Button()
+        b_sdt = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        b_sdt.pack_start(Gtk.Image.new_from_icon_name("dialog-information-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        b_sdt.pack_start(Gtk.Label(label="Detalles"), False, False, 0)
+        btn_sub_details.add(b_sdt)
+        btn_sub_details.get_style_context().add_class("btn-quick")
+        btn_sub_details.set_tooltip_text(f"Ver información detallada y base de datos de {subsite['name']}")
+        btn_sub_details.connect("clicked", lambda b, s=subsite: self.show_subsite_details_dialog(s))
+        actions_box.pack_start(btn_sub_details, False, False, 0)
         
         menu_btn_drush = Gtk.MenuButton()
         menu_btn_drush.set_tooltip_text(f"Herramientas Drush para {subsite['name']}")
