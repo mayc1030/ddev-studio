@@ -74,7 +74,7 @@ class CIDialog(Gtk.Dialog):
             warn_box.get_style_context().add_class("warning-box")
             warn_box.pack_start(Gtk.Image.new_from_icon_name("dialog-warning-symbolic", Gtk.IconSize.MENU), False, False, 0)
             lbl_w = Gtk.Label()
-            lbl_w.set_markup("<b>⚠️ Proyecto sin Git:</b> El archivo se guardará en tu disco local, pero para que GitHub Actions se ejecute en internet debes inicializar Git (<tt>git init</tt>) y vincularlo a un repositorio de GitHub.")
+            lbl_w.set_markup("<b>Proyecto sin Git:</b> El archivo se guardará en tu disco local, pero para que GitHub Actions se ejecute en internet debes inicializar Git (<tt>git init</tt>) y vincularlo a un repositorio de GitHub.")
             lbl_w.set_line_wrap(True)
             lbl_w.set_halign(Gtk.Align.START)
             warn_box.pack_start(lbl_w, True, True, 0)
