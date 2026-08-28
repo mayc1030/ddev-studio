@@ -34,6 +34,10 @@
   - Compatibilidad completa con dev server moderno Vite y `--allowed-hosts`.
   - Desactivación no interactiva de analíticas (`NG_CLI_ANALYTICS=false`).
   - Live Dev Server en segundo plano conectado a `https://<proyecto>.ddev.site`.
+- ⚛️ **Next.js (React Full-Stack / App Router):**
+  - Scaffolding completo con `create-next-app` (TypeScript, Tailwind CSS, App Router, ESLint, alias `@/*`).
+  - Nginx Reverse Proxy integrado con soporte para Fast Refresh / WebSockets en `https://<proyecto>.ddev.site`.
+  - Servidor de desarrollo gestionado como daemon de fondo con Node.js 22 LTS.
 - ⚛️ **React (Vite + TypeScript):** Scaffolding rápido con Vite, Fast Refresh y proxy a puerto expuesto.
 - 💚 **Vue 3 (Vite + TypeScript):** Plantilla moderna con Hot Module Replacement (HMR).
 - 🎼 **Symfony:** Proyecto con Skeleton y bundle WebApp listo para producción.
@@ -42,7 +46,7 @@
 ---
 
 ### 📁 Importación Inteligente de Proyectos Existentes
-- **Detección Automática Heurística:** Analiza carpetas locales y autodetecta la tecnología (Drupal, WordPress, Laravel, Symfony, Django, Flask, Angular, React, Vue, PHP), la raíz web (`docroot`, `public`, `web`, `dist`, etc.), la versión óptima de PHP y configuración de Drupal Multisite.
+- **Detección Automática Heurística:** Analiza carpetas locales y autodetecta la tecnología (Drupal, WordPress, Laravel, Symfony, Django, Flask, Next.js, Angular, React, Vue, PHP), la raíz web (`docroot`, `public`, `web`, `dist`, etc.), la versión óptima de PHP y configuración de Drupal Multisite.
 - **Modo Switcher en Nuevo Proyecto:** Alterna entre `📦 Descargar Proyecto Nuevo` y `📁 Importar Carpeta Existente`.
 - **Acceso Rápido:** Botón de importación directa desde el buscador y en el estado vacío de *Mis Proyectos*.
 

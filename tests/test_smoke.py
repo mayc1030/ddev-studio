@@ -47,6 +47,7 @@ class TestConstants(unittest.TestCase):
     def test_icons_dir(self):
         self.assertTrue(os.path.isdir(ICONS_DIR))
         self.assertTrue(os.path.exists(os.path.join(ICONS_DIR, "ddev.svg")))
+        self.assertTrue(os.path.exists(os.path.join(ICONS_DIR, "nextjs.svg")))
 
 
 class TestDetector(unittest.TestCase):
@@ -59,6 +60,30 @@ class TestDetector(unittest.TestCase):
     def test_invalid_path(self):
         res = detect_project_details("/non/existent/path/12345")
         self.assertFalse(res["valid"])
+
+    def test_nextjs_detection_with_config(self):
+        next_config = os.path.join(self.test_dir, "next.config.mjs")
+        with open(next_config, "w") as f:
+            f.write("/** @type {import('next').NextConfig} */\nconst nextConfig = {};\nexport default nextConfig;")
+            
+        det = detect_project_details(self.test_dir)
+        self.assertTrue(det["valid"])
+        self.assertEqual(det["type"], "nextjs")
+        self.assertEqual(det["docroot"], ".")
+
+    def test_nextjs_detection_with_package_json(self):
+        pkg_json = os.path.join(self.test_dir, "package.json")
+        with open(pkg_json, "w") as f:
+            f.write('{"name": "my-next-app", "dependencies": {"next": "^14.2.0", "react": "^18.3.0", "react-dom": "^18.3.0"}}')
+            
+        det = detect_project_details(self.test_dir)
+        self.assertTrue(det["valid"])
+        self.assertEqual(det["type"], "nextjs")
+
+        tech, has_db, is_php, is_py, is_js, is_static = inspect_project_stack(self.test_dir, {}, {})
+        self.assertEqual(tech, "nextjs")
+        self.assertTrue(is_js)
+        self.assertFalse(has_db)
 
     def test_drupal_detection_with_sites_dir(self):
         docroot = os.path.join(self.test_dir, "web")

@@ -217,7 +217,73 @@ def run_create_project(parent_window, raw_name, base_dir, clean_target_before, f
                 
                 set_st("Generando clave de aplicación...")
                 run_subproc(["ddev", "exec", "php artisan key:generate"], target_dir, dialog)
-                log("\n🎉 Laravel instalado con éxito!")
+            elif fw_id == "nextjs":
+                set_st("Configurando DDEV para Next.js (React Full-Stack)...")
+                cfg_cmd = [
+                    "ddev", "config",
+                    f"--project-name={slug}",
+                    "--project-type=generic",
+                    "--docroot=.",
+                    f"--nodejs-version={node_version}",
+                ]
+                if db_type == "none":
+                    cfg_cmd.append("--omit-containers=db")
+                else:
+                    cfg_cmd.append(f"--database={db_type}")
+                run_subproc(cfg_cmd, target_dir, dialog)
+                
+                try:
+                    cfg_yaml = os.path.join(target_dir, ".ddev", "config.yaml")
+                    if os.path.exists(cfg_yaml):
+                        with open(cfg_yaml, "a") as f:
+                            f.write("\nweb_extra_exposed_ports:\n  - name: nodejs\n    container_port: 3000\n    http_port: 2999\n    https_port: 3000\n")
+                except Exception:
+                    pass
+                
+                set_st("Levantando contenedores DDEV...")
+                run_subproc(["ddev", "start", "-y"], target_dir, dialog)
+                
+                set_st("Creando aplicación Next.js con App Router y Tailwind CSS...")
+                run_subproc([
+                    "ddev", "npx", "--yes", "create-next-app@latest", "tmp-next",
+                    "--typescript",
+                    "--tailwind",
+                    "--eslint",
+                    "--app",
+                    "--src-dir",
+                    '--import-alias=@/*',
+                    "--use-npm"
+                ], target_dir, dialog)
+                
+                set_st("Organizando estructura del proyecto...")
+                run_subproc(["ddev", "exec", "sh -c 'cp -a tmp-next/. . && rm -rf tmp-next'"], target_dir, dialog)
+                run_subproc(["ddev", "exec", "sed -i 's/\"dev\": \"next dev\"/\"dev\": \"next dev -H 0.0.0.0 -p 3000\"/g' package.json"], target_dir, dialog)
+                
+                set_st("Configurando Nginx Reverse Proxy y daemon en segundo plano...")
+                nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
+                os.makedirs(nginx_full_dir, exist_ok=True)
+                with open(os.path.join(nginx_full_dir, "nginx-site.conf"), "w") as nf:
+                    nf.write("""location / {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+""")
+                with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
+                    df.write("""#ddev-silent-no-warn
+web_extra_daemons:
+  - name: nextjs-dev-server
+    command: "npm run dev"
+    directory: /var/www/html
+""")
+                set_st("Reiniciando DDEV para activar el servidor Next.js...")
+                run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
+                log("\n🎉 ¡Proyecto Next.js creado y ejecutándose en segundo plano!")
 
             elif fw_id == "react":
                 set_st("Configurando DDEV para React...")
@@ -776,6 +842,27 @@ web_extra_daemons:
 web_extra_daemons:
   - name: angular-dev-server
     command: "npx ng serve --host 0.0.0.0 --port 4200 --allowed-hosts"
+    directory: /var/www/html
+""")
+            elif p_type == "nextjs":
+                os.makedirs(os.path.join(target_dir, ".ddev", "nginx_full"), exist_ok=True)
+                with open(os.path.join(target_dir, ".ddev", "nginx_full", "nginx-site.conf"), "w") as nf:
+                    nf.write("""location / {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+""")
+                with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
+                    df.write("""#ddev-silent-no-warn
+web_extra_daemons:
+  - name: nextjs-dev-server
+    command: "npm run dev"
     directory: /var/www/html
 """)
             

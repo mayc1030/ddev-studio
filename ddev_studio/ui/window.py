@@ -423,6 +423,7 @@ class DDEVManagerWindow(Gtk.Window):
             ("symfony", "Symfony"),
             ("django", "Django (Python)"),
             ("flask", "Flask (Python)"),
+            ("nextjs", "Next.js (React Full-Stack)"),
             ("angular", "Angular (Node.js)"),
             ("react", "React (Node.js)"),
             ("vue", "Vue (Node.js)"),
@@ -804,7 +805,9 @@ class DDEVManagerWindow(Gtk.Window):
         ptype = tech_type.lower()
         
         icon_name = "php.svg"
-        if "wordpress" in ptype:
+        if "next" in ptype:
+            icon_name = "nextjs.svg"
+        elif "wordpress" in ptype:
             icon_name = "wordpress.svg"
         elif "drupal" in ptype:
             icon_name = "drupal.svg"
@@ -1501,7 +1504,7 @@ class DDEVManagerWindow(Gtk.Window):
         t_id = combo.get_active_id() or ""
         is_dr = "drupal" in t_id
         is_php = is_dr or t_id in ["laravel", "php", "symfony", "wordpress"]
-        is_node = t_id in ["angular", "react", "vue", "generic"]
+        is_node = t_id in ["angular", "react", "vue", "nextjs", "generic"]
         is_python = t_id in ["django", "flask"]
         
         if hasattr(self, "box_import_drupal_options"):

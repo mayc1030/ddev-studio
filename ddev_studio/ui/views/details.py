@@ -351,10 +351,13 @@ class ProjectDetailsView(Gtk.Box):
         
         # Find icon based on accurate tech_type
         icon_file = "ddev.svg"
-        for fw_cand in ["drupal", "wordpress", "laravel", "django", "flask", "angular", "react", "vue", "symfony", "python", "php", "node"]:
-            if fw_cand in tech_type:
-                icon_file = f"{fw_cand}.svg"
-                break
+        if "next" in tech_type:
+            icon_file = "nextjs.svg"
+        else:
+            for fw_cand in ["drupal", "wordpress", "laravel", "django", "flask", "angular", "react", "vue", "symfony", "python", "php", "node"]:
+                if fw_cand in tech_type:
+                    icon_file = f"{fw_cand}.svg"
+                    break
         pix = load_icon(icon_file, 36)
         if pix:
             top_row.pack_start(Gtk.Image.new_from_pixbuf(pix), False, False, 0)

@@ -280,6 +280,17 @@ FRAMEWORKS = [
         "db": "mariadb:10.11",
     },
     {
+        "id": "nextjs",
+        "name": "Next.js (React)",
+        "category": "React Full-Stack / SSR",
+        "desc": "Meta-framework full-stack para React con App Router, TypeScript, Tailwind CSS y SSR/SSG.",
+        "icon": "nextjs.svg",
+        "php": "8.3",
+        "nodejs": "22",
+        "docroot": ".",
+        "db": "none",
+    },
+    {
         "id": "react",
         "name": "React (Vite)",
         "category": "Frontend SPA",

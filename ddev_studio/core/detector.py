@@ -120,11 +120,16 @@ def detect_project_details(folder_path):
     if os.path.exists(os.path.join(folder_path, "app.py")) or os.path.exists(os.path.join(folder_path, "wsgi.py")):
         return {"name": slug, "type": "flask", "docroot": ".", "php": "8.3", "nodejs": "22", "db": "mariadb:10.11", "is_drupal": False, "is_multisite": False, "summary": "Proyecto Flask detectado (Python 3)", "valid": True}
 
+    if os.path.exists(os.path.join(folder_path, "next.config.js")) or os.path.exists(os.path.join(folder_path, "next.config.mjs")) or os.path.exists(os.path.join(folder_path, "next.config.ts")):
+        return {"name": slug, "type": "nextjs", "docroot": ".", "php": "8.3", "nodejs": "22", "db": "none", "is_drupal": False, "is_multisite": False, "summary": "Proyecto Next.js detectado (React Full-Stack)", "valid": True}
+
     if os.path.exists(os.path.join(folder_path, "package.json")) and not os.path.exists(os.path.join(folder_path, "composer.json")):
         try:
             with open(os.path.join(folder_path, "package.json"), "r") as pf:
                 pdata = json.load(pf)
             all_deps = {**pdata.get("dependencies", {}), **pdata.get("devDependencies", {})}
+            if "next" in all_deps:
+                return {"name": slug, "type": "nextjs", "docroot": ".", "php": "8.3", "nodejs": "22", "db": "none", "is_drupal": False, "is_multisite": False, "summary": "Proyecto Next.js detectado (React Full-Stack)", "valid": True}
             if "react" in all_deps:
                 return {"name": slug, "type": "react", "docroot": ".", "php": "8.3", "nodejs": "22", "db": "none", "is_drupal": False, "is_multisite": False, "summary": "Proyecto React detectado (Vite/Node)", "valid": True}
             if "vue" in all_deps:
@@ -178,20 +183,23 @@ def inspect_project_stack(approot, raw_data, proj_dict):
                 pass
                 
         # 2. Check package.json for Frontend JS frameworks
+        if os.path.exists(os.path.join(approot, "next.config.js")) or os.path.exists(os.path.join(approot, "next.config.mjs")) or os.path.exists(os.path.join(approot, "next.config.ts")):
+            tech_type = "nextjs"
+            
         pkg_json = os.path.join(approot, "package.json")
         if os.path.exists(pkg_json):
             try:
                 with open(pkg_json, "r", encoding="utf-8") as f:
                     pdata = json.load(f)
                 deps = {**pdata.get("dependencies", {}), **pdata.get("devDependencies", {})}
-                if "@angular/core" in deps or "@angular/cli" in deps:
+                if "next" in deps:
+                    tech_type = "nextjs"
+                elif "@angular/core" in deps or "@angular/cli" in deps:
                     tech_type = "angular"
                 elif "react" in deps or "react-dom" in deps:
                     tech_type = "react"
                 elif "vue" in deps:
                     tech_type = "vue"
-                elif "next" in deps:
-                    tech_type = "nextjs"
                 elif "nuxt" in deps:
                     tech_type = "nuxt"
                 elif "svelte" in deps:
