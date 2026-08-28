@@ -759,11 +759,18 @@ web_extra_daemons:
                 set_st("Levantando contenedores DDEV...")
                 run_subproc(["ddev", "start", "-y"], target_dir, dialog)
                 
-                set_st("Descargando Symfony...")
-                run_subproc(["ddev", "composer", "create-project", "symfony/skeleton", "tmp-symfony"], target_dir, dialog)
-                run_subproc(["ddev", "exec", "sh -c 'cp -a tmp-symfony/. . && rm -rf tmp-symfony'"], target_dir, dialog)
-                run_subproc(["ddev", "composer", "require", "webapp"], target_dir, dialog)
-                log("\n🎉 Proyecto Symfony listo!")
+                set_st("Descargando e instalando Symfony Skeleton...")
+                run_subproc(["ddev", "composer", "create-project", "symfony/skeleton", "."], target_dir, dialog)
+                
+                set_st("Instalando componentes web (webapp)...")
+                run_subproc(["ddev", "composer", "require", "webapp", "-n"], target_dir, dialog)
+                
+                set_st("Configurando conexión a base de datos DDEV...")
+                env_local_file = os.path.join(target_dir, ".env.local")
+                with open(env_local_file, "w") as ef:
+                    ef.write('DATABASE_URL="mysql://db:db@db:3306/db?serverVersion=mariadb-10.11.8&charset=utf8mb4"\n')
+                
+                log("\n🎉 ¡Proyecto Symfony listo y conectado a la base de datos!")
 
             else:  # Generic PHP
                 set_st("Configurando DDEV PHP...")
@@ -795,7 +802,7 @@ web_extra_daemons:
 <body>
     <div class="card">
         <h1>¡Proyecto {slug} Activo! 🚀</h1>
-        <p>Tu entorno DDEV está corriendo perfectamente en Ubuntu MATE.</p>
+        <p>Tu entorno DDEV está corriendo perfectamente</p>
         <p><span class="badge">PHP <?php echo phpversion(); ?></span></p>
     </div>
 </body>
