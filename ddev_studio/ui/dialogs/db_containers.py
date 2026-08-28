@@ -29,12 +29,8 @@ services:
       - VIRTUAL_HOST=${DDEV_HOSTNAME}
       - HTTP_EXPOSE=8978:8978
       - HTTPS_EXPOSE=8979:8978
-      - CLOUDBEAVER_APP_ANONYMOUS_ACCESS_ENABLED=true
-      - CLOUDBEAVER_APP_GRANT_CONNECTIONS_ACCESS_TO_ANONYMOUS_TEAM=true
-      - CLOUDBEAVER_APP_SUPPORTS_CUSTOM_CONNECTIONS=true
+      - CB_SERVER_NAME=DDEV Studio (${DDEV_SITENAME})
     volumes:
-      - "./cloudbeaver/conf/initial-data.conf:/opt/cloudbeaver/conf/initial-data.conf"
-      - "./cloudbeaver/conf/initial-data-sources.conf:/opt/cloudbeaver/conf/initial-data-sources.conf"
       - "./cloudbeaver/workspace:/opt/cloudbeaver/workspace"
 """
 
@@ -235,7 +231,7 @@ class DBContainersDialog(Gtk.Dialog):
         self.destroy()
         cb_compose_file = os.path.join(self.approot, ".ddev", "docker-compose.cloudbeaver.yaml")
         cb_base_dir = os.path.join(self.approot, ".ddev", "cloudbeaver")
-        conf_dir = os.path.join(cb_base_dir, "conf")
+        dbeaver_dir = os.path.join(cb_base_dir, "workspace", "GlobalConfiguration", ".dbeaver")
         dialog = ProgressDialog(self.parent_view.main_app, title=f"DBeaver en Docker: {self.proj_name}")
         dialog.set_status("Configurando contenedor DBeaver (CloudBeaver)...")
         
@@ -244,41 +240,15 @@ class DBContainersDialog(Gtk.Dialog):
                 def log(t):
                     GLib.idle_add(dialog.append_log, t)
                 if enable:
-                    log("🐬 Preparando auto-configuración instantánea de DBeaver (CloudBeaver)...\n")
-                    os.makedirs(conf_dir, exist_ok=True)
+                    log("🐬 Preparando configuración de DBeaver (CloudBeaver)...\n")
+                    ddev_dir = os.path.join(self.approot, ".ddev")
+                    subprocess.run(["docker", "run", "--rm", "-v", f"{ddev_dir}:/ddev", "alpine", "rm", "-rf", "/ddev/cloudbeaver"], check=False)
                     
-                    init_data_content = """{
-    adminName: "admin",
-    adminPassword: "admin",
-    serverName: "DDEV Studio DBeaver",
-    anonymousAccessEnabled: true,
-    supportsCustomConnections: true,
-    grantConnectionsAccessToAnonymousTeam: true,
-    teams: [
-        {
-            subjectId: "admin",
-            teamName: "Admin",
-            description: "Administrative access. Has all permissions.",
-            permissions: [ "admin" ]
-        },
-        {
-            subjectId: "user",
-            teamName: "User",
-            description: "All users, including anonymous.",
-            permissions: [ "admin" ]
-        }
-    ],
-    users: [
-        {
-            userId: "admin",
-            teams: [ "admin" ]
-        }
-    ]
-}
-"""
-                    with open(os.path.join(conf_dir, "initial-data.conf"), "w", encoding="utf-8") as f:
-                        f.write(init_data_content)
-                    log("✓ Modo instantáneo configurado (sin asistente inicial).\n")
+                    os.makedirs(dbeaver_dir, mode=0o777, exist_ok=True)
+                    os.chmod(cb_base_dir, 0o777)
+                    os.chmod(os.path.join(cb_base_dir, "workspace"), 0o777)
+                    os.chmod(os.path.join(cb_base_dir, "workspace", "GlobalConfiguration"), 0o777)
+                    os.chmod(dbeaver_dir, 0o777)
                     
                     db_type = self.parent_view.raw_data.get("database_type", "mariadb")
                     is_pg = ("postgres" in db_type.lower())
@@ -310,8 +280,10 @@ class DBContainersDialog(Gtk.Dialog):
                             }
                         }
                     }
-                    with open(os.path.join(conf_dir, "initial-data-sources.conf"), "w", encoding="utf-8") as f:
+                    ds_path = os.path.join(dbeaver_dir, "data-sources.json")
+                    with open(ds_path, "w", encoding="utf-8") as f:
                         json.dump(init_sources, f, indent=2)
+                    os.chmod(ds_path, 0o666)
                     log("✓ Conexión a la base de datos pre-configurada (db:db@db).\n")
                     
                     with open(cb_compose_file, "w", encoding="utf-8") as f:
@@ -321,8 +293,9 @@ class DBContainersDialog(Gtk.Dialog):
                     log("🗑️ Eliminando configuración de DBeaver...\n")
                     if os.path.exists(cb_compose_file):
                         os.remove(cb_compose_file)
-                    if os.path.exists(cb_base_dir):
-                        shutil.rmtree(cb_base_dir, ignore_errors=True)
+                    ddev_dir = os.path.join(self.approot, ".ddev")
+                    subprocess.run(["docker", "run", "--rm", "-v", f"{ddev_dir}:/ddev", "alpine", "rm", "-rf", "/ddev/cloudbeaver"], check=False)
+                    log("✓ Contenedor y workspace de DBeaver eliminados.\n")
                 
                 log("\n🔄 Reiniciando proyecto DDEV para aplicar cambios de contenedor...\n")
                 p2 = subprocess.Popen(["ddev", "restart", "-y"], cwd=self.approot, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
