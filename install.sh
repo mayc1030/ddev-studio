@@ -42,6 +42,7 @@ mkdir -p "$APP_DIR"
 echo -e "${YELLOW}[3/5] Copiando archivos de DDEV Studio...${NC}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cp -f "$SCRIPT_DIR/ddev_manager.py" "$INSTALL_DIR/ddev_manager.py"
+cp -rf "$SCRIPT_DIR/ddev_studio" "$INSTALL_DIR/"
 cp -rf "$SCRIPT_DIR/icons/"* "$INSTALL_DIR/icons/"
 chmod +x "$INSTALL_DIR/ddev_manager.py"
 

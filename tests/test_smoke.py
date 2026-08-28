@@ -1,0 +1,150 @@
+# -*- coding: utf-8 -*-
+"""
+Smoke tests for DDEV Studio modular package.
+"""
+
+import os
+import sys
+import unittest
+import tempfile
+import shutil
+
+# Ensure root directory is in sys.path
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from ddev_studio.constants import (
+    FRAMEWORKS,
+    DRUPAL_VERSIONS,
+    DEFAULT_SITES_DIR,
+    CUSTOM_CSS,
+    ICONS_DIR
+)
+from ddev_studio.core.detector import detect_project_details, inspect_project_stack
+from ddev_studio.core.terminal import find_terminal_command
+
+
+class TestConstants(unittest.TestCase):
+    def test_frameworks_structure(self):
+        self.assertIsInstance(FRAMEWORKS, list)
+        self.assertGreater(len(FRAMEWORKS), 0)
+        for fw in FRAMEWORKS:
+            self.assertIn("id", fw)
+            self.assertIn("name", fw)
+            self.assertIn("category", fw)
+            self.assertIn("icon", fw)
+
+    def test_drupal_versions(self):
+        self.assertIsInstance(DRUPAL_VERSIONS, list)
+        self.assertGreaterEqual(len(DRUPAL_VERSIONS), 5)
+        for dv in DRUPAL_VERSIONS:
+            self.assertIn("id", dv)
+            self.assertIn("label", dv)
+            self.assertIn("php", dv)
+            self.assertIn("docroot", dv)
+
+    def test_icons_dir(self):
+        self.assertTrue(os.path.isdir(ICONS_DIR))
+        self.assertTrue(os.path.exists(os.path.join(ICONS_DIR, "ddev.svg")))
+
+
+class TestDetector(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_invalid_path(self):
+        res = detect_project_details("/non/existent/path/12345")
+        self.assertFalse(res["valid"])
+
+    def test_drupal_detection_with_sites_dir(self):
+        docroot = os.path.join(self.test_dir, "web")
+        sites_dir = os.path.join(docroot, "sites")
+        os.makedirs(sites_dir)
+        
+        det = detect_project_details(self.test_dir)
+        self.assertTrue(det["valid"])
+        self.assertIn("drupal", det["type"])
+        self.assertEqual(det["docroot"], "web")
+
+    def test_wordpress_detection(self):
+        wp_file = os.path.join(self.test_dir, "wp-config.php")
+        with open(wp_file, "w") as f:
+            f.write("<?php // WordPress configuration")
+            
+        det = detect_project_details(self.test_dir)
+        self.assertTrue(det["valid"])
+        self.assertEqual(det["type"], "wordpress")
+        self.assertEqual(det["docroot"], ".")
+
+    def test_laravel_detection(self):
+        artisan_file = os.path.join(self.test_dir, "artisan")
+        with open(artisan_file, "w") as f:
+            f.write("#!/usr/bin/env php\n<?php")
+        os.makedirs(os.path.join(self.test_dir, "public"))
+        
+        det = detect_project_details(self.test_dir)
+        self.assertTrue(det["valid"])
+        self.assertEqual(det["type"], "laravel")
+        self.assertEqual(det["docroot"], "public")
+
+    def test_django_detection(self):
+        manage_py = os.path.join(self.test_dir, "manage.py")
+        with open(manage_py, "w") as f:
+            f.write("#!/usr/bin/env python\nimport django")
+            
+        det = detect_project_details(self.test_dir)
+        self.assertTrue(det["valid"])
+        self.assertEqual(det["type"], "django")
+
+    def test_inspect_stack_frontend(self):
+        pkg_json = os.path.join(self.test_dir, "package.json")
+        with open(pkg_json, "w") as f:
+            f.write('{"name": "test-react", "dependencies": {"react": "^18.0.0"}}')
+            
+        tech, has_db, is_php, is_py, is_js, is_static = inspect_project_stack(self.test_dir, {}, {})
+        self.assertEqual(tech, "react")
+        self.assertTrue(is_js)
+        self.assertFalse(has_db)
+
+    def test_inspect_stack_no_db(self):
+        tech, has_db, is_php, is_py, is_js, is_static = inspect_project_stack(
+            self.test_dir,
+            {"database_type": "none"},
+            {}
+        )
+        self.assertFalse(has_db)
+
+
+class TestTerminal(unittest.TestCase):
+    def test_terminal_detection(self):
+        term = find_terminal_command()
+        self.assertTrue(term is None or isinstance(term, str))
+
+
+class TestImports(unittest.TestCase):
+    def test_all_modules_importable(self):
+        import ddev_studio
+        import ddev_studio.constants
+        import ddev_studio.core
+        import ddev_studio.core.terminal
+        import ddev_studio.core.process
+        import ddev_studio.core.detector
+        import ddev_studio.recipes
+        import ddev_studio.recipes.runner
+        import ddev_studio.ui
+        import ddev_studio.ui.helpers
+        import ddev_studio.ui.dialogs.progress
+        import ddev_studio.ui.dialogs.db_containers
+        import ddev_studio.ui.views.details
+        import ddev_studio.ui.views.subsites
+        import ddev_studio.ui.window
+        import ddev_studio.main
+        self.assertIsNotNone(ddev_studio.__version__)
+
+
+if __name__ == "__main__":
+    unittest.main()
