@@ -273,12 +273,10 @@ def run_create_project(parent_window, raw_name, base_dir, clean_target_before, f
                 set_st("Instalando Laravel con Composer...")
                 run_subproc(["ddev", "composer", "create-project", "--prefer-dist", "laravel/laravel", "."], target_dir, dialog)
                 
-                set_st("Configurando variables de entorno (.env) y base de datos...")
-                run_subproc(["ddev", "exec", "sh -c 'sed -i \"s/DB_CONNECTION=sqlite/DB_CONNECTION=mysql/g\" .env 2>/dev/null || true; sed -i \"s/DB_HOST=127.0.0.1/DB_HOST=db/g\" .env 2>/dev/null || true; sed -i \"s/# DB_HOST=127.0.0.1/DB_HOST=db/g\" .env 2>/dev/null || true; sed -i \"s/DB_PORT=3306/DB_PORT=3306/g\" .env 2>/dev/null || true; sed -i \"s/DB_DATABASE=laravel/DB_DATABASE=db/g\" .env 2>/dev/null || true; sed -i \"s/# DB_DATABASE=laravel/DB_DATABASE=db/g\" .env 2>/dev/null || true; sed -i \"s/DB_USERNAME=root/DB_USERNAME=db/g\" .env 2>/dev/null || true; sed -i \"s/# DB_USERNAME=root/DB_USERNAME=db/g\" .env 2>/dev/null || true; sed -i \"s/DB_PASSWORD=/DB_PASSWORD=db/g\" .env 2>/dev/null || true; sed -i \"s/# DB_PASSWORD=/DB_PASSWORD=db/g\" .env 2>/dev/null || true'"], target_dir, dialog)
+                set_st("Ejecutando migraciones iniciales de base de datos...")
+                run_subproc(["ddev", "exec", "php artisan migrate --force"], target_dir, dialog)
                 
-                set_st("Generando clave de aplicación...")
-                run_subproc(["ddev", "exec", "php artisan key:generate"], target_dir, dialog)
-                log("\n🎉 Proyecto Laravel listo y conectado a la base de datos!")
+                log("\n🎉 ¡Proyecto Laravel listo y conectado a la base de datos!")
 
             elif fw_id == "nextjs":
                 set_st("Configurando DDEV para Next.js (React Full-Stack)...")
