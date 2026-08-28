@@ -112,14 +112,15 @@ def run_create_project(parent_window, raw_name, base_dir, clean_target_before, f
             log(f"📁 Directorio del proyecto: {target_dir}")
             log(f"🚀 Tecnología: {fw['name']}" + (f" (Versión {drupal_ver_info['id']})" if fw_id == 'drupal' else ""))
             
+            db_label = "SQLite (Archivo local)" if db_type == "sqlite" else ("Ninguna" if db_type == "none" else db_type)
             if fw_id in ["nextjs", "react", "vue", "angular"]:
-                log(f"📦 Entorno: Node.js (v{node_version}) | DB: {db_type}\n" + "="*50)
+                log(f"📦 Entorno: Node.js (v{node_version}) | DB: {db_label}\n" + "="*50)
             elif fw_id in ["django", "flask"]:
-                log(f"🐍 Entorno: Python 3 (Virtualenv) | DB: {db_type}\n" + "="*50)
+                log(f"🐍 Entorno: Python 3 (Virtualenv) | DB: {db_label}\n" + "="*50)
             elif fw_id == "html":
                 log(f"🌐 Entorno: HTML5 Estático (Nginx)\n" + "="*50)
             else:
-                log(f"🐘 Versión de PHP: {php_version} | DB: {db_type}\n" + "="*50)
+                log(f"🐘 Versión de PHP: {php_version} | DB: {db_label}\n" + "="*50)
             
             primary_url = f"https://{slug}.ddev.site"
             
@@ -271,8 +272,11 @@ def run_create_project(parent_window, raw_name, base_dir, clean_target_before, f
                     "--project-type=laravel",
                     "--docroot=public",
                     f"--php-version={php_version}",
-                    f"--database={db_type}"
                 ]
+                if db_type in ["none", "sqlite"]:
+                    cfg_cmd.append("--omit-containers=db")
+                else:
+                    cfg_cmd.append(f"--database={db_type}")
                 run_subproc(cfg_cmd, target_dir, dialog)
                 
                 set_st("Levantando contenedores DDEV...")
@@ -281,6 +285,17 @@ def run_create_project(parent_window, raw_name, base_dir, clean_target_before, f
                 set_st("Instalando Laravel con Composer...")
                 run_subproc(["ddev", "composer", "create-project", "--prefer-dist", "laravel/laravel", "."], target_dir, dialog)
                 
+                if db_type == "sqlite":
+                    set_st("Configurando conexión SQLite en .env...")
+                    env_file = os.path.join(target_dir, ".env")
+                    if os.path.exists(env_file):
+                        with open(env_file, "r", encoding="utf-8") as ef:
+                            env_txt = ef.read()
+                        env_txt = re.sub(r'DB_CONNECTION=\w+', 'DB_CONNECTION=sqlite', env_txt)
+                        with open(env_file, "w", encoding="utf-8") as ef:
+                            ef.write(env_txt)
+                    run_subproc(["ddev", "exec", "touch database/database.sqlite"], target_dir, dialog)
+                    
                 set_st("Ejecutando migraciones iniciales de base de datos...")
                 run_subproc(["ddev", "exec", "php artisan migrate --force"], target_dir, dialog)
                 
@@ -295,7 +310,7 @@ def run_create_project(parent_window, raw_name, base_dir, clean_target_before, f
                     "--docroot=.",
                     f"--nodejs-version={node_version}",
                 ]
-                if db_type == "none":
+                if db_type in ["none", "sqlite"]:
                     cfg_cmd.append("--omit-containers=db")
                 else:
                     cfg_cmd.append(f"--database={db_type}")
@@ -345,7 +360,7 @@ web_extra_daemons:
                     "--docroot=.",
                     f"--nodejs-version={node_version}"
                 ]
-                if db_type == "none":
+                if db_type in ["none", "sqlite"]:
                     cfg_cmd.append("--omit-containers=db")
                 else:
                     cfg_cmd.append(f"--database={db_type}")
@@ -419,7 +434,7 @@ web_extra_daemons:
                     "--docroot=.",
                     f"--nodejs-version={node_version}"
                 ]
-                if db_type == "none":
+                if db_type in ["none", "sqlite"]:
                     cfg_cmd.append("--omit-containers=db")
                 else:
                     cfg_cmd.append(f"--database={db_type}")
@@ -491,9 +506,12 @@ web_extra_daemons:
                     f"--project-name={slug}",
                     "--project-type=generic",
                     "--docroot=.",
-                    f"--database={db_type}",
                     "--webimage-extra-packages=python3-venv,python3-pip"
                 ]
+                if db_type in ["none", "sqlite"]:
+                    cfg_cmd.append("--omit-containers=db")
+                else:
+                    cfg_cmd.append(f"--database={db_type}")
                 run_subproc(cfg_cmd, target_dir, dialog)
                 
                 set_st("Iniciando contenedores DDEV...")
@@ -503,7 +521,10 @@ web_extra_daemons:
                 run_subproc(["ddev", "exec", "python3 -m venv /var/www/html/.venv"], target_dir, dialog)
                 
                 set_st("Instalando Django y conectores de base de datos...")
-                run_subproc(["ddev", "exec", "/var/www/html/.venv/bin/pip install django PyMySQL cryptography psycopg2-binary"], target_dir, dialog)
+                pip_pkgs = "django"
+                if db_type != "sqlite":
+                    pip_pkgs += " PyMySQL cryptography psycopg2-binary"
+                run_subproc(["ddev", "exec", f"/var/www/html/.venv/bin/pip install {pip_pkgs}"], target_dir, dialog)
                 
                 set_st("Generando estructura inicial de Django...")
                 run_subproc(["ddev", "exec", "/var/www/html/.venv/bin/django-admin startproject app ."], target_dir, dialog)
@@ -515,7 +536,10 @@ web_extra_daemons:
                         with open(settings_py_path, "r") as sf:
                             s_code = sf.read()
                         s_code = s_code.replace("ALLOWED_HOSTS = []", "ALLOWED_HOSTS = ['*']")
-                        if "postgres" in db_type:
+                        if db_type == "sqlite":
+                            # Django ya viene preconfigurado con SQLite por defecto
+                            pass
+                        elif "postgres" in db_type:
                             db_block = """DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -526,6 +550,7 @@ web_extra_daemons:
         'PORT': '5432',
     }
 }"""
+                            s_code = re.sub(r'DATABASES\s*=\s*\{.*?\n\}', db_block, s_code, flags=re.DOTALL)
                         else:
                             db_block = """import pymysql
 pymysql.install_as_MySQLdb()
@@ -540,7 +565,7 @@ DATABASES = {
         'PORT': '3306',
     }
 }"""
-                        s_code = re.sub(r'DATABASES\s*=\s*\{.*?\n\}', db_block, s_code, flags=re.DOTALL)
+                            s_code = re.sub(r'DATABASES\s*=\s*\{.*?\n\}', db_block, s_code, flags=re.DOTALL)
                         with open(settings_py_path, "w") as sf:
                             sf.write(s_code)
                     except Exception as ex:
@@ -607,9 +632,12 @@ web_extra_daemons:
                     f"--project-name={slug}",
                     "--project-type=generic",
                     "--docroot=.",
-                    f"--database={db_type}",
                     "--webimage-extra-packages=python3-venv,python3-pip"
                 ]
+                if db_type in ["none", "sqlite"]:
+                    cfg_cmd.append("--omit-containers=db")
+                else:
+                    cfg_cmd.append(f"--database={db_type}")
                 run_subproc(cfg_cmd, target_dir, dialog)
                 
                 set_st("Iniciando contenedores DDEV...")
@@ -715,7 +743,7 @@ web_extra_daemons:
                     f"--nodejs-version={node_version}",
                     "--web-environment-add=NG_CLI_ANALYTICS=false"
                 ]
-                if db_type == "none":
+                if db_type in ["none", "sqlite"]:
                     cfg_cmd.append("--omit-containers=db")
                 else:
                     cfg_cmd.append(f"--database={db_type}")
@@ -779,9 +807,12 @@ web_extra_daemons:
                     f"--project-name={slug}",
                     "--project-type=php",
                     "--docroot=.",
-                    f"--php-version={php_version}",
-                    f"--database={db_type}"
+                    f"--php-version={php_version}"
                 ]
+                if db_type in ["none", "sqlite"]:
+                    cfg_cmd.append("--omit-containers=db")
+                else:
+                    cfg_cmd.append(f"--database={db_type}")
                 run_subproc(cfg_cmd, target_dir, dialog)
                 
                 index_path = os.path.join(target_dir, "index.php")

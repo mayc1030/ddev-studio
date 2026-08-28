@@ -14,7 +14,7 @@ gi.require_version('Gtk', '3.0')
 gi.require_version('Gdk', '3.0')
 from gi.repository import Gtk, Gdk, GLib
 
-from ddev_studio.core.detector import inspect_project_stack
+from ddev_studio.core.detector import inspect_project_stack, detect_sqlite_database
 from ddev_studio.ui.helpers import load_icon
 from ddev_studio.ui.dialogs.progress import ProgressDialog
 from ddev_studio.ui.dialogs.db_containers import DBContainersDialog
@@ -456,8 +456,56 @@ class ProjectDetailsView(Gtk.Box):
         header_card.pack_start(actions_row, False, False, 0)
         self.content_box.pack_start(header_card, False, False, 0)
         
-        # 2. Database Card (Only for projects with database)
-        if has_db:
+        # 2. Database Card (Docker Database or SQLite)
+        sqlite_info = detect_sqlite_database(approot)
+        if sqlite_info:
+            db_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            db_card.get_style_context().add_class("project-card")
+            
+            db_title_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            db_title_row.pack_start(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            lbl_db_title = Gtk.Label()
+            lbl_db_title.set_markup("<b>Base de Datos &amp; Archivo Local</b>")
+            db_title_row.pack_start(lbl_db_title, False, False, 0)
+            
+            lbl_badge_sql = Gtk.Label(label="SQLITE (ARCHIVO LOCAL)")
+            lbl_badge_sql.get_style_context().add_class("badge")
+            lbl_badge_sql.get_style_context().add_class("badge-running")
+            db_title_row.pack_start(lbl_badge_sql, False, False, 0)
+            db_card.pack_start(db_title_row, False, False, 0)
+            
+            grid_db = Gtk.Grid()
+            grid_db.set_column_spacing(20)
+            grid_db.set_row_spacing(6)
+            
+            grid_db.attach(Gtk.Label(label="Motor:", halign=Gtk.Align.END), 0, 0, 1, 1)
+            grid_db.attach(Gtk.Label(label="<b>SQLite 3</b> (Sin contenedor Docker - 0 MB RAM)", use_markup=True, halign=Gtk.Align.START), 1, 0, 1, 1)
+            
+            grid_db.attach(Gtk.Label(label="Archivo:", halign=Gtk.Align.END), 0, 1, 1, 1)
+            grid_db.attach(Gtk.Label(label=f"<tt><b>{sqlite_info['rel_path']}</b></tt>", use_markup=True, halign=Gtk.Align.START), 1, 1, 1, 1)
+            
+            grid_db.attach(Gtk.Label(label="Tamaño:", halign=Gtk.Align.END), 2, 0, 1, 1)
+            grid_db.attach(Gtk.Label(label=f"<b>{sqlite_info['size_human']}</b>", use_markup=True, halign=Gtk.Align.START), 3, 0, 1, 1)
+            
+            db_card.pack_start(grid_db, False, False, 0)
+            
+            db_row1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            db_row1.set_margin_top(6)
+            
+            btn_open_file = Gtk.Button()
+            b_of = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_of.pack_start(Gtk.Image.new_from_icon_name("folder-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_of.pack_start(Gtk.Label(label="Abrir Carpeta de Base de Datos"), False, False, 0)
+            btn_open_file.add(b_of)
+            file_target = sqlite_info["full_path"] if sqlite_info["full_path"] else approot
+            folder_target = os.path.dirname(file_target) if os.path.isfile(file_target) else approot
+            btn_open_file.connect("clicked", lambda b, p=folder_target: subprocess.Popen(["xdg-open", p]))
+            db_row1.pack_start(btn_open_file, False, False, 0)
+            
+            db_card.pack_start(db_row1, False, False, 0)
+            self.content_box.pack_start(db_card, False, False, 0)
+            
+        elif has_db:
             db_info = self.raw_data.get("dbinfo") or {}
             db_type = self.raw_data.get("database_type", self.raw_data.get("db_type", "mariadb"))
             db_ver = self.raw_data.get("database_version", "10.11")

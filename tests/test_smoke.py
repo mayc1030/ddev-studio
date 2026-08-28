@@ -21,7 +21,7 @@ from ddev_studio.constants import (
     CUSTOM_CSS,
     ICONS_DIR
 )
-from ddev_studio.core.detector import detect_project_details, inspect_project_stack, sanitize_project_name
+from ddev_studio.core.detector import detect_project_details, inspect_project_stack, sanitize_project_name, detect_sqlite_database
 from ddev_studio.core.terminal import find_terminal_command
 
 
@@ -152,6 +152,18 @@ class TestDetector(unittest.TestCase):
             {}
         )
         self.assertFalse(has_db)
+
+    def test_sqlite_detection(self):
+        self.assertIsNone(detect_sqlite_database(self.test_dir))
+        
+        sqlite_file = os.path.join(self.test_dir, "db.sqlite3")
+        with open(sqlite_file, "w") as f:
+            f.write("sqlite database content")
+            
+        sql_info = detect_sqlite_database(self.test_dir)
+        self.assertIsNotNone(sql_info)
+        self.assertEqual(sql_info["rel_path"], "db.sqlite3")
+        self.assertTrue(sql_info["size_kb"] >= 0)
 
 
 class TestTerminal(unittest.TestCase):

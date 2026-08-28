@@ -594,25 +594,41 @@ class DDEVManagerWindow(Gtk.Window):
                 self.combo_db.remove_all()
                 if is_node:
                     self.combo_db.append("none", "🚫 Ninguna (Solo Frontend / Ahorro de RAM)")
+                    self.combo_db.append("sqlite", "🗄️ SQLite (Basada en archivo / 0 RAM adicional)")
                     self.combo_db.append("mariadb:10.11", "MariaDB 10.11")
-                    self.combo_db.append("mysql:8.0", "MySQL 8.0")
                     self.combo_db.append("postgres:16", "PostgreSQL 16")
+                    self.combo_db.append("mysql:8.0", "MySQL 8.0")
                     self.combo_db.set_active_id("none")
                 elif fw_id == "django":
-                    self.combo_db.append("postgres:16", "PostgreSQL 16 (Recomendada)")
-                    self.combo_db.append("mysql:8.0", "MySQL 8.0")
+                    self.combo_db.append("sqlite", "🗄️ SQLite (Predeterminada de Django - db.sqlite3)")
+                    self.combo_db.append("postgres:16", "PostgreSQL 16 (Producción)")
                     self.combo_db.append("mariadb:10.11", "MariaDB 10.11")
-                    self.combo_db.set_active_id("postgres:16")
+                    self.combo_db.append("mysql:8.0", "MySQL 8.0")
+                    self.combo_db.set_active_id("sqlite")
                 elif fw_id == "flask":
-                    self.combo_db.append("mariadb:10.11", "MariaDB 10.11 (Recomendada)")
+                    self.combo_db.append("sqlite", "🗄️ SQLite (Recomendada para Flask - Archivo local)")
+                    self.combo_db.append("mariadb:10.11", "MariaDB 10.11")
                     self.combo_db.append("postgres:16", "PostgreSQL 16")
                     self.combo_db.append("mysql:8.0", "MySQL 8.0")
+                    self.combo_db.set_active_id("sqlite")
+                elif fw_id == "laravel":
+                    self.combo_db.append("mariadb:10.11", "MariaDB 10.11 (Recomendada)")
+                    self.combo_db.append("sqlite", "🗄️ SQLite (Ligera - database/database.sqlite)")
+                    self.combo_db.append("mysql:8.0", "MySQL 8.0")
+                    self.combo_db.append("postgres:16", "PostgreSQL 16")
                     self.combo_db.set_active_id("mariadb:10.11")
-                else:
+                elif fw_id in ["drupal", "wordpress", "symfony"]:
                     self.combo_db.append("mariadb:10.11", "MariaDB 10.11 (Recomendada)")
                     self.combo_db.append("mysql:8.0", "MySQL 8.0")
                     self.combo_db.append("postgres:16", "PostgreSQL 16")
                     self.combo_db.append("mariadb:10.5", "MariaDB 10.5")
+                    self.combo_db.set_active_id("mariadb:10.11")
+                else:  # Generic PHP / HTML
+                    self.combo_db.append("mariadb:10.11", "MariaDB 10.11 (Recomendada)")
+                    self.combo_db.append("sqlite", "🗄️ SQLite (Archivo local)")
+                    self.combo_db.append("mysql:8.0", "MySQL 8.0")
+                    self.combo_db.append("postgres:16", "PostgreSQL 16")
+                    self.combo_db.append("none", "🚫 Ninguna")
                     self.combo_db.set_active_id("mariadb:10.11")
 
             # Checkbox auto-install contextual

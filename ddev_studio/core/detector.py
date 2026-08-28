@@ -303,3 +303,50 @@ def inspect_project_stack(approot, raw_data, proj_dict):
         has_db = False
         
     return tech_type, has_db, is_php, is_python, is_js, is_static
+
+
+def detect_sqlite_database(approot):
+    """
+    Busca si el proyecto utiliza una base de datos SQLite local y retorna su ruta relativa y tamaño si existe.
+    """
+    if not approot or not os.path.exists(approot):
+        return None
+        
+    candidates = [
+        "database/database.sqlite",
+        "database.sqlite",
+        "db.sqlite3",
+        "app.db",
+        "dev.db",
+        "prisma/dev.db",
+        "instance/app.db",
+        "data.db"
+    ]
+    for c in candidates:
+        full_p = os.path.join(approot, c)
+        if os.path.isfile(full_p):
+            size_bytes = os.path.getsize(full_p)
+            size_kb = round(size_bytes / 1024, 1)
+            return {
+                "rel_path": c,
+                "full_path": full_p,
+                "size_kb": size_kb,
+                "size_human": f"{size_kb} KB" if size_kb < 1024 else f"{round(size_kb/1024, 2)} MB"
+            }
+            
+    # Check .env for sqlite
+    env_p = os.path.join(approot, ".env")
+    if os.path.exists(env_p):
+        try:
+            with open(env_p, "r", encoding="utf-8", errors="ignore") as ef:
+                content = ef.read()
+            if "DB_CONNECTION=sqlite" in content or "sqlite:" in content.lower():
+                return {
+                    "rel_path": "database.sqlite (según .env)",
+                    "full_path": "",
+                    "size_kb": 0,
+                    "size_human": "SQLite"
+                }
+        except Exception:
+            pass
+    return None
