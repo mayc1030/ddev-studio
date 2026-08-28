@@ -110,7 +110,10 @@ def generate_ci_workflow(tech_type, options=None):
         with:
           autostart: true
       - name: Install Composer Dependencies
-        run: ddev composer install --no-interaction --prefer-dist --optimize-autoloader
+        run: |
+          if [ -f composer.json ]; then
+            ddev composer install --no-interaction --prefer-dist --optimize-autoloader
+          fi
 
       - name: Install Drupal Site
         run: ddev drush site:install standard --yes --account-name=admin --account-pass=admin || true
