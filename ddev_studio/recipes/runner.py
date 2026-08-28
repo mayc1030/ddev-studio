@@ -134,27 +134,23 @@ def run_create_project(parent_window, raw_name, base_dir, clean_target_before, f
                 set_st("Levantando contenedores DDEV...")
                 run_subproc(["ddev", "start", "-y"], target_dir, dialog)
                 
-                if d_ver in ["11", "10", "9", "8"]:
+                if d_ver in ["11", "10", "9"]:
                     set_st(f"Descargando Drupal {d_ver} con Composer...")
                     pkg = "drupal/recommended-project"
+                    drush_pkg = "drush/drush"
                     if d_ver == "11":
                         pkg = "drupal/recommended-project:^11"
+                        drush_pkg = "drush/drush"
                     elif d_ver == "10":
                         pkg = "drupal/recommended-project:^10"
+                        drush_pkg = "drush/drush"
                     elif d_ver == "9":
                         pkg = "drupal/recommended-project:^9"
-                    elif d_ver == "8":
-                        pkg = "drupal/recommended-project:^8"
+                        drush_pkg = "drush/drush:^11"
                         
-                    run_subproc(["ddev", "composer", "create-project", pkg, "/tmp/drupal-pkg"], target_dir, dialog)
+                    run_subproc(["ddev", "composer", "create-project", pkg, "."], target_dir, dialog)
                     
-                    set_st("Moviendo archivos del proyecto...")
-                    run_subproc(["ddev", "exec", "sh -c 'cp -a /tmp/drupal-pkg/. . && rm -rf /tmp/drupal-pkg'"], target_dir, dialog)
-                    
-                    set_st("Instalando Drush...")
-                    drush_pkg = "drush/drush"
-                    if d_ver == "8":
-                        drush_pkg = "drush/drush:^10"
+                    set_st(f"Instalando Drush ({drush_pkg})...")
                     run_subproc(["ddev", "composer", "require", drush_pkg], target_dir, dialog)
                     
                     if auto_install:
@@ -169,14 +165,42 @@ def run_create_project(parent_window, raw_name, base_dir, clean_target_before, f
                         run_subproc(inst_cmd, target_dir, dialog)
                         log("\n🎉 Drupal instalado con éxito!")
                         log("Credenciales: admin / admin")
-                        
-                elif d_ver == "7":
-                    set_st("Descargando Drupal 7...")
-                    run_subproc(["ddev", "drush", "dl", "drupal-7", "-y", "--destination=/tmp/d7"], target_dir, dialog)
-                    run_subproc(["ddev", "exec", "sh -c 'cp -a /tmp/d7/drupal-7*/* /var/www/html/ && cp -a /tmp/d7/drupal-7*/.* /var/www/html/ 2>/dev/null || true; rm -rf /tmp/d7'"], target_dir, dialog)
+
+                elif d_ver == "8":
+                    set_st("Descargando Drupal 8 con Composer...")
+                    run_subproc(["ddev", "composer", "create-project", "--no-install", "drupal/recommended-project:^8", "."], target_dir, dialog)
+                    
+                    set_st("Configurando permisos de plugins en Composer (allow-plugins)...")
+                    run_subproc(["ddev", "composer", "config", "--no-plugins", "allow-plugins.composer/installers", "true"], target_dir, dialog)
+                    run_subproc(["ddev", "composer", "config", "--no-plugins", "allow-plugins.drupal/core-composer-scaffold", "true"], target_dir, dialog)
+                    run_subproc(["ddev", "composer", "config", "--no-plugins", "allow-plugins.drupal/core-project-message", "true"], target_dir, dialog)
+                    run_subproc(["ddev", "composer", "config", "--no-plugins", "allow-plugins.dealerdirect/phpcodesniffer-composer-installer", "true"], target_dir, dialog)
+                    
+                    set_st("Instalando dependencias de Drupal 8...")
+                    run_subproc(["ddev", "composer", "install"], target_dir, dialog)
+                    
+                    set_st("Instalando Drush 10 para Drupal 8...")
+                    run_subproc(["ddev", "composer", "require", "drush/drush:^10"], target_dir, dialog)
                     
                     if auto_install:
-                        set_st("Instalando Drupal 7 estándar...")
+                        set_st("Instalando Drupal 8 estándar con Drush...")
+                        inst_cmd = [
+                            "ddev", "drush", "site:install", "standard",
+                            "--account-name=admin",
+                            "--account-pass=admin",
+                            f"--site-name={slug.capitalize()}",
+                            "-y"
+                        ]
+                        run_subproc(inst_cmd, target_dir, dialog)
+                        log("\n🎉 Drupal 8 instalado con éxito!")
+                        log("Credenciales: admin / admin")
+                        
+                elif d_ver == "7":
+                    set_st("Descargando Drupal 7 desde Drupal.org...")
+                    run_subproc(["ddev", "exec", "sh -c 'curl -fsSL https://ftp.drupal.org/files/projects/drupal-7.103.tar.gz | tar -xz --strip-components=1'"], target_dir, dialog)
+                    
+                    if auto_install:
+                        set_st("Instalando Drupal 7 estándar con Drush...")
                         inst_cmd = [
                             "ddev", "drush", "site:install", "standard",
                             "--account-name=admin",
@@ -191,7 +215,7 @@ def run_create_project(parent_window, raw_name, base_dir, clean_target_before, f
                 # Drupal Multisite Architecture
                 if is_multisite_enabled:
                     set_st("Configurando arquitectura Drupal Multisite...")
-                    sites_php_dir = os.path.join(target_dir, d_docroot, "sites") if d_docroot else os.path.join(target_dir, "sites")
+                    sites_php_dir = os.path.join(target_dir, d_docroot, "sites") if d_docroot and d_docroot != "." else os.path.join(target_dir, "sites")
                     os.makedirs(sites_php_dir, exist_ok=True)
                     sites_php_file = os.path.join(sites_php_dir, "sites.php")
                     with open(sites_php_file, "w") as sf:
@@ -247,10 +271,15 @@ def run_create_project(parent_window, raw_name, base_dir, clean_target_before, f
                 run_subproc(["ddev", "start", "-y"], target_dir, dialog)
                 
                 set_st("Instalando Laravel con Composer...")
-                run_subproc(["ddev", "composer", "create-project", "--prefer-dist", "laravel/laravel"], target_dir, dialog)
+                run_subproc(["ddev", "composer", "create-project", "--prefer-dist", "laravel/laravel", "."], target_dir, dialog)
+                
+                set_st("Configurando variables de entorno (.env) y base de datos...")
+                run_subproc(["ddev", "exec", "sh -c 'sed -i \"s/DB_CONNECTION=sqlite/DB_CONNECTION=mysql/g\" .env 2>/dev/null || true; sed -i \"s/DB_HOST=127.0.0.1/DB_HOST=db/g\" .env 2>/dev/null || true; sed -i \"s/# DB_HOST=127.0.0.1/DB_HOST=db/g\" .env 2>/dev/null || true; sed -i \"s/DB_PORT=3306/DB_PORT=3306/g\" .env 2>/dev/null || true; sed -i \"s/DB_DATABASE=laravel/DB_DATABASE=db/g\" .env 2>/dev/null || true; sed -i \"s/# DB_DATABASE=laravel/DB_DATABASE=db/g\" .env 2>/dev/null || true; sed -i \"s/DB_USERNAME=root/DB_USERNAME=db/g\" .env 2>/dev/null || true; sed -i \"s/# DB_USERNAME=root/DB_USERNAME=db/g\" .env 2>/dev/null || true; sed -i \"s/DB_PASSWORD=/DB_PASSWORD=db/g\" .env 2>/dev/null || true; sed -i \"s/# DB_PASSWORD=/DB_PASSWORD=db/g\" .env 2>/dev/null || true'"], target_dir, dialog)
                 
                 set_st("Generando clave de aplicación...")
                 run_subproc(["ddev", "exec", "php artisan key:generate"], target_dir, dialog)
+                log("\n🎉 Proyecto Laravel listo y conectado a la base de datos!")
+
             elif fw_id == "nextjs":
                 set_st("Configurando DDEV para Next.js (React Full-Stack)...")
                 cfg_cmd = [
@@ -265,14 +294,6 @@ def run_create_project(parent_window, raw_name, base_dir, clean_target_before, f
                 else:
                     cfg_cmd.append(f"--database={db_type}")
                 run_subproc(cfg_cmd, target_dir, dialog)
-                
-                try:
-                    cfg_yaml = os.path.join(target_dir, ".ddev", "config.yaml")
-                    if os.path.exists(cfg_yaml):
-                        with open(cfg_yaml, "a") as f:
-                            f.write("\nweb_extra_exposed_ports:\n  - name: nodejs\n    container_port: 3000\n    http_port: 2999\n    https_port: 3000\n")
-                except Exception:
-                    pass
                 
                 set_st("Levantando contenedores DDEV...")
                 run_subproc(["ddev", "start", "-y"], target_dir, dialog)
@@ -315,19 +336,14 @@ web_extra_daemons:
                     "ddev", "config",
                     f"--project-name={slug}",
                     "--project-type=generic",
-                    "--docroot=dist",
-                    f"--nodejs-version={node_version}",
-                    f"--database={db_type}"
+                    "--docroot=.",
+                    f"--nodejs-version={node_version}"
                 ]
+                if db_type == "none":
+                    cfg_cmd.append("--omit-containers=db")
+                else:
+                    cfg_cmd.append(f"--database={db_type}")
                 run_subproc(cfg_cmd, target_dir, dialog)
-                
-                try:
-                    cfg_yaml = os.path.join(target_dir, ".ddev", "config.yaml")
-                    if os.path.exists(cfg_yaml):
-                        with open(cfg_yaml, "a") as f:
-                            f.write("\nweb_extra_exposed_ports:\n  - name: nodejs\n    container_port: 5173\n    http_port: 5172\n    https_port: 5173\n")
-                except Exception:
-                    pass
                 
                 set_st("Levantando contenedores DDEV...")
                 run_subproc(["ddev", "start", "-y"], target_dir, dialog)
@@ -337,14 +353,26 @@ web_extra_daemons:
                 
                 set_st("Organizando estructura del proyecto...")
                 run_subproc(["ddev", "exec", "sh -c 'cp -a tmp-vite/. . && rm -rf tmp-vite'"], target_dir, dialog)
-                run_subproc(["ddev", "exec", "sed -i 's/\"dev\": \"vite\"/\"dev\": \"vite --host 0.0.0.0\"/g' package.json"], target_dir, dialog)
+                run_subproc(["ddev", "exec", "sed -i 's/\"dev\": \"vite\"/\"dev\": \"vite --host 0.0.0.0 --port 5173\"/g' package.json"], target_dir, dialog)
                 
                 set_st("Instalando dependencias npm...")
                 run_subproc(["ddev", "npm", "install"], target_dir, dialog)
                 
-                set_st("Compilando versión inicial...")
-                run_subproc(["ddev", "npm", "run", "build"], target_dir, dialog)
-                log("\n🎉 Proyecto React listo!")
+                set_st("Configurando Nginx Reverse Proxy y Live Dev Server...")
+                nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
+                os.makedirs(nginx_full_dir, exist_ok=True)
+                with open(os.path.join(nginx_full_dir, "nginx-site.conf"), "w") as nf:
+                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=5173))
+                with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
+                    df.write("""#ddev-silent-no-warn
+web_extra_daemons:
+  - name: react-dev-server
+    command: "npm run dev"
+    directory: /var/www/html
+""")
+                set_st("Reiniciando DDEV para activar React Live Dev Server...")
+                run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
+                log("\n🎉 Proyecto React listo con Live Fast Refresh en segundo plano!")
 
             elif fw_id == "vue":
                 set_st("Configurando DDEV para Vue 3...")
@@ -352,19 +380,14 @@ web_extra_daemons:
                     "ddev", "config",
                     f"--project-name={slug}",
                     "--project-type=generic",
-                    "--docroot=dist",
-                    f"--nodejs-version={node_version}",
-                    f"--database={db_type}"
+                    "--docroot=.",
+                    f"--nodejs-version={node_version}"
                 ]
+                if db_type == "none":
+                    cfg_cmd.append("--omit-containers=db")
+                else:
+                    cfg_cmd.append(f"--database={db_type}")
                 run_subproc(cfg_cmd, target_dir, dialog)
-                
-                try:
-                    cfg_yaml = os.path.join(target_dir, ".ddev", "config.yaml")
-                    if os.path.exists(cfg_yaml):
-                        with open(cfg_yaml, "a") as f:
-                            f.write("\nweb_extra_exposed_ports:\n  - name: nodejs\n    container_port: 5173\n    http_port: 5172\n    https_port: 5173\n")
-                except Exception:
-                    pass
                 
                 set_st("Levantando contenedores DDEV...")
                 run_subproc(["ddev", "start", "-y"], target_dir, dialog)
@@ -374,14 +397,26 @@ web_extra_daemons:
                 
                 set_st("Organizando estructura del proyecto...")
                 run_subproc(["ddev", "exec", "sh -c 'cp -a tmp-vite/. . && rm -rf tmp-vite'"], target_dir, dialog)
-                run_subproc(["ddev", "exec", "sed -i 's/\"dev\": \"vite\"/\"dev\": \"vite --host 0.0.0.0\"/g' package.json"], target_dir, dialog)
+                run_subproc(["ddev", "exec", "sed -i 's/\"dev\": \"vite\"/\"dev\": \"vite --host 0.0.0.0 --port 5173\"/g' package.json"], target_dir, dialog)
                 
                 set_st("Instalando dependencias npm...")
                 run_subproc(["ddev", "npm", "install"], target_dir, dialog)
                 
-                set_st("Compilando versión inicial...")
-                run_subproc(["ddev", "npm", "run", "build"], target_dir, dialog)
-                log("\n🎉 Proyecto Vue listo!")
+                set_st("Configurando Nginx Reverse Proxy y Live Dev Server...")
+                nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
+                os.makedirs(nginx_full_dir, exist_ok=True)
+                with open(os.path.join(nginx_full_dir, "nginx-site.conf"), "w") as nf:
+                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=5173))
+                with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
+                    df.write("""#ddev-silent-no-warn
+web_extra_daemons:
+  - name: vue-dev-server
+    command: "npm run dev"
+    directory: /var/www/html
+""")
+                set_st("Reiniciando DDEV para activar Vue 3 Live Dev Server...")
+                run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
+                log("\n🎉 Proyecto Vue 3 listo con Live Fast Refresh en segundo plano!")
 
             elif fw_id == "django":
                 set_st("Configurando DDEV para Django...")
@@ -610,7 +645,7 @@ web_extra_daemons:
                     "ddev", "config",
                     f"--project-name={slug}",
                     "--project-type=generic",
-                    "--docroot=dist",
+                    "--docroot=.",
                     f"--nodejs-version={node_version}",
                     "--web-environment-add=NG_CLI_ANALYTICS=false"
                 ]
@@ -624,42 +659,14 @@ web_extra_daemons:
                 run_subproc(["ddev", "start", "-y"], target_dir, dialog)
                 
                 set_st("Creando proyecto Angular con @angular/cli...")
-                run_subproc(["ddev", "exec", "NG_CLI_ANALYTICS=false npx -y @angular/cli new app --directory=. --routing --style=css --skip-git --defaults"], target_dir, dialog)
+                run_subproc(["ddev", "exec", "NG_CLI_ANALYTICS=false npx -y @angular/cli new tmp-ng --routing --style=css --skip-git --defaults"], target_dir, dialog)
+                run_subproc(["ddev", "exec", "sh -c 'cp -a tmp-ng/. . && rm -rf tmp-ng'"], target_dir, dialog)
                 
                 set_st("Configurando Nginx Reverse Proxy y Live Dev Server...")
                 nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
                 os.makedirs(nginx_full_dir, exist_ok=True)
                 with open(os.path.join(nginx_full_dir, "nginx-site.conf"), "w") as nf:
-                    nf.write("""server {
-    listen 80 default_server;
-    listen 443 ssl default_server;
-
-    root /var/www/html;
-
-    ssl_certificate /etc/ssl/certs/master.crt;
-    ssl_certificate_key /etc/ssl/certs/master.key;
-
-    include /etc/nginx/monitoring.conf;
-
-    error_log /dev/stdout info;
-    access_log /var/log/nginx/access.log;
-
-    location / {
-        proxy_pass http://127.0.0.1:4200;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 600s;
-    }
-
-    include /etc/nginx/common.d/*.conf;
-    include /mnt/ddev_config/nginx/*.conf;
-}
-""")
+                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=4200))
                 with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
                     df.write("""#ddev-silent-no-warn
 web_extra_daemons:
@@ -687,7 +694,8 @@ web_extra_daemons:
                 run_subproc(["ddev", "start", "-y"], target_dir, dialog)
                 
                 set_st("Descargando Symfony...")
-                run_subproc(["ddev", "composer", "create-project", "symfony/skeleton", "."], target_dir, dialog)
+                run_subproc(["ddev", "composer", "create-project", "symfony/skeleton", "tmp-symfony"], target_dir, dialog)
+                run_subproc(["ddev", "exec", "sh -c 'cp -a tmp-symfony/. . && rm -rf tmp-symfony'"], target_dir, dialog)
                 run_subproc(["ddev", "composer", "require", "webapp"], target_dir, dialog)
                 log("\n🎉 Proyecto Symfony listo!")
 

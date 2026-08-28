@@ -94,6 +94,10 @@ CUSTOM_CSS = b"""
     background-color: #f59e0b;
     color: white;
 }
+.badge-danger {
+    background-color: #ef4444;
+    color: white;
+}
 .badge-tech {
     background-color: alpha(@theme_selected_bg_color, 0.25);
     color: @theme_text_color;
@@ -275,9 +279,10 @@ FRAMEWORKS = [
         "category": "Frontend SPA",
         "desc": "Plataforma y framework TypeScript de Google para aplicaciones web escalables.",
         "icon": "angular.svg",
-        "php": "8.2",
-        "docroot": "dist",
-        "db": "mariadb:10.11",
+        "php": "8.3",
+        "nodejs": "22",
+        "docroot": ".",
+        "db": "none",
     },
     {
         "id": "nextjs",
@@ -296,9 +301,10 @@ FRAMEWORKS = [
         "category": "Frontend SPA",
         "desc": "Desarrollo rápido con Vite + React (TypeScript/JavaScript).",
         "icon": "react.svg",
-        "php": "8.2",
-        "docroot": "dist",
-        "db": "mariadb:10.11",
+        "php": "8.3",
+        "nodejs": "22",
+        "docroot": ".",
+        "db": "none",
     },
     {
         "id": "vue",
@@ -306,9 +312,10 @@ FRAMEWORKS = [
         "category": "Frontend SPA",
         "desc": "Vite + Vue 3 con Fast Refresh y Node.js integrado.",
         "icon": "vue.svg",
-        "php": "8.2",
-        "docroot": "dist",
-        "db": "mariadb:10.11",
+        "php": "8.3",
+        "nodejs": "22",
+        "docroot": ".",
+        "db": "none",
     },
     {
         "id": "php",

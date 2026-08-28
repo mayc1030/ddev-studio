@@ -844,13 +844,23 @@ class DDEVManagerWindow(Gtk.Window):
         title_row.pack_start(lbl_name, False, False, 0)
         
         status = proj.get("status", "").lower()
-        lbl_status = Gtk.Label(label=status.upper())
+        approot = proj.get("approot", "")
+        exists_on_disk = approot and os.path.exists(approot)
+        is_missing = ("missing" in status) or (not exists_on_disk)
+        
+        lbl_status = Gtk.Label()
         lbl_status.get_style_context().add_class("badge")
-        if "running" in status or "ok" in status:
+        if is_missing:
+            lbl_status.set_label("CARPETA NO ENCONTRADA")
+            lbl_status.get_style_context().add_class("badge-danger")
+        elif "running" in status or "ok" in status:
+            lbl_status.set_label(status.upper())
             lbl_status.get_style_context().add_class("badge-running")
         elif "paused" in status:
+            lbl_status.set_label(status.upper())
             lbl_status.get_style_context().add_class("badge-paused")
         else:
+            lbl_status.set_label(status.upper())
             lbl_status.get_style_context().add_class("badge-stopped")
         title_row.pack_start(lbl_status, False, False, 0)
         
@@ -859,7 +869,6 @@ class DDEVManagerWindow(Gtk.Window):
         lbl_type.get_style_context().add_class("badge-tech")
         title_row.pack_start(lbl_type, False, False, 0)
         
-        approot = proj.get("approot", "")
         is_drupal = "drupal" in ptype or (approot and (os.path.exists(os.path.join(approot, "docroot", "sites")) or os.path.exists(os.path.join(approot, "web", "sites")) or os.path.exists(os.path.join(approot, "sites"))))
         if is_drupal:
             subsite_count = 0
@@ -895,7 +904,7 @@ class DDEVManagerWindow(Gtk.Window):
         
         primary_url = proj.get("primary_url") or proj.get("httpsurl") or proj.get("httpurl") or ""
         lbl_url = Gtk.Label()
-        if primary_url:
+        if primary_url and not is_missing:
             lbl_url.set_markup(f"🌐 <a href='{primary_url}'><b>{primary_url}</b></a>")
         else:
             lbl_url.set_markup("<span color='#9ca3af'>🌐 Sin URL activa</span>")
@@ -903,7 +912,9 @@ class DDEVManagerWindow(Gtk.Window):
         info_box.pack_start(lbl_url, False, False, 0)
         
         lbl_path = Gtk.Label()
-        if approot:
+        if is_missing:
+            lbl_path.set_markup(f"<small><span color='#ef4444'>⚠️ <b>Carpeta no encontrada en disco:</b> {approot}</span></small>")
+        elif approot:
             lbl_path.set_markup(f"<small><span color='#94a3b8'>📁 <b>Ubicación:</b> {approot}</span></small>")
         else:
             lbl_path.set_markup("<small><span color='#94a3b8'>📁 <i>Ubicación no disponible</i></span></small>")
@@ -913,6 +924,21 @@ class DDEVManagerWindow(Gtk.Window):
         card.pack_start(info_box, True, True, 0)
         
         actions_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        actions_box.set_valign(Gtk.Align.CENTER)
+        
+        if is_missing:
+            btn_del_orphan = Gtk.Button()
+            btn_del_orphan.get_style_context().add_class("btn-primary")
+            b_del_orphan_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_del_orphan_box.pack_start(Gtk.Image.new_from_icon_name("user-trash-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+            b_del_orphan_box.pack_start(Gtk.Label(label="Desregistrar / Eliminar"), False, False, 0)
+            btn_del_orphan.add(b_del_orphan_box)
+            btn_del_orphan.set_tooltip_text("Desregistrar y eliminar proyecto huérfano de DDEV (ddev stop --unlist / delete)")
+            btn_del_orphan.connect("clicked", lambda b, p=proj: self.confirm_delete_project(p))
+            actions_box.pack_start(btn_del_orphan, False, False, 0)
+            
+            card.pack_start(actions_box, False, False, 0)
+            return card
         actions_box.set_valign(Gtk.Align.CENTER)
         
         is_running = "running" in status or "ok" in status
@@ -1243,36 +1269,65 @@ class DDEVManagerWindow(Gtk.Window):
     def execute_simple_action(self, action, proj):
         approot = proj.get("approot", "")
         pname = proj.get("name", "")
+        exists_on_disk = bool(approot and os.path.exists(approot))
         
         dialog = ProgressDialog(self, title=f"{action.capitalize()} {pname}")
         dialog.set_status(f"Ejecutando ddev {action} en {pname}...")
         
         def task():
-            cmd = ["ddev"] + action.split()
-            process = subprocess.Popen(
-                cmd,
-                cwd=approot,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1
-            )
-            for line in iter(process.stdout.readline, ''):
-                if line:
-                    GLib.idle_add(dialog.append_log, line)
-            process.stdout.close()
-            process.wait()
-            success = (process.returncode == 0)
-            url = proj.get("primary_url", "") if "start" in action else ""
-            msg = f"Proyecto {pname} {action} con éxito" if success else f"Error al ejecutar {action}"
-            GLib.idle_add(dialog.finish, success, msg, url, approot)
-            GLib.idle_add(self.refresh_projects)
+            try:
+                cmd = ["ddev"] + action.split()
+                if "delete" in action or not exists_on_disk:
+                    if pname and pname not in cmd:
+                        cmd.append(pname)
+                    if "-y" not in cmd and "delete" in action:
+                        cmd.append("-y")
+                    effective_cwd = approot if exists_on_disk else None
+                else:
+                    effective_cwd = approot
+                
+                cmd_str = " ".join(cmd)
+                GLib.idle_add(dialog.append_log, f"$ {cmd_str}\n")
+                
+                process = subprocess.Popen(
+                    cmd,
+                    cwd=effective_cwd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+                for line in iter(process.stdout.readline, ''):
+                    if line:
+                        GLib.idle_add(dialog.append_log, line)
+                process.stdout.close()
+                process.wait()
+                success = (process.returncode == 0)
+                
+                # If ddev delete -O failed on an orphaned project, fallback to ddev stop --unlist
+                if not success and ("delete" in action or not exists_on_disk):
+                    GLib.idle_add(dialog.append_log, f"\nIntentando desregistrar con 'ddev stop --unlist {pname}'...\n")
+                    p_fallback = subprocess.run(["ddev", "stop", "--unlist", pname], capture_output=True, text=True)
+                    if p_fallback.stdout:
+                        GLib.idle_add(dialog.append_log, p_fallback.stdout + "\n")
+                    if p_fallback.returncode == 0:
+                        success = True
+                
+                url = proj.get("primary_url", "") if "start" in action else ""
+                msg = f"Proyecto {pname} {action} con éxito" if success else f"Error al ejecutar {action}"
+                GLib.idle_add(dialog.finish, success, msg, url, approot)
+                GLib.idle_add(self.refresh_projects)
+            except Exception as ex:
+                GLib.idle_add(dialog.append_log, f"\nExcepción: {str(ex)}\n")
+                GLib.idle_add(dialog.finish, False, f"Error: {str(ex)}", "", approot)
+                GLib.idle_add(self.refresh_projects)
             
         threading.Thread(target=task, daemon=True).start()
 
     def confirm_delete_project(self, proj):
         pname = proj.get("name", "")
         approot = proj.get("approot", "")
+        exists_on_disk = bool(approot and os.path.exists(approot))
         
         dialog = Gtk.MessageDialog(
             transient_for=self,
@@ -1281,9 +1336,15 @@ class DDEVManagerWindow(Gtk.Window):
             buttons=Gtk.ButtonsType.OK_CANCEL,
             text=f"¿Estás seguro de eliminar '{pname}'?"
         )
-        dialog.format_secondary_text(
-            f"Se detendrán y eliminarán los contenedores y base de datos de DDEV.\nUbicación: {approot}\n\nNota: Los archivos de tu código fuente permanecerán seguros."
-        )
+        if not exists_on_disk:
+            dialog.format_secondary_text(
+                f"La carpeta local de este proyecto ({approot}) no existe en el disco.\n\n"
+                f"DDEV detendrá y desregistrará cualquier contenedor o registro huérfano asociado a '{pname}'."
+            )
+        else:
+            dialog.format_secondary_text(
+                f"Se detendrán y eliminarán los contenedores y base de datos de DDEV.\nUbicación: {approot}\n\nNota: Los archivos de tu código fuente permanecerán seguros."
+            )
         res = dialog.run()
         dialog.destroy()
         
