@@ -106,12 +106,9 @@ def generate_ci_workflow(tech_type, options=None):
         uses: actions/checkout@v4
 
       - name: Set up DDEV environment
-        uses: ddev/github-action@v1
+        uses: ddev/github-action-setup-ddev@v1
         with:
-          ddev-version: stable
-
-      - name: Start DDEV
-        run: ddev start -y
+          autostart: true
 """
             if include_tests:
                 steps += """
