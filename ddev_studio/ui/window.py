@@ -693,15 +693,16 @@ class DDEVManagerWindow(Gtk.Window):
         
         self.box_projects_list_view.pack_start(search_box, False, False, 0)
         
-        # Barra horizontal de chips de categorías con iconos SVG
-        self.categories_scroller = Gtk.ScrolledWindow()
-        self.categories_scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
-        self.categories_scroller.get_style_context().add_class("category-chips-scroller")
-        self.categories_scroller.set_min_content_height(38)
-        
-        self.categories_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        self.categories_scroller.add(self.categories_box)
-        self.box_projects_list_view.pack_start(self.categories_scroller, False, False, 0)
+        # Barra responsiva de chips de categorías con FlowBox (Wrap automático multilínea sin scroll)
+        self.categories_flow = Gtk.FlowBox()
+        self.categories_flow.set_valign(Gtk.Align.START)
+        self.categories_flow.set_max_children_per_line(30)
+        self.categories_flow.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.categories_flow.set_homogeneous(False)
+        self.categories_flow.set_column_spacing(6)
+        self.categories_flow.set_row_spacing(6)
+        self.categories_flow.get_style_context().add_class("category-chips-flow")
+        self.box_projects_list_view.pack_start(self.categories_flow, False, False, 0)
         
         self.projects_scrolled = Gtk.ScrolledWindow()
         self.projects_scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -806,16 +807,16 @@ class DDEVManagerWindow(Gtk.Window):
             p["_tech_family"] = cat_id
             cat_counts[cat_id] = cat_counts.get(cat_id, 0) + 1
             
-        # Reconstruir botones de chip con iconos SVG
-        for child in self.categories_box.get_children():
-            self.categories_box.remove(child)
+        # Reconstruir botones de chip en FlowBox
+        for child in self.categories_flow.get_children():
+            self.categories_flow.remove(child)
         self.category_buttons = {}
         
         if self.active_category != "all" and cat_counts.get(self.active_category, 0) == 0:
             self.active_category = "all"
             
         if projects:
-            self.categories_scroller.show()
+            self.categories_flow.show()
             for cat in TECH_CATEGORIES:
                 cat_id = cat["id"]
                 count = cat_counts.get(cat_id, 0)
@@ -841,11 +842,11 @@ class DDEVManagerWindow(Gtk.Window):
                 
                 btn.add(btn_content)
                 btn.connect("clicked", lambda b, c=cat_id: self.set_active_category(c))
-                self.categories_box.pack_start(btn, False, False, 0)
+                self.categories_flow.add(btn)
                 self.category_buttons[cat_id] = btn
-            self.categories_box.show_all()
+            self.categories_flow.show_all()
         else:
-            self.categories_scroller.hide()
+            self.categories_flow.hide()
             empty_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
             empty_box.set_margin_top(40)
             

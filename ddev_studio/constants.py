@@ -118,9 +118,21 @@ CUSTOM_CSS = b"""
     background: alpha(@theme_selected_bg_color, 0.08);
     padding: 12px 16px;
 }
-.category-chips-scroller {
+.category-chips-flow {
     background: transparent;
-    padding: 2px 0px;
+    padding: 2px 0px 4px 0px;
+}
+.category-chips-flow flowboxchild {
+    background: transparent;
+    padding: 0px;
+    margin: 0px;
+    border: none;
+}
+.category-chips-flow flowboxchild:selected,
+.category-chips-flow flowboxchild:active,
+.category-chips-flow flowboxchild:hover {
+    background: transparent;
+    border: none;
 }
 .category-chip {
     border-radius: 20px;
