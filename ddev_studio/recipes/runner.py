@@ -435,6 +435,36 @@ web_extra_daemons:
                 run_subproc(["ddev", "exec", "sh -c 'cp -a tmp-vite/. . && rm -rf tmp-vite'"], target_dir, dialog)
                 run_subproc(["ddev", "exec", "sed -i 's/\"dev\": \"vite\"/\"dev\": \"vite --host 0.0.0.0 --port 5173\"/g' package.json"], target_dir, dialog)
                 
+                set_st("Configurando Vite para DDEV (allowedHosts y HMR)...")
+                vite_cfg_ts = os.path.join(target_dir, "vite.config.ts")
+                vite_cfg_js = os.path.join(target_dir, "vite.config.js")
+                vue_vite_config = """import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [vue()],
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: true,
+    allowedHosts: true,
+    hmr: {
+      clientPort: 443,
+    },
+  },
+})
+"""
+                if os.path.exists(vite_cfg_ts):
+                    with open(vite_cfg_ts, "w") as f:
+                        f.write(vue_vite_config)
+                elif os.path.exists(vite_cfg_js):
+                    with open(vite_cfg_js, "w") as f:
+                        f.write(vue_vite_config)
+                else:
+                    with open(vite_cfg_ts, "w") as f:
+                        f.write(vue_vite_config)
+                
                 set_st("Instalando dependencias npm...")
                 run_subproc(["ddev", "npm", "install"], target_dir, dialog)
                 
