@@ -13,6 +13,7 @@ import threading
 import shutil
 import webbrowser
 import time
+from datetime import datetime
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -1060,6 +1061,7 @@ class SubsitesManagerView(Gtk.Box):
             
         self.subsites = subsites
         if base_proj:
+            self.proj = base_proj
             st = base_proj.get("status", "stopped").lower()
             is_run = "running" in st or "ok" in st
             php_v = base_proj.get("php_version", "8.3")
@@ -1314,6 +1316,9 @@ class SubsitesManagerView(Gtk.Box):
             filter_all.set_name("Todos los archivos")
             filter_all.add_pattern("*")
             dialog.add_filter(filter_all)
+            dialog.set_modal(True)
+            dialog.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
+            dialog.present()
             
             resp = dialog.run()
             src_file = dialog.get_filename()
@@ -1370,6 +1375,9 @@ class SubsitesManagerView(Gtk.Box):
             dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
             dialog.set_current_name(default_filename)
             dialog.set_do_overwrite_confirmation(True)
+            dialog.set_modal(True)
+            dialog.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
+            dialog.present()
             
             downloads_dir = os.path.expanduser("~/Descargas")
             if not os.path.exists(downloads_dir):
