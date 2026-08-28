@@ -41,6 +41,38 @@ if (is_dir($sites_base)) {
 }
 '''
 
+NGINX_FULL_PROXY_TEMPLATE = '''#ddev-silent-no-warn
+server {{
+    listen 80 default_server;
+    listen 443 ssl default_server;
+
+    root /var/www/html;
+
+    ssl_certificate /etc/ssl/certs/master.crt;
+    ssl_certificate_key /etc/ssl/certs/master.key;
+
+    include /etc/nginx/monitoring.conf;
+
+    error_log /dev/stdout info;
+    access_log /var/log/nginx/access.log;
+
+    location / {{
+        proxy_pass http://127.0.0.1:{port};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 600s;
+    }}
+
+    include /etc/nginx/common.d/*.conf;
+    include /mnt/ddev_config/nginx/*.conf;
+}}
+'''
+
 
 def run_create_project(parent_window, raw_name, base_dir, clean_target_before, fw, drupal_ver_info, php_version, db_type, node_version, auto_install, is_multisite_enabled, on_success_callback=None):
     """
@@ -265,17 +297,7 @@ def run_create_project(parent_window, raw_name, base_dir, clean_target_before, f
                 nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
                 os.makedirs(nginx_full_dir, exist_ok=True)
                 with open(os.path.join(nginx_full_dir, "nginx-site.conf"), "w") as nf:
-                    nf.write("""location / {
-    proxy_pass http://127.0.0.1:3000;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-""")
+                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=3000))
                 with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
                     df.write("""#ddev-silent-no-warn
 web_extra_daemons:
@@ -789,17 +811,7 @@ def run_import_project(parent_window, target_dir, slug, p_type, docroot, php_ver
             if p_type == "django":
                 os.makedirs(os.path.join(target_dir, ".ddev", "nginx_full"), exist_ok=True)
                 with open(os.path.join(target_dir, ".ddev", "nginx_full", "nginx-site.conf"), "w") as nf:
-                    nf.write("""location / {
-    proxy_pass http://127.0.0.1:8000;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-""")
+                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=8000))
                 with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
                     df.write("""#ddev-silent-no-warn
 web_extra_daemons:
@@ -810,17 +822,7 @@ web_extra_daemons:
             elif p_type == "flask":
                 os.makedirs(os.path.join(target_dir, ".ddev", "nginx_full"), exist_ok=True)
                 with open(os.path.join(target_dir, ".ddev", "nginx_full", "nginx-site.conf"), "w") as nf:
-                    nf.write("""location / {
-    proxy_pass http://127.0.0.1:5000;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-""")
+                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=5000))
                 with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
                     df.write("""#ddev-silent-no-warn
 web_extra_daemons:
@@ -831,17 +833,7 @@ web_extra_daemons:
             elif p_type == "angular":
                 os.makedirs(os.path.join(target_dir, ".ddev", "nginx_full"), exist_ok=True)
                 with open(os.path.join(target_dir, ".ddev", "nginx_full", "nginx-site.conf"), "w") as nf:
-                    nf.write("""location / {
-    proxy_pass http://127.0.0.1:4200;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-""")
+                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=4200))
                 with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
                     df.write("""#ddev-silent-no-warn
 web_extra_daemons:
@@ -852,17 +844,7 @@ web_extra_daemons:
             elif p_type == "nextjs":
                 os.makedirs(os.path.join(target_dir, ".ddev", "nginx_full"), exist_ok=True)
                 with open(os.path.join(target_dir, ".ddev", "nginx_full", "nginx-site.conf"), "w") as nf:
-                    nf.write("""location / {
-    proxy_pass http://127.0.0.1:3000;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-""")
+                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=3000))
                 with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
                     df.write("""#ddev-silent-no-warn
 web_extra_daemons:

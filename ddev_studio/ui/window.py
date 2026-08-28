@@ -555,7 +555,7 @@ class DDEVManagerWindow(Gtk.Window):
             
             is_drupal = (fw_id == "drupal")
             is_php = fw_id in ["drupal", "wordpress", "laravel", "symfony", "php"]
-            is_node = fw_id in ["angular", "react", "vue", "generic"]
+            is_node = fw_id in ["nextjs", "angular", "react", "vue", "generic"]
             is_python = fw_id in ["django", "flask"]
             
             # Show/hide Drupal version selector
