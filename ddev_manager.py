@@ -2864,7 +2864,7 @@ class DDEVManagerWindow(Gtk.Window):
         header = Gtk.HeaderBar()
         header.set_show_close_button(True)
         header.props.title = "DDEV Studio"
-        header.props.subtitle = "Ubuntu MATE"
+        header.props.subtitle = ""
         self.set_titlebar(header)
         
         btn_refresh = Gtk.Button()
