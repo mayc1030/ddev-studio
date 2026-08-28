@@ -14,6 +14,7 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import GLib
 
 from ddev_studio.constants import FRAMEWORKS, DRUPAL_VERSIONS
+from ddev_studio.core.detector import sanitize_project_name
 from ddev_studio.core.process import run_subproc
 from ddev_studio.ui.dialogs.progress import ProgressDialog
 
@@ -45,7 +46,8 @@ def run_create_project(parent_window, raw_name, base_dir, clean_target_before, f
     """
     Ejecuta el flujo completo de creación y scaffolding para el framework seleccionado.
     """
-    slug = re.sub(r'[^a-zA-Z0-9_-]', '-', raw_name).lower()
+    slug = sanitize_project_name(raw_name)
+    node_version = re.sub(r'[^\d]', '', str(node_version or '')) or "22"
     target_dir = os.path.join(base_dir, slug)
     fw_id = fw["id"]
     
@@ -725,8 +727,11 @@ def run_import_project(parent_window, target_dir, slug, p_type, docroot, php_ver
     """
     Ejecuta el flujo de importación y configuración de un proyecto local existente en DDEV.
     """
+    slug = sanitize_project_name(slug or os.path.basename(target_dir.rstrip("/")))
+    node_ver = re.sub(r'[^\d]', '', str(node_ver or '')) or "22"
+    
     is_php = ("drupal" in p_type) or p_type in ["laravel", "php", "symfony", "wordpress"]
-    is_node = p_type in ["angular", "react", "vue", "generic"]
+    is_node = p_type in ["angular", "react", "vue", "nextjs", "generic"]
     is_python = p_type in ["django", "flask"]
     
     dialog = ProgressDialog(parent_window, title=f"Importando Proyecto: {slug}")
@@ -752,7 +757,7 @@ def run_import_project(parent_window, target_dir, slug, p_type, docroot, php_ver
             # 1. ddev config
             set_st("Configurando DDEV en el proyecto...")
             ddev_type = p_type
-            if p_type in ["angular", "react", "vue", "django", "flask"]:
+            if p_type in ["angular", "react", "vue", "nextjs", "django", "flask"]:
                 ddev_type = "generic"
             elif p_type == "symfony":
                 ddev_type = "php"

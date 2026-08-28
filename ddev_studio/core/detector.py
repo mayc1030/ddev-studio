@@ -8,6 +8,19 @@ import os
 import re
 
 
+def sanitize_project_name(raw_name: str) -> str:
+    """
+    Sanitiza el nombre del proyecto para que sea un hostname DNS RFC 1123 válido para DDEV
+    (solo caracteres alfanuméricos en minúsculas y guiones, sin guiones bajos ni guiones al inicio/final).
+    """
+    if not raw_name:
+        return ""
+    slug = str(raw_name).replace("_", "-")
+    slug = re.sub(r'[^a-zA-Z0-9-]', '-', slug).lower()
+    slug = re.sub(r'-+', '-', slug)
+    return slug.strip('-')
+
+
 def detect_project_details(folder_path):
     """
     Analiza un directorio local y autodetecta el framework, docroot, versiones de PHP/Node y base de datos.
@@ -27,7 +40,7 @@ def detect_project_details(folder_path):
         }
         
     pname = os.path.basename(folder_path.rstrip("/"))
-    slug = re.sub(r'[^a-zA-Z0-9_-]', '-', pname).lower()
+    slug = sanitize_project_name(pname)
     
     # 1. Detect Docroot
     docroot = "."

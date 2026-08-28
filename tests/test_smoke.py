@@ -21,8 +21,18 @@ from ddev_studio.constants import (
     CUSTOM_CSS,
     ICONS_DIR
 )
-from ddev_studio.core.detector import detect_project_details, inspect_project_stack
+from ddev_studio.core.detector import detect_project_details, inspect_project_stack, sanitize_project_name
 from ddev_studio.core.terminal import find_terminal_command
+
+
+class TestSanitizeName(unittest.TestCase):
+    def test_hostname_sanitization(self):
+        self.assertEqual(sanitize_project_name("test_next"), "test-next")
+        self.assertEqual(sanitize_project_name("My_Awesome_App"), "my-awesome-app")
+        self.assertEqual(sanitize_project_name("_leading_and_trailing_"), "leading-and-trailing")
+        self.assertEqual(sanitize_project_name("special@chars#123"), "special-chars-123")
+        self.assertEqual(sanitize_project_name("multiple---dashes"), "multiple-dashes")
+        self.assertEqual(sanitize_project_name(""), "")
 
 
 class TestConstants(unittest.TestCase):

@@ -20,7 +20,7 @@ from ddev_studio.constants import (
     FRAMEWORKS,
     DRUPAL_VERSIONS
 )
-from ddev_studio.core.detector import detect_project_details, inspect_project_stack
+from ddev_studio.core.detector import detect_project_details, inspect_project_stack, sanitize_project_name
 from ddev_studio.core.process import run_subproc
 from ddev_studio.core.terminal import open_terminal
 from ddev_studio.recipes.runner import run_create_project, run_import_project
@@ -640,7 +640,7 @@ class DDEVManagerWindow(Gtk.Window):
 
     def on_project_name_changed(self, entry):
         raw_name = entry.get_text().strip()
-        slug = re.sub(r'[^a-zA-Z0-9_-]', '-', raw_name).lower()
+        slug = sanitize_project_name(raw_name)
         base_dir = self.entry_path.get_text().strip()
         final_path = os.path.join(base_dir, slug if slug else "")
         self.lbl_path_preview.set_markup(f"<small>Carpeta final: <tt>{final_path}</tt></small>")
@@ -1585,14 +1585,17 @@ class DDEVManagerWindow(Gtk.Window):
             return
             
         raw_name = self.entry_import_name.get_text().strip()
-        slug = re.sub(r'[^a-zA-Z0-9_-]', '-', raw_name).lower()
+        slug = sanitize_project_name(raw_name)
         if not slug:
-            slug = os.path.basename(target_dir.rstrip("/"))
+            slug = sanitize_project_name(os.path.basename(target_dir.rstrip("/")))
             
         p_type = self.combo_import_type.get_active_id() or "drupal10"
         docroot = self.combo_import_docroot.get_active_text() or "docroot"
         php_ver = self.combo_import_php.get_active_text() or "8.3"
-        node_ver = self.combo_import_nodejs.get_active_id() if hasattr(self, "combo_import_nodejs") else "22"
+        raw_node = self.combo_import_nodejs.get_active_id() if hasattr(self, "combo_import_nodejs") else "22"
+        if not raw_node and hasattr(self, "combo_import_nodejs"):
+            raw_node = self.combo_import_nodejs.get_active_text()
+        node_ver = re.sub(r'[^\d]', '', str(raw_node or '')) or "22"
         db_type = self.combo_import_db.get_active_id() or "mariadb:10.11"
         is_multisite = ("drupal" in p_type) and self.chk_import_multisite.get_active()
         do_composer = self.chk_import_composer.get_active()
@@ -1617,14 +1620,14 @@ class DDEVManagerWindow(Gtk.Window):
 
     def on_create_project_clicked(self, widget):
         raw_name = self.entry_name.get_text().strip()
-        slug = re.sub(r'[^a-zA-Z0-9_-]', '-', raw_name).lower()
+        slug = sanitize_project_name(raw_name)
         if not slug:
             msg_diag = Gtk.MessageDialog(
                 transient_for=self,
                 flags=0,
                 message_type=Gtk.MessageType.ERROR,
                 buttons=Gtk.ButtonsType.OK,
-                text="Por favor ingresa un nombre para el proyecto"
+                text="Por favor ingresa un nombre válido para el proyecto"
             )
             msg_diag.run()
             msg_diag.destroy()
@@ -1669,7 +1672,8 @@ class DDEVManagerWindow(Gtk.Window):
 
         php_version = self.combo_php.get_active_text() or fw.get("php", "8.3")
         db_type = self.combo_db.get_active_id() or self.combo_db.get_active_text() or fw.get("db", "mariadb:10.11")
-        node_version = self.combo_node.get_active_text() or "22"
+        raw_node = self.combo_node.get_active_id() or self.combo_node.get_active_text() or "22"
+        node_version = re.sub(r'[^\d]', '', str(raw_node or '')) or "22"
         auto_install = self.chk_auto_install.get_active()
         is_multisite_enabled = getattr(self, "chk_enable_multisite", None) and self.chk_enable_multisite.get_active()
         
