@@ -30,6 +30,12 @@ services:
       - HTTP_EXPOSE=8978:8978
       - HTTPS_EXPOSE=8979:8978
       - CB_SERVER_NAME=DDEV Studio (${DDEV_SITENAME})
+      - CB_SERVER_URL=https://${DDEV_HOSTNAME}:8979
+      - CB_ADMIN_NAME=ddev
+      - CB_ADMIN_PASSWORD=ddev
+      - CLOUDBEAVER_APP_ANONYMOUS_ACCESS_ENABLED=true
+      - CLOUDBEAVER_APP_GRANT_CONNECTIONS_ACCESS_TO_ANONYMOUS_TEAM=true
+      - CLOUDBEAVER_APP_SUPPORTS_CUSTOM_CONNECTIONS=true
     volumes:
       - "./cloudbeaver/workspace:/opt/cloudbeaver/workspace"
 """
