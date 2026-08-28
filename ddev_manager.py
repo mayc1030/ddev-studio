@@ -2399,9 +2399,9 @@ class ProjectDetailsView(Gtk.Box):
                 
                 success = (p.returncode == 0)
                 msg = f"Base de datos exportada con éxito en:\n{target_file}" if success else "Error al exportar la base de datos"
-                GLib.idle_add(dialog.finish, success, msg)
+                GLib.idle_add(dialog.finish, success, msg, "", os.path.dirname(target_file))
             except Exception as ex:
-                GLib.idle_add(dialog.finish, False, f"Error: {ex}")
+                GLib.idle_add(dialog.finish, False, f"Error: {ex}", "", approot)
                 
         threading.Thread(target=task, daemon=True).start()
 
@@ -2423,15 +2423,14 @@ class ProjectDetailsView(Gtk.Box):
                 
                 success = (p.returncode == 0)
                 msg = f"Base de datos importada con éxito desde:\n{source_file}" if success else "Error al importar la base de datos"
-                GLib.idle_add(dialog.finish, success, msg)
+                GLib.idle_add(dialog.finish, success, msg, "", approot)
                 GLib.idle_add(self.refresh_details)
             except Exception as ex:
-                GLib.idle_add(dialog.finish, False, f"Error: {ex}")
+                GLib.idle_add(dialog.finish, False, f"Error: {ex}", "", approot)
                 
         threading.Thread(target=task, daemon=True).start()
 
     def on_export_db_clicked(self, approot, pname):
-        import datetime
         chooser = Gtk.FileChooserDialog(
             title=f"Exportar Base de Datos ({pname})",
             parent=self.main_app,
@@ -2440,11 +2439,21 @@ class ProjectDetailsView(Gtk.Box):
         chooser.add_button("Cancelar", Gtk.ResponseType.CANCEL)
         chooser.add_button("Exportar", Gtk.ResponseType.OK)
         chooser.set_do_overwrite_confirmation(True)
+        chooser.set_modal(True)
+        chooser.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
         
-        default_filename = f"{pname}_db_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.sql.gz"
+        now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_filename = f"{pname}_db_{now_str}.sql.gz"
         chooser.set_current_name(default_filename)
-        chooser.set_current_folder(os.path.expanduser("~"))
         
+        downloads_dir = os.path.expanduser("~/Descargas")
+        if not os.path.exists(downloads_dir):
+            downloads_dir = os.path.expanduser("~/Downloads")
+        if os.path.exists(downloads_dir):
+            chooser.set_current_folder(downloads_dir)
+        else:
+            chooser.set_current_folder(os.path.expanduser("~"))
+            
         filter_sql_gz = Gtk.FileFilter()
         filter_sql_gz.set_name("SQL Comprimido (*.sql.gz)")
         filter_sql_gz.add_pattern("*.sql.gz")
@@ -2460,6 +2469,7 @@ class ProjectDetailsView(Gtk.Box):
         filter_all.add_pattern("*")
         chooser.add_filter(filter_all)
         
+        chooser.present()
         resp = chooser.run()
         target_path = chooser.get_filename()
         chooser.destroy()
@@ -2475,8 +2485,17 @@ class ProjectDetailsView(Gtk.Box):
         )
         chooser.add_button("Cancelar", Gtk.ResponseType.CANCEL)
         chooser.add_button("Importar", Gtk.ResponseType.OK)
-        chooser.set_current_folder(os.path.expanduser("~"))
+        chooser.set_modal(True)
+        chooser.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
         
+        downloads_dir = os.path.expanduser("~/Descargas")
+        if not os.path.exists(downloads_dir):
+            downloads_dir = os.path.expanduser("~/Downloads")
+        if os.path.exists(downloads_dir):
+            chooser.set_current_folder(downloads_dir)
+        else:
+            chooser.set_current_folder(os.path.expanduser("~"))
+            
         filter_db = Gtk.FileFilter()
         filter_db.set_name("Respaldos de Base de Datos (*.sql, *.sql.gz, *.tar.gz, *.zip)")
         filter_db.add_pattern("*.sql")
@@ -2490,6 +2509,7 @@ class ProjectDetailsView(Gtk.Box):
         filter_all.add_pattern("*")
         chooser.add_filter(filter_all)
         
+        chooser.present()
         resp = chooser.run()
         source_path = chooser.get_filename()
         chooser.destroy()
@@ -4449,6 +4469,16 @@ class DDEVManagerWindow(Gtk.Window):
     def open_project_details(self, proj):
         self.project_details_view.load_project_details(proj)
         self.stack_projects_tab.set_visible_child_name("details")
+
+    def on_export_db(self, widget, proj):
+        approot = proj.get("approot", "")
+        pname = proj.get("name", "")
+        self.project_details_view.on_export_db_clicked(approot, pname)
+
+    def on_import_db(self, widget, proj):
+        approot = proj.get("approot", "")
+        pname = proj.get("name", "")
+        self.project_details_view.on_import_db_clicked(approot, pname)
 
     def show_projects_list(self):
         self.stack_projects_tab.set_visible_child_name("list")
