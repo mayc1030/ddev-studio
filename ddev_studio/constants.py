@@ -226,6 +226,55 @@ CUSTOM_CSS = b"""
 .btn-back:hover {
     background-color: alpha(@theme_selected_bg_color, 0.3);
 }
+
+.marketplace-header-box {
+    background: alpha(@theme_base_color, 0.5);
+    border: 1px solid rgba(128, 128, 128, 0.2);
+    border-radius: 12px;
+    padding: 12px 16px;
+}
+.addon-card {
+    border-radius: 12px;
+    border: 1px solid rgba(128, 128, 128, 0.22);
+    background: alpha(@theme_base_color, 0.6);
+    padding: 14px;
+    min-height: 175px;
+    transition: all 180ms ease-in-out;
+}
+.addon-card:hover {
+    border-color: @theme_selected_bg_color;
+    background: alpha(@theme_selected_bg_color, 0.08);
+}
+.addon-card.installed {
+    border-color: alpha(#10b981, 0.6);
+    background: alpha(#10b981, 0.06);
+}
+.badge-addon-official {
+    background-color: #0284c7;
+    color: white;
+    font-weight: 600;
+}
+.badge-addon-contrib {
+    background-color: #8b5cf6;
+    color: white;
+    font-weight: 600;
+}
+.badge-addon-installed {
+    background-color: #10b981;
+    color: white;
+    font-weight: 700;
+}
+.badge-addon-available {
+    background-color: #64748b;
+    color: white;
+    font-weight: 500;
+}
+.badge-addon-stars {
+    background-color: alpha(#f59e0b, 0.2);
+    color: #f59e0b;
+    font-weight: 600;
+    border: 1px solid alpha(#f59e0b, 0.4);
+}
 """
 
 FRAMEWORKS = [

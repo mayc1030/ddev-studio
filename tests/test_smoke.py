@@ -232,9 +232,11 @@ class TestImports(unittest.TestCase):
         import ddev_studio.ui.dialogs.db_containers
         import ddev_studio.ui.dialogs.ci_dialog
         import ddev_studio.ui.dialogs.drupal_tools
+        import ddev_studio.core.addons
         import ddev_studio.ui.views.details
         import ddev_studio.ui.views.subsites
         import ddev_studio.ui.views.drupal_tools
+        import ddev_studio.ui.views.addons
         import ddev_studio.ui.window
         import ddev_studio.main
         self.assertIsNotNone(ddev_studio.__version__)
@@ -254,6 +256,16 @@ class TestImports(unittest.TestCase):
         self.assertEqual(view.project_name, "drupal-demo")
         self.assertEqual(view.from_view, "details")
         self.assertEqual(view.btn_back_lbl.get_text(), "Volver a Detalles")
+
+    def test_addons_view_instantiation(self):
+        from ddev_studio.ui.views.addons import AddonsMarketplaceView
+        view = AddonsMarketplaceView(main_app=None)
+        self.assertIsNotNone(view)
+        demo_projects = [
+            {"name": "demo-proj", "status": "running", "approot": "/tmp/demo-proj"}
+        ]
+        view.update_projects(demo_projects)
+        self.assertEqual(len(view.projects), 1)
 
 
 if __name__ == "__main__":

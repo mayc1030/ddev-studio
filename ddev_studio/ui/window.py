@@ -30,6 +30,7 @@ from ddev_studio.ui.helpers import load_icon, create_icon_menu_item
 from ddev_studio.ui.views.details import ProjectDetailsView
 from ddev_studio.ui.views.subsites import SubsitesManagerView
 from ddev_studio.ui.views.drupal_tools import DrupalToolsView
+from ddev_studio.ui.views.addons import AddonsMarketplaceView
 
 
 class DDEVManagerWindow(Gtk.Window):
@@ -117,6 +118,13 @@ class DDEVManagerWindow(Gtk.Window):
         lbl_tools.pack_start(Gtk.Label(label="Herramientas"), False, False, 0)
         lbl_tools.show_all()
         self.notebook.append_page(tab_tools, lbl_tools)
+        
+        self.tab_addons = AddonsMarketplaceView(self)
+        lbl_addons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        lbl_addons.pack_start(Gtk.Image.new_from_icon_name("system-software-install-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        lbl_addons.pack_start(Gtk.Label(label="Add-ons"), False, False, 0)
+        lbl_addons.show_all()
+        self.notebook.append_page(self.tab_addons, lbl_addons)
 
     def switch_to_new_project_tab(self, mode="create"):
         self.notebook.set_current_page(1)
@@ -836,6 +844,9 @@ class DDEVManagerWindow(Gtk.Window):
             self.projects_list_box.remove(child)
             
         self.lbl_proj_title.set_text(f"Mis Proyectos ({len(projects)})")
+        
+        if hasattr(self, "tab_addons"):
+            self.tab_addons.update_projects(projects)
         
         # Calcular conteos por categoría de tecnología
         cat_counts = {"all": len(projects)}
