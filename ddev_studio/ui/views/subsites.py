@@ -229,6 +229,16 @@ class SubsitesManagerView(Gtk.Box):
         dialog.run()
         dialog.destroy()
 
+    def open_subsite_drupal_tools(self, subsite):
+        subsite_proj = dict(self.proj or {})
+        subsite_proj["name"] = self.base_name
+        subsite_proj["approot"] = self.base_dir
+        subsite_proj["docroot"] = getattr(self, "docroot_dir", "web") or "web"
+        subsite_proj["subsite_name"] = subsite["name"]
+        subsite_proj["subsite_url"] = subsite.get("url", f"https://{subsite['name']}.ddev.site")
+        subsite_proj["primary_url"] = subsite.get("url", f"https://{subsite['name']}.ddev.site")
+        self.main_app.open_drupal_tools(subsite_proj, from_view="subsites")
+
     def show_subsite_details_dialog(self, subsite):
         dialog = Gtk.Dialog(
             title=f"Detalles del Subsitio: {subsite['name']}",
@@ -615,6 +625,8 @@ class SubsitesManagerView(Gtk.Box):
         menu_btn_drush.add(b_drush_lbl)
         
         drush_menu = Gtk.Menu()
+        drush_menu.append(create_icon_menu_item("system-run-symbolic", "🛠️ Asistente de Código y APIs Drupal...", lambda w, s=subsite: self.open_subsite_drupal_tools(s)))
+        drush_menu.append(Gtk.SeparatorMenuItem())
         drush_menu.append(create_icon_menu_item("dialog-password-symbolic", "Iniciar Sesión Admin (drush uli)", lambda w: self.execute_subsite_drush_action("uli", subsite["name"], subsite_url, base_dir)))
         drush_menu.append(create_icon_menu_item("view-refresh-symbolic", "Limpiar / Reconstruir Caché (drush cr)", lambda w: self.execute_subsite_drush_action("cr", subsite["name"], subsite_url, base_dir)))
         drush_menu.append(create_icon_menu_item("software-update-available-symbolic", "Actualizar Base de Datos (drush updb)", lambda w: self.execute_subsite_drush_action("updb", subsite["name"], subsite_url, base_dir)))

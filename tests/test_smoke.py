@@ -223,6 +223,7 @@ class TestImports(unittest.TestCase):
         import ddev_studio.core.process
         import ddev_studio.core.detector
         import ddev_studio.core.ci_templates
+        import ddev_studio.core.drupal_tools
         import ddev_studio.recipes
         import ddev_studio.recipes.runner
         import ddev_studio.ui
@@ -230,11 +231,29 @@ class TestImports(unittest.TestCase):
         import ddev_studio.ui.dialogs.progress
         import ddev_studio.ui.dialogs.db_containers
         import ddev_studio.ui.dialogs.ci_dialog
+        import ddev_studio.ui.dialogs.drupal_tools
         import ddev_studio.ui.views.details
         import ddev_studio.ui.views.subsites
+        import ddev_studio.ui.views.drupal_tools
         import ddev_studio.ui.window
         import ddev_studio.main
         self.assertIsNotNone(ddev_studio.__version__)
+
+    def test_drupal_tools_view_instantiation(self):
+        from ddev_studio.ui.views.drupal_tools import DrupalToolsView
+        view = DrupalToolsView(main_app=None)
+        self.assertIsNotNone(view)
+        
+        # Test loading project
+        demo_proj = {
+            "name": "drupal-demo",
+            "approot": "/tmp/drupal-demo",
+            "docroot": "web"
+        }
+        view.load_project(demo_proj, from_view="details")
+        self.assertEqual(view.project_name, "drupal-demo")
+        self.assertEqual(view.from_view, "details")
+        self.assertEqual(view.btn_back_lbl.get_text(), "Volver a Detalles")
 
 
 if __name__ == "__main__":

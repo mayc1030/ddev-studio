@@ -883,9 +883,42 @@ class ProjectDetailsView(Gtk.Box):
             ci_btns_row.pack_start(btn_gh, False, False, 0)
             
         ci_content_box.pack_start(ci_btns_row, False, False, 0)
-        ci_card.pack_start(ci_content_box, False, False, 0)
-        
         self.content_box.pack_start(ci_card, False, False, 0)
+        
+        # 6. Drupal Studio Card (Scaffolding & APIs) if project is Drupal
+        if "drupal" in tech_type:
+            drupal_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+            drupal_card.get_style_context().add_class("project-card")
+            
+            d_title_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            pix_dp = load_icon("drupal.svg", 20)
+            if pix_dp:
+                d_title_row.pack_start(Gtk.Image.new_from_pixbuf(pix_dp), False, False, 0)
+            lbl_d_t = Gtk.Label()
+            lbl_d_t.set_markup("<b>Drupal Developer &amp; API Studio</b>")
+            d_title_row.pack_start(lbl_d_t, False, False, 0)
+            drupal_card.pack_start(d_title_row, False, False, 0)
+            
+            lbl_d_desc = Gtk.Label(label="Generación asistida de módulos y temas (Starterkit), gestión de APIs REST / JSON:API y autenticación OAuth2.")
+            lbl_d_desc.set_halign(Gtk.Align.START)
+            lbl_d_desc.set_line_wrap(True)
+            drupal_card.pack_start(lbl_d_desc, False, False, 0)
+            
+            d_btns_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            d_btns_row.set_margin_top(4)
+            
+            btn_d_modal = Gtk.Button()
+            b_dm = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            b_dm.pack_start(Gtk.Image.new_from_icon_name("system-run-symbolic", Gtk.IconSize.MENU), False, False, 0)
+            b_dm.pack_start(Gtk.Label(label="🛠️ Abrir Asistente de Código y APIs Drupal..."), False, False, 0)
+            btn_d_modal.add(b_dm)
+            btn_d_modal.get_style_context().add_class("btn-drupal")
+            btn_d_modal.connect("clicked", lambda b: self.show_drupal_tools_dialog())
+            d_btns_row.pack_start(btn_d_modal, False, False, 0)
+            drupal_card.pack_start(d_btns_row, False, False, 0)
+            
+            self.content_box.pack_start(drupal_card, False, False, 0)
+            
         self.content_box.show_all()
 
     def copy_to_clipboard(self, text, message="Copiado al portapapeles"):
@@ -934,3 +967,6 @@ class ProjectDetailsView(Gtk.Box):
         p = self.proj
         self.main_app.execute_simple_action(action, p)
         GLib.timeout_add(1500, self.refresh_details)
+
+    def show_drupal_tools_dialog(self):
+        self.main_app.open_drupal_tools(self.proj, from_view="details")

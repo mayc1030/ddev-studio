@@ -16,6 +16,7 @@ def main():
     app = DDEVManagerWindow()
     app.connect("destroy", Gtk.main_quit)
     app.show_all()
+    app.stack_projects_tab.set_visible_child_name("list")
     
     # Ensure proper initial framework visibility
     first_child = app.flowbox_fw.get_child_at_index(0)

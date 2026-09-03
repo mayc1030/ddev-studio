@@ -12,7 +12,7 @@ import webbrowser
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gdk', '3.0')
-from gi.repository import Gtk, Gdk, GLib
+from gi.repository import Gtk, Gdk, GLib, GdkPixbuf
 
 from ddev_studio.constants import (
     DEFAULT_SITES_DIR,
@@ -29,6 +29,7 @@ from ddev_studio.ui.dialogs.progress import ProgressDialog
 from ddev_studio.ui.helpers import load_icon, create_icon_menu_item
 from ddev_studio.ui.views.details import ProjectDetailsView
 from ddev_studio.ui.views.subsites import SubsitesManagerView
+from ddev_studio.ui.views.drupal_tools import DrupalToolsView
 
 
 class DDEVManagerWindow(Gtk.Window):
@@ -42,7 +43,7 @@ class DDEVManagerWindow(Gtk.Window):
             self.set_icon(ddev_icon)
             
         self.active_category = "all"
-        self.category_buttons = {}
+        self.combo_tech_filter_handler_id = None
         
         css_provider = Gtk.CssProvider()
         css_provider.load_from_data(CUSTOM_CSS)
@@ -697,6 +698,26 @@ class DDEVManagerWindow(Gtk.Window):
         self.search_entry.connect("search-changed", self.on_search_changed)
         search_box.pack_start(self.search_entry, True, True, 0)
         
+        # Selector desplegable con soporte de iconos SVG reales desde icons/
+        self.tech_filter_store = Gtk.ListStore(GdkPixbuf.Pixbuf, str, str)
+        self.combo_tech_filter = Gtk.ComboBox(model=self.tech_filter_store)
+        self.combo_tech_filter.get_style_context().add_class("combo-filter")
+        self.combo_tech_filter.set_tooltip_text("Filtrar proyectos por tecnología")
+        
+        renderer_pix = Gtk.CellRendererPixbuf()
+        renderer_pix.set_property("xpad", 4)
+        self.combo_tech_filter.pack_start(renderer_pix, False)
+        self.combo_tech_filter.add_attribute(renderer_pix, "pixbuf", 0)
+        
+        renderer_text = Gtk.CellRendererText()
+        renderer_text.set_property("xpad", 4)
+        self.combo_tech_filter.pack_start(renderer_text, True)
+        self.combo_tech_filter.add_attribute(renderer_text, "text", 1)
+        self.combo_tech_filter.set_id_column(2)
+        
+        self.combo_tech_filter_handler_id = self.combo_tech_filter.connect("changed", self.on_tech_filter_changed)
+        search_box.pack_start(self.combo_tech_filter, False, False, 0)
+        
         btn_import_shortcut = Gtk.Button(label="📁 Importar Carpeta...")
         btn_import_shortcut.set_tooltip_text("Vincular un proyecto o repositorio existente en tu disco a DDEV")
         btn_import_shortcut.connect("clicked", lambda b: self.switch_to_new_project_tab("import"))
@@ -708,17 +729,6 @@ class DDEVManagerWindow(Gtk.Window):
         search_box.pack_start(btn_new_shortcut, False, False, 0)
         
         self.box_projects_list_view.pack_start(search_box, False, False, 0)
-        
-        # Barra responsiva de chips de categorías con FlowBox (Wrap automático multilínea sin scroll)
-        self.categories_flow = Gtk.FlowBox()
-        self.categories_flow.set_valign(Gtk.Align.START)
-        self.categories_flow.set_max_children_per_line(30)
-        self.categories_flow.set_selection_mode(Gtk.SelectionMode.NONE)
-        self.categories_flow.set_homogeneous(False)
-        self.categories_flow.set_column_spacing(6)
-        self.categories_flow.set_row_spacing(6)
-        self.categories_flow.get_style_context().add_class("category-chips-flow")
-        self.box_projects_list_view.pack_start(self.categories_flow, False, False, 0)
         
         self.projects_scrolled = Gtk.ScrolledWindow()
         self.projects_scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -736,6 +746,13 @@ class DDEVManagerWindow(Gtk.Window):
         # View 3: Project Details Embedded View
         self.project_details_view = ProjectDetailsView(self)
         self.stack_projects_tab.add_named(self.project_details_view, "details")
+        
+        # View 4: Drupal Tools Embedded View
+        self.drupal_tools_view = DrupalToolsView(self)
+        self.stack_projects_tab.add_named(self.drupal_tools_view, "drupal_tools")
+        
+        # Asegurar que la vista inicial sea siempre la lista de proyectos
+        self.stack_projects_tab.set_visible_child_name("list")
         
         return self.stack_projects_tab
 
@@ -800,12 +817,19 @@ class DDEVManagerWindow(Gtk.Window):
 
     def set_active_category(self, cat_id):
         self.active_category = cat_id
-        for cid, btn in self.category_buttons.items():
-            if cid == cat_id:
-                btn.get_style_context().add_class("category-chip-active")
-            else:
-                btn.get_style_context().remove_class("category-chip-active")
+        if hasattr(self, "combo_tech_filter"):
+            if self.combo_tech_filter_handler_id:
+                self.combo_tech_filter.handler_block(self.combo_tech_filter_handler_id)
+            self.combo_tech_filter.set_active_id(cat_id)
+            if self.combo_tech_filter_handler_id:
+                self.combo_tech_filter.handler_unblock(self.combo_tech_filter_handler_id)
         self.apply_project_filters()
+
+    def on_tech_filter_changed(self, combo):
+        active_id = combo.get_active_id()
+        if active_id:
+            self.active_category = active_id
+            self.apply_project_filters()
 
     def update_projects_ui(self, projects):
         for child in self.projects_list_box.get_children():
@@ -823,46 +847,42 @@ class DDEVManagerWindow(Gtk.Window):
             p["_tech_family"] = cat_id
             cat_counts[cat_id] = cat_counts.get(cat_id, 0) + 1
             
-        # Reconstruir botones de chip en FlowBox
-        for child in self.categories_flow.get_children():
-            self.categories_flow.remove(child)
-        self.category_buttons = {}
-        
-        if self.active_category != "all" and cat_counts.get(self.active_category, 0) == 0:
-            self.active_category = "all"
+        # Reconstruir opciones del desplegable con iconos SVG reales desde icons/
+        if hasattr(self, "combo_tech_filter") and hasattr(self, "tech_filter_store"):
+            if self.combo_tech_filter_handler_id:
+                self.combo_tech_filter.handler_block(self.combo_tech_filter_handler_id)
+                
+            self.tech_filter_store.clear()
             
-        if projects:
-            self.categories_flow.show()
-            for cat in TECH_CATEGORIES:
-                cat_id = cat["id"]
-                count = cat_counts.get(cat_id, 0)
-                if cat_id != "all" and count == 0:
-                    continue
+            if projects:
+                self.combo_tech_filter.show()
+                for cat in TECH_CATEGORIES:
+                    cat_id = cat["id"]
+                    count = cat_counts.get(cat_id, 0)
+                    if cat_id != "all" and count == 0:
+                        continue
+                        
+                    icon_name = cat.get("icon", "ddev.svg")
+                    pixbuf = load_icon(icon_name, 18)
                     
-                btn = Gtk.Button()
-                btn.get_style_context().add_class("category-chip")
-                if self.active_category == cat_id:
-                    btn.get_style_context().add_class("category-chip-active")
+                    if cat_id == "all":
+                        label = f"Todos los tipos ({count})"
+                    else:
+                        label = f"{cat['name']} ({count})"
+                        
+                    self.tech_filter_store.append([pixbuf, label, cat_id])
                     
-                btn_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-                
-                icon_pixbuf = load_icon(cat["icon"], 16)
-                if icon_pixbuf:
-                    btn_content.pack_start(Gtk.Image.new_from_pixbuf(icon_pixbuf), False, False, 0)
+                if self.active_category != "all" and cat_counts.get(self.active_category, 0) == 0:
+                    self.active_category = "all"
                     
-                btn_content.pack_start(Gtk.Label(label=cat["name"]), False, False, 0)
+                self.combo_tech_filter.set_active_id(self.active_category or "all")
+            else:
+                self.combo_tech_filter.hide()
                 
-                lbl_cnt = Gtk.Label(label=str(count))
-                lbl_cnt.get_style_context().add_class("category-chip-count")
-                btn_content.pack_start(lbl_cnt, False, False, 0)
+            if self.combo_tech_filter_handler_id:
+                self.combo_tech_filter.handler_unblock(self.combo_tech_filter_handler_id)
                 
-                btn.add(btn_content)
-                btn.connect("clicked", lambda b, c=cat_id: self.set_active_category(c))
-                self.categories_flow.add(btn)
-                self.category_buttons[cat_id] = btn
-            self.categories_flow.show_all()
-        else:
-            self.categories_flow.hide()
+        if not projects:
             empty_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
             empty_box.set_margin_top(40)
             
@@ -1124,6 +1144,8 @@ class DDEVManagerWindow(Gtk.Window):
             menu_btn_drush.add(b_drush_lbl)
             
             drush_menu = Gtk.Menu()
+            drush_menu.append(create_icon_menu_item("system-run-symbolic", "🛠️ Asistente de Código y APIs Drupal...", lambda w, pr=proj: self.open_drupal_tools(pr, from_view="list")))
+            drush_menu.append(Gtk.SeparatorMenuItem())
             drush_menu.append(create_icon_menu_item("dialog-password-symbolic", "Iniciar Sesión Admin (drush uli)", lambda w, pr=proj: self.execute_drush_action("uli", pr)))
             drush_menu.append(create_icon_menu_item("view-refresh-symbolic", "Limpiar / Reconstruir Caché (drush cr)", lambda w, pr=proj: self.execute_drush_action("cr", pr)))
             drush_menu.append(create_icon_menu_item("software-update-available-symbolic", "Actualizar Base de Datos (drush updb)", lambda w, pr=proj: self.execute_drush_action("updb", pr)))
@@ -1592,6 +1614,10 @@ class DDEVManagerWindow(Gtk.Window):
     def open_subsites_manager(self, proj):
         self.subsites_manager_view.load_project(proj)
         self.stack_projects_tab.set_visible_child_name("subsites")
+
+    def open_drupal_tools(self, proj, from_view="list"):
+        self.drupal_tools_view.load_project(proj, from_view=from_view)
+        self.stack_projects_tab.set_visible_child_name("drupal_tools")
 
     def open_project_details(self, proj):
         self.project_details_view.load_project_details(proj)

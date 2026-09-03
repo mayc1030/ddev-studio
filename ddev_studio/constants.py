@@ -118,57 +118,11 @@ CUSTOM_CSS = b"""
     background: alpha(@theme_selected_bg_color, 0.08);
     padding: 12px 16px;
 }
-.category-chips-flow {
-    background: transparent;
-    padding: 2px 0px 4px 0px;
-}
-.category-chips-flow flowboxchild {
-    background: transparent;
-    padding: 0px;
-    margin: 0px;
-    border: none;
-}
-.category-chips-flow flowboxchild:selected,
-.category-chips-flow flowboxchild:active,
-.category-chips-flow flowboxchild:hover {
-    background: transparent;
-    border: none;
-}
-.category-chip {
-    border-radius: 20px;
-    padding: 4px 10px;
-    font-size: 12px;
+.combo-filter {
+    border-radius: 8px;
     font-weight: 500;
-    border: 1px solid alpha(@theme_text_color, 0.15);
-    background: alpha(@theme_base_color, 0.5);
-    color: @theme_text_color;
-    transition: all 150ms ease-in-out;
-}
-.category-chip:hover {
-    background: alpha(@theme_selected_bg_color, 0.15);
-    border-color: alpha(@theme_selected_bg_color, 0.4);
-}
-.category-chip-active {
-    background: @theme_selected_bg_color;
-    color: @theme_selected_fg_color;
-    border-color: @theme_selected_bg_color;
-    font-weight: bold;
-}
-.category-chip-active:hover {
-    background: @theme_selected_bg_color;
-    color: @theme_selected_fg_color;
-}
-.category-chip-count {
-    border-radius: 10px;
-    padding: 1px 6px;
-    font-size: 10px;
-    font-weight: bold;
-    background: alpha(@theme_text_color, 0.12);
-    color: inherit;
-}
-.category-chip-active .category-chip-count {
-    background: alpha(@theme_selected_fg_color, 0.25);
-    color: @theme_selected_fg_color;
+    font-size: 13px;
+    padding: 2px 6px;
 }
 .btn-primary {
     background-color: #0284c7;
