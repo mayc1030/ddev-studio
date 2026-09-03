@@ -118,6 +118,7 @@ def parse_pm_list_output(raw_output: str) -> dict:
         # Architecture & Paragraphs
         "paragraphs": False,
         "paragraphs_library": False,
+        "entity_usage": False,
         "field_group": False,
         "inline_entity_form": False,
         # Admin & Media
@@ -173,6 +174,7 @@ def parse_pm_list_output(raw_output: str) -> dict:
         # Paragraphs & Architecture
         "paragraphs": [r"\bparagraphs\b"],
         "paragraphs_library": [r"\bparagraphs_library\b", r"\bparagraphs\s+library\b"],
+        "entity_usage": [r"\bentity_usage\b", r"\bentity\s+usage\b"],
         "field_group": [r"\bfield_group\b", r"\bfield\s+group\b"],
         "inline_entity_form": [r"\binline_entity_form\b", r"\binline\s+entity\s+form\b"],
         # Admin & Media

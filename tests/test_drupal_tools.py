@@ -74,6 +74,7 @@ class TestDrupalTools(unittest.TestCase):
             "simple_sitemap": {"status": "Enabled", "type": "module"},
             "redirect": {"status": "Enabled", "type": "module"},
             "paragraphs": {"status": "Enabled", "type": "module"},
+            "entity_usage": {"status": "Enabled", "type": "module"},
             "field_group": {"status": "Enabled", "type": "module"},
             "admin_toolbar": {"status": "Enabled", "type": "module"},
             "focal_point": {"status": "Enabled", "type": "module"},
@@ -91,6 +92,7 @@ class TestDrupalTools(unittest.TestCase):
         self.assertTrue(res["metatag"])
         self.assertTrue(res["pathauto"])
         self.assertTrue(res["paragraphs"])
+        self.assertTrue(res["entity_usage"])
         self.assertTrue(res["admin_toolbar"])
         self.assertTrue(res["focal_point"])
         self.assertTrue(res["jsonapi"])
@@ -110,6 +112,7 @@ class TestDrupalTools(unittest.TestCase):
         SEO       Token                  Enabled  1.14.0
         SEO       Simple XML Sitemap     Enabled  4.1.0
         Structure Paragraphs             Enabled  1.16.0
+        Structure Entity Usage           Enabled  2.0.0
         Structure Field Group            Enabled  3.4.0
         Admin     Admin Toolbar          Enabled  3.4.0
         Media     Focal Point            Enabled  2.1.0
@@ -124,6 +127,7 @@ class TestDrupalTools(unittest.TestCase):
         self.assertTrue(res["metatag"])
         self.assertTrue(res["pathauto"])
         self.assertTrue(res["paragraphs"])
+        self.assertTrue(res["entity_usage"])
         self.assertTrue(res["admin_toolbar"])
         self.assertTrue(res["focal_point"])
         self.assertTrue(res["jsonapi"])

@@ -566,20 +566,21 @@ class DrupalToolsView(Gtk.Box):
         )
         main_box.pack_start(self.card_seo, False, False, 0)
         
-        # 2. BUNDLE ARQUITECTURA: Paragraphs, Paragraphs Library, Field Group, Inline Entity Form
+        # 2. BUNDLE ARQUITECTURA: Paragraphs, Paragraphs Library, Entity Usage, Field Group, Inline Entity Form
         self.card_paragraphs = self.create_bundle_card(
             title="🧩 Arquitectura Modular & Paragraphs Suite",
-            desc="Paragraphs, Paragraphs Library, Field Group e Inline Entity Form para modelado de páginas por componentes reutilizables y serialización en APIs.",
+            desc="Paragraphs, Paragraphs Library, Entity Usage, Field Group e Inline Entity Form para modelado de páginas por componentes reutilizables y serialización en APIs.",
             status_keys=["paragraphs", "field_group"],
             btn_install_label="📦 Instalar Paragraphs & Componentes",
             cmd_install=[
                 "ddev", "exec",
-                "composer require drupal/paragraphs drupal/entity_reference_revisions drupal/field_group drupal/inline_entity_form --no-interaction && drush pm:enable paragraphs paragraphs_library entity_reference_revisions field_group inline_entity_form -y && drush cr"
+                "composer require drupal/paragraphs drupal/entity_reference_revisions drupal/field_group drupal/inline_entity_form drupal/entity_usage --no-interaction && drush pm:enable paragraphs entity_usage paragraphs_library entity_reference_revisions field_group inline_entity_form -y && drush cr"
             ],
             success_msg="¡Suite de Paragraphs y Componentes instalada!",
             extra_actions=[
                 ("🧩 Paragraph Types", lambda: webbrowser.open(f"{self.primary_url}/admin/structure/paragraphs_type")),
                 ("📚 Paragraphs Library", lambda: webbrowser.open(f"{self.primary_url}/admin/content/paragraphs-library")),
+                ("📊 Entity Usage", lambda: webbrowser.open(f"{self.primary_url}/admin/config/entity-usage")),
             ]
         )
         main_box.pack_start(self.card_paragraphs, False, False, 0)
