@@ -17,7 +17,11 @@ from ddev_studio.core.drupal_tools import (
     scan_custom_modules,
     scan_custom_themes,
     check_drupal_api_status,
-    build_drush_generate_command
+    build_drush_generate_command,
+    scaffold_custom_module,
+    scaffold_custom_theme,
+    scaffold_custom_component,
+    scaffold_rest_resource
 )
 from ddev_studio.core.terminal import open_terminal
 from ddev_studio.core.process import run_subproc
@@ -471,7 +475,7 @@ class DrupalToolsView(Gtk.Box):
             
         if self.btn_gen_module.get_active():
             name = self.entry_mod_name.get_text().strip()
-            machine = self.entry_mod_machine.get_text().strip()
+            machine = sanitize_machine_name(self.entry_mod_machine.get_text().strip())
             if not machine:
                 return
             desc = self.entry_mod_desc.get_text().strip()
@@ -479,17 +483,29 @@ class DrupalToolsView(Gtk.Box):
             has_install = self.chk_mod_install.get_active()
             has_perm = self.chk_mod_permissions.get_active()
             
+            def do_scaffold_module(log):
+                log("🔨 Generando estructura de archivos para módulo personalizado...")
+                files = scaffold_custom_module(
+                    self.approot, self.docroot, machine, name, desc, pkg, has_install, has_perm
+                )
+                for f in files:
+                    log(f"  ✓ Creado: {f}")
+            
             cmd = ["ddev", "drush"]
             if self.subsite_url:
                 cmd.append(f"--uri={self.subsite_url}")
-            cmd.extend([
-                "generate", "module",
-                f"--answers={{\"name\":\"{name or machine}\",\"machine_name\":\"{machine}\",\"description\":\"{desc}\",\"package\":\"{pkg}\",\"install_file\":{str(has_install).lower()},\"permissions\":{str(has_perm).lower()}}}"
-            ])
-            self.run_task_with_progress(f"Generando Módulo: {machine}", cmd, f"Módulo '{machine}' creado en web/modules/custom/{machine}")
+            cmd.append("cr")
+            
+            self.run_task_with_progress(
+                f"Generando Módulo: {machine}",
+                cmd,
+                f"Módulo '{machine}' creado exitosamente en web/modules/custom/{machine}",
+                pre_action=do_scaffold_module,
+                on_complete=self.populate_custom_modules
+            )
             
         elif self.btn_gen_theme.get_active():
-            machine = self.entry_thm_machine.get_text().strip()
+            machine = sanitize_machine_name(self.entry_thm_machine.get_text().strip())
             name = self.entry_thm_name.get_text().strip() or machine
             if not machine:
                 return
@@ -498,10 +514,29 @@ class DrupalToolsView(Gtk.Box):
             
             if thm_type == "starterkit":
                 cmd = ["ddev", "exec", f"php core/scripts/drupal generate-theme {machine} --name='{name}' --starterkit"]
+                self.run_task_with_progress(
+                    f"Generando Starterkit: {machine}",
+                    cmd,
+                    f"Tema Starterkit '{machine}' creado en web/themes/custom/{machine}"
+                )
             else:
-                cmd = ["ddev", "drush", "generate", "theme", f"--answers={{\"name\":\"{name}\",\"machine_name\":\"{machine}\",\"base_theme\":\"{base}\"}}"]
+                def do_scaffold_theme(log):
+                    log("🎨 Generando estructura de archivos para tema personalizado...")
+                    files = scaffold_custom_theme(self.approot, self.docroot, machine, name, base)
+                    for f in files:
+                        log(f"  ✓ Creado: {f}")
                 
-            self.run_task_with_progress(f"Generando Tema: {machine}", cmd, f"Tema '{machine}' creado en web/themes/custom/{machine}")
+                cmd = ["ddev", "drush"]
+                if self.subsite_url:
+                    cmd.append(f"--uri={self.subsite_url}")
+                cmd.append("cr")
+                
+                self.run_task_with_progress(
+                    f"Generando Tema: {machine}",
+                    cmd,
+                    f"Tema '{machine}' creado exitosamente en web/themes/custom/{machine}",
+                    pre_action=do_scaffold_theme
+                )
             
         elif self.btn_gen_component.get_active():
             cmp_type = self.combo_cmp_type.get_active_id() or "controller"
@@ -515,11 +550,23 @@ class DrupalToolsView(Gtk.Box):
                 open_terminal(self.approot, f"ddev drush {uri_flag}generate {cmp_type}")
                 return
                 
+            def do_scaffold_cmp(log):
+                log(f"⚙️ Generando componente '{cmp_type}' ({cmp_name}) en módulo '{target_mod}'...")
+                files = scaffold_custom_component(self.approot, self.docroot, target_mod, cmp_type, cmp_name)
+                for f in files:
+                    log(f"  ✓ Creado: {f}")
+            
             cmd = ["ddev", "drush"]
             if self.subsite_url:
                 cmd.append(f"--uri={self.subsite_url}")
-            cmd.extend([cmp_type, f"--answers={{\"module\":\"{target_mod}\",\"class\":\"{cmp_name}\",\"name\":\"{cmp_name}\"}}"])
-            self.run_task_with_progress(f"Generando {cmp_type}: {cmp_name}", cmd, f"Componente '{cmp_name}' generado en {target_mod}")
+            cmd.append("cr")
+            
+            self.run_task_with_progress(
+                f"Generando {cmp_type}: {cmp_name}",
+                cmd,
+                f"Componente '{cmp_name}' generado exitosamente en {target_mod}",
+                pre_action=do_scaffold_cmp
+            )
 
     # -------------------------------------------------------------------------
     # TAB 2: SUITE DE MÓDULOS ESENCIALES & APIS
@@ -844,7 +891,7 @@ class DrupalToolsView(Gtk.Box):
             return
             
         target_mod = self.combo_ep_module.get_active_id()
-        ep_id = self.entry_ep_id.get_text().strip() or "custom_api_resource"
+        ep_id = sanitize_machine_name(self.entry_ep_id.get_text().strip() or "custom_api_resource")
         label = self.entry_ep_label.get_text().strip() or ep_id
         uri = self.entry_ep_uri.get_text().strip() or "/api/v1/data"
         
@@ -853,19 +900,28 @@ class DrupalToolsView(Gtk.Box):
             open_terminal(self.approot, f"ddev drush {uri_flag}generate plugin:rest-resource")
             return
             
+        def do_scaffold_ep(log):
+            log(f"🌐 Generando Plugin REST Resource '{ep_id}' en módulo '{target_mod}'...")
+            files = scaffold_rest_resource(self.approot, self.docroot, target_mod, ep_id, label, uri)
+            for f in files:
+                log(f"  ✓ Creado: {f}")
+        
         cmd = ["ddev", "drush"]
         if self.subsite_url:
             cmd.append(f"--uri={self.subsite_url}")
-        cmd.extend([
-            "generate", "plugin:rest-resource",
-            f"--answers={{\"module\":\"{target_mod}\",\"class\":\"{ep_id.capitalize()}Resource\",\"plugin_id\":\"{ep_id}\",\"plugin_label\":\"{label}\",\"canonical_url\":\"{uri}\"}}"
-        ])
-        self.run_task_with_progress(f"Generando Plugin REST: {ep_id}", cmd, f"Plugin REST generado en {target_mod}")
+        cmd.append("cr")
+        
+        self.run_task_with_progress(
+            f"Generando Plugin REST: {ep_id}",
+            cmd,
+            f"Plugin REST '{ep_id}' generado en {target_mod}",
+            pre_action=do_scaffold_ep
+        )
 
     # -------------------------------------------------------------------------
     # Progress Dialog Runner Helper
     # -------------------------------------------------------------------------
-    def run_task_with_progress(self, title, cmd_list, success_msg):
+    def run_task_with_progress(self, title, cmd_list, success_msg, pre_action=None, on_complete=None):
         dialog = ProgressDialog(self.main_app, title=title)
         dialog.set_status(f"Ejecutando: {' '.join(cmd_list[:3])}...")
         
@@ -874,14 +930,22 @@ class DrupalToolsView(Gtk.Box):
                 def log(t):
                     GLib.idle_add(dialog.append_log, t + "\n")
                 log(f"📁 Directorio: {self.approot}")
-                log(f"$ {' '.join(cmd_list)}\n" + "="*50)
                 
-                run_subproc(cmd_list, self.approot, dialog)
+                if pre_action:
+                    pre_action(log)
+                    log("-" * 50)
+
+                if cmd_list:
+                    log(f"$ {' '.join(cmd_list)}\n" + "="*50)
+                    run_subproc(cmd_list, self.approot, dialog)
                 
                 log("\n" + "="*50)
                 log("✓ ¡Operación completada con éxito!")
                 GLib.idle_add(dialog.finish, True, success_msg, self.primary_url, self.approot)
                 GLib.idle_add(self.refresh_api_status)
+                GLib.idle_add(self.populate_custom_modules)
+                if on_complete:
+                    GLib.idle_add(on_complete)
             except Exception as ex:
                 GLib.idle_add(dialog.finish, False, f"Error: {str(ex)}", "", self.approot)
                 

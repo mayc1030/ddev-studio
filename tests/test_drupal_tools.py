@@ -19,7 +19,11 @@ from ddev_studio.core.drupal_tools import (
     scan_custom_modules,
     scan_custom_themes,
     parse_pm_list_output,
-    build_drush_generate_command
+    build_drush_generate_command,
+    scaffold_custom_module,
+    scaffold_custom_theme,
+    scaffold_custom_component,
+    scaffold_rest_resource
 )
 
 
@@ -156,6 +160,57 @@ class TestDrupalTools(unittest.TestCase):
         self.assertEqual(cmd2[3], "controller")
         self.assertTrue(cmd2[4].startswith("--answers="))
         self.assertIn('"machine_name": "test"', cmd2[4])
+
+    def test_scaffold_custom_module(self):
+        files = scaffold_custom_module(
+            self.test_dir, "web", "my_test_mod", "My Test Mod",
+            "Modulo de prueba", "Custom", has_install=True, has_permissions=True
+        )
+        self.assertEqual(len(files), 4)
+        mod_dir = os.path.join(self.test_dir, "web", "modules", "custom", "my_test_mod")
+        self.assertTrue(os.path.isfile(os.path.join(mod_dir, "my_test_mod.info.yml")))
+        self.assertTrue(os.path.isfile(os.path.join(mod_dir, "my_test_mod.module")))
+        self.assertTrue(os.path.isfile(os.path.join(mod_dir, "my_test_mod.install")))
+        self.assertTrue(os.path.isfile(os.path.join(mod_dir, "my_test_mod.permissions.yml")))
+
+        with open(os.path.join(mod_dir, "my_test_mod.info.yml")) as f:
+            content = f.read()
+        self.assertIn("name: 'My Test Mod'", content)
+        self.assertIn("core_version_requirement:", content)
+
+    def test_scaffold_custom_theme(self):
+        files = scaffold_custom_theme(
+            self.test_dir, "web", "my_custom_theme", "My Custom Theme", "olivero"
+        )
+        self.assertEqual(len(files), 5)
+        thm_dir = os.path.join(self.test_dir, "web", "themes", "custom", "my_custom_theme")
+        self.assertTrue(os.path.isfile(os.path.join(thm_dir, "my_custom_theme.info.yml")))
+        self.assertTrue(os.path.isfile(os.path.join(thm_dir, "my_custom_theme.theme")))
+        self.assertTrue(os.path.isfile(os.path.join(thm_dir, "my_custom_theme.libraries.yml")))
+        self.assertTrue(os.path.isfile(os.path.join(thm_dir, "css", "style.css")))
+        self.assertTrue(os.path.isfile(os.path.join(thm_dir, "js", "script.js")))
+
+    def test_scaffold_custom_component(self):
+        # Create module first
+        scaffold_custom_module(self.test_dir, "web", "demo_mod", "Demo Mod")
+        # Scaffold controller
+        files = scaffold_custom_component(self.test_dir, "web", "demo_mod", "controller", "HelloController")
+        self.assertEqual(len(files), 2)
+        ctrl_path = os.path.join(self.test_dir, "web", "modules", "custom", "demo_mod", "src", "Controller", "HelloController.php")
+        self.assertTrue(os.path.isfile(ctrl_path))
+        routing_path = os.path.join(self.test_dir, "web", "modules", "custom", "demo_mod", "demo_mod.routing.yml")
+        self.assertTrue(os.path.isfile(routing_path))
+
+    def test_scaffold_rest_resource(self):
+        scaffold_custom_module(self.test_dir, "web", "api_mod", "API Mod")
+        files = scaffold_rest_resource(self.test_dir, "web", "api_mod", "products_api", "Products API", "/api/v1/products")
+        self.assertEqual(len(files), 1)
+        res_path = os.path.join(self.test_dir, "web", "modules", "custom", "api_mod", "src", "Plugin", "rest", "resource", "ProductsApiResource.php")
+        self.assertTrue(os.path.isfile(res_path))
+        with open(res_path) as f:
+            code = f.read()
+        self.assertIn("@RestResource", code)
+        self.assertIn("class ProductsApiResource extends ResourceBase", code)
 
 
 if __name__ == "__main__":
