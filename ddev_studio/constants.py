@@ -11,11 +11,15 @@ APP_DIR = os.path.dirname(PACKAGE_DIR)
 # Resolución dinámica de la carpeta de iconos
 ICONS_DIR = os.path.join(APP_DIR, "icons")
 if not os.path.exists(ICONS_DIR):
-    installed_icons = os.path.expanduser("~/.local/share/ddev-manager/icons")
+    installed_icons = os.path.expanduser("~/.local/share/ddev-studio/icons")
+    legacy_icons = os.path.expanduser("~/.local/share/ddev-manager/icons")
     if os.path.exists(installed_icons):
         ICONS_DIR = installed_icons
+    elif os.path.exists(legacy_icons):
+        ICONS_DIR = legacy_icons
     else:
         ICONS_DIR = os.path.join(PACKAGE_DIR, "icons")
+
 
 DEFAULT_SITES_DIR = os.path.expanduser("~/sites")
 

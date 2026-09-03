@@ -5,9 +5,13 @@ Smoke tests for DDEV Studio modular package.
 
 import os
 import sys
+import logging
 import unittest
 import tempfile
 import shutil
+
+from ddev_studio.logger import setup_logger, logger
+
 
 # Ensure root directory is in sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -21,8 +25,17 @@ from ddev_studio.constants import (
     CUSTOM_CSS,
     ICONS_DIR
 )
-from ddev_studio.core.detector import detect_project_details, inspect_project_stack, sanitize_project_name, detect_sqlite_database
-from ddev_studio.core.terminal import find_terminal_command
+from ddev_studio.core.detector import (
+    detect_project_details,
+    inspect_project_stack,
+    sanitize_project_name,
+    detect_sqlite_database,
+    read_ddev_config
+)
+
+from ddev_studio.core.terminal import find_terminal_command, build_terminal_args, open_terminal
+from unittest.mock import patch
+
 
 
 class TestSanitizeName(unittest.TestCase):
@@ -70,6 +83,70 @@ class TestDetector(unittest.TestCase):
     def test_invalid_path(self):
         res = detect_project_details("/non/existent/path/12345")
         self.assertFalse(res["valid"])
+
+    def test_read_ddev_config_nonexistent(self):
+        self.assertIsNone(read_ddev_config("/non/existent/path/12345"))
+        self.assertIsNone(read_ddev_config(""))
+
+    def test_read_ddev_config_structured_yaml(self):
+        ddev_dir = os.path.join(self.test_dir, ".ddev")
+        os.makedirs(ddev_dir, exist_ok=True)
+        cfg_file = os.path.join(ddev_dir, "config.yaml")
+        with open(cfg_file, "w", encoding="utf-8") as f:
+            f.write("""# DDEV Configuration File
+name: sample-project # inline comment
+type: laravel
+docroot: public
+php_version: "8.3"
+nodejs_version: '22'
+database:
+  type: postgres
+  version: "16"
+omit_containers:
+  - db
+""")
+        cfg = read_ddev_config(self.test_dir)
+        self.assertIsNotNone(cfg)
+        self.assertEqual(cfg.get("name"), "sample-project")
+        self.assertEqual(cfg.get("type"), "laravel")
+        self.assertEqual(cfg.get("docroot"), "public")
+        self.assertEqual(str(cfg.get("php_version")), "8.3")
+        self.assertIn("db", cfg.get("omit_containers", []))
+
+        # Test detect_project_details using this config
+        det = detect_project_details(self.test_dir)
+        self.assertTrue(det["valid"])
+        self.assertEqual(det["name"], "sample-project")
+        self.assertEqual(det["type"], "laravel")
+        self.assertEqual(det["docroot"], "public")
+        self.assertEqual(det["db"], "none")
+
+        # Test inspect_project_stack respecting omit_containers: [db]
+        tech, has_db, is_php, is_py, is_js, is_static = inspect_project_stack(self.test_dir, {}, {})
+        self.assertEqual(tech, "laravel")
+        self.assertFalse(has_db)
+
+    def test_read_ddev_config_inline_bracket_omit(self):
+        ddev_dir = os.path.join(self.test_dir, ".ddev")
+        os.makedirs(ddev_dir, exist_ok=True)
+        cfg_file = os.path.join(ddev_dir, "config.yaml")
+        with open(cfg_file, "w", encoding="utf-8") as f:
+            f.write("""name: drupal-site
+type: drupal10
+docroot: web
+php_version: 8.3
+database:
+  type: mariadb
+  version: "10.11"
+""")
+        cfg = read_ddev_config(self.test_dir)
+        self.assertIsNotNone(cfg)
+        self.assertEqual(cfg.get("name"), "drupal-site")
+        det = detect_project_details(self.test_dir)
+        self.assertTrue(det["valid"])
+        self.assertEqual(det["db"], "mariadb:10.11")
+        self.assertTrue(det["is_drupal"])
+
 
     def test_nextjs_detection_with_config(self):
         next_config = os.path.join(self.test_dir, "next.config.mjs")
@@ -170,6 +247,47 @@ class TestTerminal(unittest.TestCase):
     def test_terminal_detection(self):
         term = find_terminal_command()
         self.assertTrue(term is None or isinstance(term, str))
+
+    def test_build_terminal_args_no_command(self):
+        args, cwd = build_terminal_args("mate-terminal", "/tmp/my project")
+        self.assertEqual(args[0], "mate-terminal")
+        self.assertIn("--working-directory=/tmp/my project", args)
+        self.assertNotIn("-e", args)
+        self.assertEqual(cwd, "/tmp/my project")
+
+    def test_build_terminal_args_with_command_and_quotes(self):
+        # Escaping test: command with single and double quotes
+        cmd = "echo 'Hello DDEV' && echo \"Success\""
+        args, cwd = build_terminal_args("mate-terminal", "/tmp/project", cmd)
+        self.assertIn("-e", args)
+        e_idx = args.index("-e")
+        bash_arg = args[e_idx + 1]
+        self.assertTrue(bash_arg.startswith("bash -c "))
+        self.assertIn("exec bash", bash_arg)
+
+    def test_build_terminal_args_generic_xterm(self):
+        cmd = "drush status"
+        args, cwd = build_terminal_args("/usr/bin/xterm", "/var/www/html", cmd)
+        self.assertEqual(args[0], "/usr/bin/xterm")
+        self.assertIn("-e", args)
+        self.assertEqual(cwd, "/var/www/html")
+
+    def test_build_terminal_args_konsole(self):
+        cmd = "ddev ssh"
+        args, cwd = build_terminal_args("konsole", "/home/user/project", cmd)
+        self.assertEqual(args[0], "konsole")
+        self.assertIn("--workdir", args)
+        self.assertIn("/home/user/project", args)
+
+    @patch("subprocess.Popen")
+    @patch("ddev_studio.core.terminal.find_terminal_command", return_value="mate-terminal")
+    def test_open_terminal_mock(self, mock_find, mock_popen):
+        res = open_terminal("/tmp", "ls -la")
+        self.assertIsNotNone(res)
+        mock_popen.assert_called_once()
+        call_args, call_kwargs = mock_popen.call_args
+        self.assertEqual(call_kwargs["cwd"], "/tmp")
+
 
 
 class TestCITemplates(unittest.TestCase):
@@ -280,6 +398,100 @@ class TestImports(unittest.TestCase):
         self.assertIn("multisitio", view.known_projects)
         view.stop_polling()
 
+    def test_tools_view_instantiation(self):
+        from ddev_studio.ui.views.tools import GlobalToolsView
+        view = GlobalToolsView(main_app=None)
+        self.assertIsNotNone(view)
+        self.assertIsNotNone(view.docker_monitor_view)
+        self.assertIsNotNone(view.lbl_system_info)
+
+    def test_new_project_view_instantiation(self):
+        from ddev_studio.ui.views.new_project import NewProjectView
+        view = NewProjectView(main_app=None)
+        self.assertIsNotNone(view)
+        self.assertIsNotNone(view.flowbox_fw)
+        self.assertIsNotNone(view.btn_mode_create)
+        self.assertIsNotNone(view.btn_mode_import)
+        self.assertTrue(view.btn_mode_create.get_active())
+        view.switch_mode("import")
+        self.assertTrue(view.btn_mode_import.get_active())
+
+
+
+class TestLogger(unittest.TestCase):
+    def test_setup_logger_default(self):
+        log = setup_logger(verbose=False)
+        self.assertEqual(log.name, "ddev_studio")
+        self.assertTrue(len(log.handlers) > 0)
+
+    def test_setup_logger_debug(self):
+        log = setup_logger(verbose=True)
+        self.assertEqual(log.level, logging.DEBUG)
+
+    def test_setup_logger_env(self):
+        with patch.dict(os.environ, {"DDEV_STUDIO_DEBUG": "1"}):
+            log = setup_logger()
+            self.assertEqual(log.level, logging.DEBUG)
+
+
+class TestRecipesStrategy(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_recipe_registry(self):
+        from ddev_studio.recipes import get_recipe
+        from ddev_studio.recipes.php import DrupalRecipe, WordPressRecipe, LaravelRecipe, GenericPhpRecipe
+        from ddev_studio.recipes.node import NextjsRecipe, ReactRecipe
+        from ddev_studio.recipes.python import DjangoRecipe, FlaskRecipe
+
+        self.assertIsInstance(get_recipe("drupal"), DrupalRecipe)
+        self.assertIsInstance(get_recipe("wordpress"), WordPressRecipe)
+        self.assertIsInstance(get_recipe("laravel"), LaravelRecipe)
+        self.assertIsInstance(get_recipe("nextjs"), NextjsRecipe)
+        self.assertIsInstance(get_recipe("react"), ReactRecipe)
+        self.assertIsInstance(get_recipe("django"), DjangoRecipe)
+        self.assertIsInstance(get_recipe("flask"), FlaskRecipe)
+        self.assertIsInstance(get_recipe("unknown-fw"), GenericPhpRecipe)
+
+    def test_recipe_templates_helpers(self):
+        from ddev_studio.recipes import get_recipe, RecipeContext
+
+        recipe = get_recipe("nextjs")
+        ctx = RecipeContext(
+            parent_window=None,
+            raw_name="test-app",
+            slug="test-app",
+            target_dir=self.test_dir,
+            fw={"id": "nextjs", "name": "Next.js"},
+            drupal_ver_info={},
+            php_version="8.3",
+            db_type="none",
+            node_version="22",
+            auto_install=False,
+            is_multisite_enabled=False,
+            dialog=None,
+            primary_url="https://test-app.ddev.site"
+        )
+        recipe.setup_nginx_proxy(ctx, port=3000)
+        proxy_conf = os.path.join(self.test_dir, ".ddev", "nginx_full", "nginx-site.conf")
+        self.assertTrue(os.path.exists(proxy_conf))
+        with open(proxy_conf, "r") as f:
+            content = f.read()
+        self.assertIn("127.0.0.1:3000", content)
+
+        recipe.setup_daemon(ctx, name="test-daemon", command="npm start")
+        daemon_conf = os.path.join(self.test_dir, ".ddev", "config.daemon.yaml")
+        self.assertTrue(os.path.exists(daemon_conf))
+        with open(daemon_conf, "r") as f:
+            d_content = f.read()
+        self.assertIn("name: test-daemon", d_content)
+        self.assertIn('command: "npm start"', d_content)
+
 
 if __name__ == "__main__":
     unittest.main()
+
+

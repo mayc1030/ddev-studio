@@ -125,8 +125,8 @@
    ```
 
 El instalador:
-- Copiará el paquete `ddev_studio` y recursos a `~/.local/share/ddev-manager`.
-- Creará el comando CLI global `ddev-gui` en `~/.local/bin/`.
+- Copiará el paquete `ddev_studio` y recursos a `~/.local/share/ddev-studio`.
+- Creará los comandos CLI globales `ddev-studio` y `ddev-gui` en `~/.local/bin/`.
 - Registrará los accesos directos en tu **Escritorio** y en el **Menú de Aplicaciones** (en la categoría *Desarrollo / Programación*).
 
 ---
@@ -137,7 +137,7 @@ Puedes iniciar **DDEV Studio** de 3 maneras:
 
 1. **Desde la Terminal:**
    ```bash
-   ddev-gui
+   ddev-studio   # o también: ddev-gui
    ```
 2. **Desde el Menú de Aplicaciones:** Busca **DDEV Studio** en la sección *Desarrollo / Programación*.
 3. **Desde el Escritorio:** Doble clic en el icono **DDEV Studio**.

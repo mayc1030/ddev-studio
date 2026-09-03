@@ -10,7 +10,9 @@ NC='\033[0m'
 
 echo -e "${YELLOW}Desinstalando DDEV Studio de tu sistema...${NC}"
 
+rm -rf "$HOME/.local/share/ddev-studio"
 rm -rf "$HOME/.local/share/ddev-manager"
+rm -f "$HOME/.local/bin/ddev-studio"
 rm -f "$HOME/.local/bin/ddev-gui"
 rm -f "$HOME/.local/share/applications/ddev-studio.desktop"
 rm -f "$HOME/Desktop/ddev-studio.desktop"

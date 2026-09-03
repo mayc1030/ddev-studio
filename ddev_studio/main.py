@@ -9,14 +9,18 @@ gi.require_version('Gtk', '3.0')
 gi.require_version('Gdk', '3.0')
 from gi.repository import Gtk
 
+from ddev_studio.logger import setup_logger, logger
 from ddev_studio.ui.window import DDEVManagerWindow
 
 
 def main():
+    setup_logger()
+    logger.info("Iniciando DDEV Studio...")
     app = DDEVManagerWindow()
     app.connect("destroy", Gtk.main_quit)
     app.show_all()
     app.stack_projects_tab.set_visible_child_name("list")
+
     
     # Ensure proper initial framework visibility
     first_child = app.flowbox_fw.get_child_at_index(0)

@@ -16,7 +16,8 @@ echo -e "${BLUE}        🚀 Instalando DDEV Studio en tu Sistema       ${NC}"
 echo -e "${BLUE}======================================================${NC}"
 
 # Directorios de destino
-INSTALL_DIR="$HOME/.local/share/ddev-manager"
+INSTALL_DIR="$HOME/.local/share/ddev-studio"
+OLD_INSTALL_DIR="$HOME/.local/share/ddev-manager"
 BIN_DIR="$HOME/.local/bin"
 APP_DIR="$HOME/.local/share/applications"
 DESKTOP_DIR="$HOME/Desktop"
@@ -32,8 +33,12 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-# 2. Crear carpetas necesarias
+# 2. Crear carpetas necesarias y migrar versión previa si existe
 echo -e "${YELLOW}[2/5] Creando directorios de instalación...${NC}"
+if [ -d "$OLD_INSTALL_DIR" ] && [ "$OLD_INSTALL_DIR" != "$INSTALL_DIR" ]; then
+    echo -e "${YELLOW}  → Limpiando instalación previa en $OLD_INSTALL_DIR...${NC}"
+    rm -rf "$OLD_INSTALL_DIR"
+fi
 mkdir -p "$INSTALL_DIR/icons"
 mkdir -p "$BIN_DIR"
 mkdir -p "$APP_DIR"
@@ -46,13 +51,14 @@ cp -rf "$SCRIPT_DIR/ddev_studio" "$INSTALL_DIR/"
 cp -rf "$SCRIPT_DIR/icons/"* "$INSTALL_DIR/icons/"
 chmod +x "$INSTALL_DIR/ddev_manager.py"
 
-# 4. Crear comando CLI ddev-gui
-echo -e "${YELLOW}[4/5] Creando acceso directo CLI (ddev-gui)...${NC}"
-cat << 'LAUNCHER' > "$BIN_DIR/ddev-gui"
+# 4. Crear comandos CLI ddev-studio y ddev-gui
+echo -e "${YELLOW}[4/5] Creando accesos directos CLI (ddev-studio y ddev-gui)...${NC}"
+cat << 'LAUNCHER' > "$BIN_DIR/ddev-studio"
 #!/usr/bin/env bash
-python3 "$HOME/.local/share/ddev-manager/ddev_manager.py" "$@"
+python3 "$HOME/.local/share/ddev-studio/ddev_manager.py" "$@"
 LAUNCHER
-chmod +x "$BIN_DIR/ddev-gui"
+chmod +x "$BIN_DIR/ddev-studio"
+ln -sf "$BIN_DIR/ddev-studio" "$BIN_DIR/ddev-gui"
 
 # 5. Crear lanzadores de escritorio y menú
 echo -e "${YELLOW}[5/5] Registrando accesos directos de escritorio y menú de aplicaciones...${NC}"
@@ -90,4 +96,5 @@ echo -e "${GREEN}======================================================${NC}"
 echo -e "Puedes abrirlo de las siguientes maneras:"
 echo -e "  1. Desde el menú de aplicaciones de tu escritorio (Programación > DDEV Studio)"
 echo -e "  2. Desde el icono en tu Escritorio"
-echo -e "  3. Desde la terminal ejecutando: ${BLUE}ddev-gui${NC}\n"
+echo -e "  3. Desde la terminal ejecutando: ${BLUE}ddev-studio${NC} (o ${BLUE}ddev-gui${NC})\n"
+

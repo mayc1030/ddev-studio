@@ -8,6 +8,9 @@ import os
 import re
 import subprocess
 
+from ddev_studio.logger import logger
+
+
 
 def detect_git_repo(approot):
     """
@@ -54,8 +57,9 @@ def detect_git_repo(approot):
                 if gh_clean.endswith(".git"):
                     gh_clean = gh_clean[:-4]
                 github_url = gh_clean
-    except Exception:
-        pass
+    except Exception as ex:
+        logger.debug(f"Error detectando metadatos Git en {approot}: {ex}")
+
         
     return {
         "has_git": True,

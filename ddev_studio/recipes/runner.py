@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Motor de ejecución de recetas de creación e importación de proyectos en DDEV.
+Motor de orquestación de creación e importación de proyectos en DDEV Studio.
+Delega el aprovisionamiento de cada tecnología a su estrategia correspondiente (Strategy Pattern).
 """
 
-import json
 import os
 import re
 import shutil
@@ -13,871 +13,142 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import GLib
 
-from ddev_studio.constants import FRAMEWORKS, DRUPAL_VERSIONS
+from ddev_studio.logger import logger
 from ddev_studio.core.detector import sanitize_project_name
 from ddev_studio.core.process import run_subproc
+from ddev_studio.recipes.base import SITES_PHP_TEMPLATE, NGINX_FULL_PROXY_TEMPLATE
+from ddev_studio.recipes.context import RecipeContext
+from ddev_studio.recipes.registry import get_recipe
 from ddev_studio.ui.dialogs.progress import ProgressDialog
 
 
-SITES_PHP_TEMPLATE = '''<?php
-/**
- * @file
- * Drupal multi-site configuration file for DDEV.
- */
-
-// Dynamic DDEV multisite mapping
-$sites_base = __DIR__;
-if (is_dir($sites_base)) {
-  $entries = scandir($sites_base);
-  foreach ($entries as $entry) {
-    if ($entry !== '.' && $entry !== '..' && $entry !== 'default' && $entry !== 'all' && $entry !== 'g' && $entry !== 'settings' && is_dir($sites_base . '/' . $entry)) {
-      $sites[$entry . '.ddev.site'] = $entry;
-      if (!empty($_ENV['DDEV_PROJECT'])) {
-        $sites[$entry . '.' . $_ENV['DDEV_PROJECT'] . '.ddev.site'] = $entry;
-      }
-      $sites['local.' . $entry . '.com'] = $entry;
-    }
-  }
-}
-'''
-
-NGINX_FULL_PROXY_TEMPLATE = '''#ddev-silent-no-warn
-server {{
-    listen 80 default_server;
-    listen 443 ssl default_server;
-
-    root /var/www/html;
-
-    ssl_certificate /etc/ssl/certs/master.crt;
-    ssl_certificate_key /etc/ssl/certs/master.key;
-
-    include /etc/nginx/monitoring.conf;
-
-    error_log /dev/stdout info;
-    access_log /var/log/nginx/access.log;
-
-    location / {{
-        proxy_pass http://127.0.0.1:{port};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 600s;
-    }}
-
-    include /etc/nginx/common.d/*.conf;
-    include /mnt/ddev_config/nginx/*.conf;
-}}
-'''
-
-
-def run_create_project(parent_window, raw_name, base_dir, clean_target_before, fw, drupal_ver_info, php_version, db_type, node_version, auto_install, is_multisite_enabled, on_success_callback=None):
+def run_create_project(
+    parent_window,
+    raw_name,
+    base_dir,
+    clean_target_before,
+    fw,
+    drupal_ver_info,
+    php_version,
+    db_type,
+    node_version,
+    auto_install,
+    is_multisite_enabled,
+    on_success_callback=None
+):
     """
-    Ejecuta el flujo completo de creación y scaffolding para el framework seleccionado.
+    Ejecuta el flujo completo de creación y scaffolding para el framework seleccionado
+    delegando a la estrategia correspondiente en el registro de recetas.
     """
     slug = sanitize_project_name(raw_name)
     node_version = re.sub(r'[^\d]', '', str(node_version or '')) or "22"
     target_dir = os.path.join(base_dir, slug)
     fw_id = fw["id"]
-    
+
     dialog_title = f"Creando {fw['name']}"
     if fw_id == "drupal":
-        dialog_title = f"Creando Drupal {drupal_ver_info['id']}: {slug}"
+        dialog_title = f"Creando Drupal {drupal_ver_info.get('id', '10')}: {slug}"
     else:
         dialog_title = f"Creando {fw['name']}: {slug}"
-        
+
     dialog = ProgressDialog(parent_window, title=dialog_title)
     dialog.set_status(f"Iniciando creación de {dialog_title}...")
-    
+
+    primary_url = f"https://{slug}.ddev.site"
+
+    ctx = RecipeContext(
+        parent_window=parent_window,
+        raw_name=raw_name,
+        slug=slug,
+        target_dir=target_dir,
+        fw=fw,
+        drupal_ver_info=drupal_ver_info,
+        php_version=php_version,
+        db_type=db_type,
+        node_version=node_version,
+        auto_install=auto_install,
+        is_multisite_enabled=is_multisite_enabled,
+        dialog=dialog,
+        primary_url=primary_url,
+        on_success_callback=on_success_callback
+    )
+
     def run_creation():
         try:
-            def log(text):
-                GLib.idle_add(dialog.append_log, text + "\n")
-                
-            def set_st(st):
-                GLib.idle_add(dialog.set_status, st)
-                
-            set_st("Limpiando contenedores anteriores si existen...")
+            ctx.set_status("Limpiando contenedores anteriores si existen...")
             subprocess.run(["ddev", "delete", "-O", "-y", slug], capture_output=True)
-            
+
             if clean_target_before and os.path.exists(target_dir):
-                set_st("Vaciando carpeta de proyecto...")
+                ctx.set_status("Vaciando carpeta de proyecto...")
                 shutil.rmtree(target_dir, ignore_errors=True)
-                
+
             os.makedirs(target_dir, exist_ok=True)
-            
-            log(f"📁 Directorio del proyecto: {target_dir}")
-            log(f"🚀 Tecnología: {fw['name']}" + (f" (Versión {drupal_ver_info['id']})" if fw_id == 'drupal' else ""))
-            
+
+            ctx.log(f"📁 Directorio del proyecto: {target_dir}")
+            ctx.log(f"🚀 Tecnología: {fw['name']}" + (f" (Versión {drupal_ver_info['id']})" if fw_id == 'drupal' else ""))
+
             db_label = "SQLite (Archivo local)" if db_type == "sqlite" else ("Ninguna" if db_type == "none" else db_type)
             if fw_id in ["nextjs", "react", "vue", "angular"]:
-                log(f"📦 Entorno: Node.js (v{node_version}) | DB: {db_label}\n" + "="*50)
+                ctx.log(f"📦 Entorno: Node.js (v{node_version}) | DB: {db_label}\n" + "="*50)
             elif fw_id in ["django", "flask"]:
-                log(f"🐍 Entorno: Python 3 (Virtualenv) | DB: {db_label}\n" + "="*50)
+                ctx.log(f"🐍 Entorno: Python 3 (Virtualenv) | DB: {db_label}\n" + "="*50)
             elif fw_id == "html":
-                log(f"🌐 Entorno: HTML5 Estático (Nginx)\n" + "="*50)
+                ctx.log(f"🌐 Entorno: HTML5 Estático (Nginx)\n" + "="*50)
             else:
-                log(f"🐘 Versión de PHP: {php_version} | DB: {db_label}\n" + "="*50)
-            
-            primary_url = f"https://{slug}.ddev.site"
-            
-            if fw_id == "drupal":
-                d_ver = drupal_ver_info["id"]
-                d_type = drupal_ver_info["type"]
-                d_docroot = drupal_ver_info["docroot"]
-                
-                set_st(f"Configurando DDEV para Drupal {d_ver}...")
-                cfg_cmd = [
-                    "ddev", "config",
-                    f"--project-name={slug}",
-                    f"--project-type={d_type}",
-                    f"--docroot={d_docroot}",
-                    f"--php-version={php_version}",
-                    f"--database={db_type}"
-                ]
-                run_subproc(cfg_cmd, target_dir, dialog)
-                
-                set_st("Levantando contenedores DDEV...")
-                run_subproc(["ddev", "start", "-y"], target_dir, dialog)
-                
-                if d_ver in ["11", "10", "9"]:
-                    set_st(f"Descargando Drupal {d_ver} con Composer...")
-                    pkg = "drupal/recommended-project"
-                    drush_pkg = "drush/drush"
-                    if d_ver == "11":
-                        pkg = "drupal/recommended-project:^11"
-                        drush_pkg = "drush/drush"
-                    elif d_ver == "10":
-                        pkg = "drupal/recommended-project:^10"
-                        drush_pkg = "drush/drush"
-                    elif d_ver == "9":
-                        pkg = "drupal/recommended-project:^9"
-                        drush_pkg = "drush/drush:^11"
-                        
-                    run_subproc(["ddev", "composer", "create-project", pkg, "."], target_dir, dialog)
-                    
-                    set_st(f"Instalando Drush ({drush_pkg})...")
-                    run_subproc(["ddev", "composer", "require", drush_pkg], target_dir, dialog)
-                    
-                    if auto_install:
-                        set_st("Instalando Drupal estándar con Drush...")
-                        inst_cmd = [
-                            "ddev", "drush", "site:install", "standard",
-                            "--account-name=admin",
-                            "--account-pass=admin",
-                            f"--site-name={slug.capitalize()}",
-                            "-y"
-                        ]
-                        run_subproc(inst_cmd, target_dir, dialog)
-                        log("\n🎉 Drupal instalado con éxito!")
-                        log("Credenciales: admin / admin")
+                ctx.log(f"🐘 Versión de PHP: {php_version} | DB: {db_label}\n" + "="*50)
 
-                elif d_ver == "8":
-                    set_st("Descargando Drupal 8 con Composer...")
-                    run_subproc(["ddev", "composer", "create-project", "--no-install", "drupal/recommended-project:^8", "."], target_dir, dialog)
-                    
-                    set_st("Configurando permisos de plugins en Composer (allow-plugins)...")
-                    run_subproc(["ddev", "composer", "config", "--no-plugins", "allow-plugins.composer/installers", "true"], target_dir, dialog)
-                    run_subproc(["ddev", "composer", "config", "--no-plugins", "allow-plugins.drupal/core-composer-scaffold", "true"], target_dir, dialog)
-                    run_subproc(["ddev", "composer", "config", "--no-plugins", "allow-plugins.drupal/core-project-message", "true"], target_dir, dialog)
-                    run_subproc(["ddev", "composer", "config", "--no-plugins", "allow-plugins.dealerdirect/phpcodesniffer-composer-installer", "true"], target_dir, dialog)
-                    
-                    set_st("Instalando dependencias de Drupal 8...")
-                    run_subproc(["ddev", "composer", "install"], target_dir, dialog)
-                    
-                    set_st("Instalando Drush 10 para Drupal 8...")
-                    run_subproc(["ddev", "composer", "require", "drush/drush:^10"], target_dir, dialog)
-                    
-                    if auto_install:
-                        set_st("Instalando Drupal 8 estándar con Drush...")
-                        inst_cmd = [
-                            "ddev", "drush", "site:install", "standard",
-                            "--account-name=admin",
-                            "--account-pass=admin",
-                            f"--site-name={slug.capitalize()}",
-                            "-y"
-                        ]
-                        run_subproc(inst_cmd, target_dir, dialog)
-                        log("\n🎉 Drupal 8 instalado con éxito!")
-                        log("Credenciales: admin / admin")
-                        
-                elif d_ver == "7":
-                    set_st("Descargando Drupal 7 desde Drupal.org...")
-                    run_subproc(["ddev", "exec", "sh -c 'curl -fsSL https://ftp.drupal.org/files/projects/drupal-7.103.tar.gz | tar -xz --strip-components=1'"], target_dir, dialog)
-                    
-                    if auto_install:
-                        set_st("Instalando Drupal 7 estándar con Drush...")
-                        inst_cmd = [
-                            "ddev", "drush", "site:install", "standard",
-                            "--account-name=admin",
-                            "--account-pass=admin",
-                            f"--site-name={slug.capitalize()}",
-                            "-y"
-                        ]
-                        run_subproc(inst_cmd, target_dir, dialog)
-                        log("\n🎉 Drupal 7 instalado con éxito!")
-                        log("Credenciales: admin / admin")
+            recipe = get_recipe(fw_id)
+            recipe.execute(ctx)
 
-                # Drupal Multisite Architecture
-                if is_multisite_enabled:
-                    set_st("Configurando arquitectura Drupal Multisite...")
-                    sites_php_dir = os.path.join(target_dir, d_docroot, "sites") if d_docroot and d_docroot != "." else os.path.join(target_dir, "sites")
-                    os.makedirs(sites_php_dir, exist_ok=True)
-                    sites_php_file = os.path.join(sites_php_dir, "sites.php")
-                    with open(sites_php_file, "w") as sf:
-                        sf.write(SITES_PHP_TEMPLATE)
-                    log("✓ Arquitectura Multisite habilitada en sites/sites.php con mapeo dinámico.")
-
-            elif fw_id == "wordpress":
-                set_st("Configurando DDEV para WordPress...")
-                cfg_cmd = [
-                    "ddev", "config",
-                    f"--project-name={slug}",
-                    "--project-type=wordpress",
-                    "--docroot=.",
-                    f"--php-version={php_version}",
-                    f"--database={db_type}"
-                ]
-                run_subproc(cfg_cmd, target_dir, dialog)
-                
-                set_st("Levantando contenedores DDEV...")
-                run_subproc(["ddev", "start", "-y"], target_dir, dialog)
-                
-                set_st("Descargando núcleo de WordPress...")
-                run_subproc(["ddev", "wp", "core", "download"], target_dir, dialog)
-                
-                if auto_install:
-                    set_st("Instalando base de datos y usuario admin...")
-                    install_cmd = [
-                        "ddev", "wp", "core", "install",
-                        f"--url=https://{slug}.ddev.site",
-                        f"--title={slug.capitalize()}",
-                        "--admin_user=admin",
-                        "--admin_password=admin",
-                        "--admin_email=admin@example.com",
-                        "--skip-email"
-                    ]
-                    run_subproc(install_cmd, target_dir, dialog)
-                    log("\n🎉 WordPress instalado!")
-                    log("Credenciales: admin / admin")
-
-            elif fw_id == "laravel":
-                set_st("Configurando DDEV para Laravel...")
-                cfg_cmd = [
-                    "ddev", "config",
-                    f"--project-name={slug}",
-                    "--project-type=laravel",
-                    "--docroot=public",
-                    f"--php-version={php_version}",
-                ]
-                if db_type in ["none", "sqlite"]:
-                    cfg_cmd.append("--omit-containers=db")
-                else:
-                    cfg_cmd.append(f"--database={db_type}")
-                run_subproc(cfg_cmd, target_dir, dialog)
-                
-                set_st("Levantando contenedores DDEV...")
-                run_subproc(["ddev", "start", "-y"], target_dir, dialog)
-                
-                set_st("Instalando Laravel con Composer...")
-                run_subproc(["ddev", "composer", "create-project", "--prefer-dist", "laravel/laravel", "."], target_dir, dialog)
-                
-                if db_type == "sqlite":
-                    set_st("Configurando conexión SQLite en .env...")
-                    env_file = os.path.join(target_dir, ".env")
-                    if os.path.exists(env_file):
-                        with open(env_file, "r", encoding="utf-8") as ef:
-                            env_txt = ef.read()
-                        env_txt = re.sub(r'DB_CONNECTION=\w+', 'DB_CONNECTION=sqlite', env_txt)
-                        with open(env_file, "w", encoding="utf-8") as ef:
-                            ef.write(env_txt)
-                    run_subproc(["ddev", "exec", "touch database/database.sqlite"], target_dir, dialog)
-                    
-                set_st("Ejecutando migraciones iniciales de base de datos...")
-                run_subproc(["ddev", "exec", "php artisan migrate --force"], target_dir, dialog)
-                
-                log("\n🎉 ¡Proyecto Laravel listo y conectado a la base de datos!")
-
-            elif fw_id == "nextjs":
-                set_st("Configurando DDEV para Next.js (React Full-Stack)...")
-                cfg_cmd = [
-                    "ddev", "config",
-                    f"--project-name={slug}",
-                    "--project-type=generic",
-                    "--docroot=.",
-                    f"--nodejs-version={node_version}",
-                ]
-                if db_type in ["none", "sqlite"]:
-                    cfg_cmd.append("--omit-containers=db")
-                else:
-                    cfg_cmd.append(f"--database={db_type}")
-                run_subproc(cfg_cmd, target_dir, dialog)
-                
-                set_st("Levantando contenedores DDEV...")
-                run_subproc(["ddev", "start", "-y"], target_dir, dialog)
-                
-                set_st("Creando aplicación Next.js con App Router y Tailwind CSS...")
-                run_subproc([
-                    "ddev", "npx", "--yes", "create-next-app@latest", "tmp-next",
-                    "--typescript",
-                    "--tailwind",
-                    "--eslint",
-                    "--app",
-                    "--src-dir",
-                    '--import-alias=@/*',
-                    "--use-npm"
-                ], target_dir, dialog)
-                
-                set_st("Organizando estructura del proyecto...")
-                run_subproc(["ddev", "exec", "sh -c 'cp -a tmp-next/. . && rm -rf tmp-next'"], target_dir, dialog)
-                run_subproc(["ddev", "exec", "sed -i 's/\"dev\": \"next dev\"/\"dev\": \"next dev -H 0.0.0.0 -p 3000\"/g' package.json"], target_dir, dialog)
-                
-                set_st("Configurando Nginx Reverse Proxy y daemon en segundo plano...")
-                nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
-                os.makedirs(nginx_full_dir, exist_ok=True)
-                with open(os.path.join(nginx_full_dir, "nginx-site.conf"), "w") as nf:
-                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=3000))
-                with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
-                    df.write("""#ddev-silent-no-warn
-web_extra_daemons:
-  - name: nextjs-dev-server
-    command: "npm run dev"
-    directory: /var/www/html
-""")
-                set_st("Reiniciando DDEV para activar el servidor Next.js...")
-                run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
-                log("\n🎉 ¡Proyecto Next.js creado y ejecutándose en segundo plano!")
-
-            elif fw_id == "react":
-                set_st("Configurando DDEV para React...")
-                cfg_cmd = [
-                    "ddev", "config",
-                    f"--project-name={slug}",
-                    "--project-type=generic",
-                    "--docroot=.",
-                    f"--nodejs-version={node_version}"
-                ]
-                if db_type in ["none", "sqlite"]:
-                    cfg_cmd.append("--omit-containers=db")
-                else:
-                    cfg_cmd.append(f"--database={db_type}")
-                run_subproc(cfg_cmd, target_dir, dialog)
-                
-                set_st("Levantando contenedores DDEV...")
-                run_subproc(["ddev", "start", "-y"], target_dir, dialog)
-                
-                set_st("Creando plantilla React con Vite...")
-                run_subproc(["ddev", "npx", "--yes", "create-vite@latest", "tmp-vite", "--template", "react-ts"], target_dir, dialog)
-                
-                set_st("Organizando estructura del proyecto...")
-                run_subproc(["ddev", "exec", "sh -c 'cp -a tmp-vite/. . && rm -rf tmp-vite'"], target_dir, dialog)
-                run_subproc(["ddev", "exec", "sed -i 's/\"dev\": \"vite\"/\"dev\": \"vite --host 0.0.0.0 --port 5173\"/g' package.json"], target_dir, dialog)
-                
-                set_st("Configurando Vite para DDEV (allowedHosts y HMR)...")
-                vite_cfg_ts = os.path.join(target_dir, "vite.config.ts")
-                vite_cfg_js = os.path.join(target_dir, "vite.config.js")
-                react_vite_config = """import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    host: '0.0.0.0',
-    port: 5173,
-    strictPort: true,
-    allowedHosts: true,
-    hmr: {
-      clientPort: 443,
-    },
-  },
-})
-"""
-                if os.path.exists(vite_cfg_ts):
-                    with open(vite_cfg_ts, "w") as f:
-                        f.write(react_vite_config)
-                elif os.path.exists(vite_cfg_js):
-                    with open(vite_cfg_js, "w") as f:
-                        f.write(react_vite_config)
-                else:
-                    with open(vite_cfg_ts, "w") as f:
-                        f.write(react_vite_config)
-                
-                set_st("Instalando dependencias npm...")
-                run_subproc(["ddev", "npm", "install"], target_dir, dialog)
-                
-                set_st("Configurando Nginx Reverse Proxy y Live Dev Server...")
-                nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
-                os.makedirs(nginx_full_dir, exist_ok=True)
-                with open(os.path.join(nginx_full_dir, "nginx-site.conf"), "w") as nf:
-                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=5173))
-                with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
-                    df.write("""#ddev-silent-no-warn
-web_extra_daemons:
-  - name: react-dev-server
-    command: "npm run dev"
-    directory: /var/www/html
-""")
-                set_st("Reiniciando DDEV para activar React Live Dev Server...")
-                run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
-                log("\n🎉 Proyecto React listo con Live Fast Refresh en segundo plano!")
-
-            elif fw_id == "vue":
-                set_st("Configurando DDEV para Vue 3...")
-                cfg_cmd = [
-                    "ddev", "config",
-                    f"--project-name={slug}",
-                    "--project-type=generic",
-                    "--docroot=.",
-                    f"--nodejs-version={node_version}"
-                ]
-                if db_type in ["none", "sqlite"]:
-                    cfg_cmd.append("--omit-containers=db")
-                else:
-                    cfg_cmd.append(f"--database={db_type}")
-                run_subproc(cfg_cmd, target_dir, dialog)
-                
-                set_st("Levantando contenedores DDEV...")
-                run_subproc(["ddev", "start", "-y"], target_dir, dialog)
-                
-                set_st("Creando plantilla Vue 3 con Vite...")
-                run_subproc(["ddev", "npx", "--yes", "create-vite@latest", "tmp-vite", "--template", "vue-ts"], target_dir, dialog)
-                
-                set_st("Organizando estructura del proyecto...")
-                run_subproc(["ddev", "exec", "sh -c 'cp -a tmp-vite/. . && rm -rf tmp-vite'"], target_dir, dialog)
-                run_subproc(["ddev", "exec", "sed -i 's/\"dev\": \"vite\"/\"dev\": \"vite --host 0.0.0.0 --port 5173\"/g' package.json"], target_dir, dialog)
-                
-                set_st("Configurando Vite para DDEV (allowedHosts y HMR)...")
-                vite_cfg_ts = os.path.join(target_dir, "vite.config.ts")
-                vite_cfg_js = os.path.join(target_dir, "vite.config.js")
-                vue_vite_config = """import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [vue()],
-  server: {
-    host: '0.0.0.0',
-    port: 5173,
-    strictPort: true,
-    allowedHosts: true,
-    hmr: {
-      clientPort: 443,
-    },
-  },
-})
-"""
-                if os.path.exists(vite_cfg_ts):
-                    with open(vite_cfg_ts, "w") as f:
-                        f.write(vue_vite_config)
-                elif os.path.exists(vite_cfg_js):
-                    with open(vite_cfg_js, "w") as f:
-                        f.write(vue_vite_config)
-                else:
-                    with open(vite_cfg_ts, "w") as f:
-                        f.write(vue_vite_config)
-                
-                set_st("Instalando dependencias npm...")
-                run_subproc(["ddev", "npm", "install"], target_dir, dialog)
-                
-                set_st("Configurando Nginx Reverse Proxy y Live Dev Server...")
-                nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
-                os.makedirs(nginx_full_dir, exist_ok=True)
-                with open(os.path.join(nginx_full_dir, "nginx-site.conf"), "w") as nf:
-                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=5173))
-                with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
-                    df.write("""#ddev-silent-no-warn
-web_extra_daemons:
-  - name: vue-dev-server
-    command: "npm run dev"
-    directory: /var/www/html
-""")
-                set_st("Reiniciando DDEV para activar Vue 3 Live Dev Server...")
-                run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
-                log("\n🎉 Proyecto Vue 3 listo con Live Fast Refresh en segundo plano!")
-
-            elif fw_id == "django":
-                set_st("Configurando DDEV para Django...")
-                cfg_cmd = [
-                    "ddev", "config",
-                    f"--project-name={slug}",
-                    "--project-type=generic",
-                    "--docroot=.",
-                    "--webimage-extra-packages=python3-venv,python3-pip"
-                ]
-                if db_type in ["none", "sqlite"]:
-                    cfg_cmd.append("--omit-containers=db")
-                else:
-                    cfg_cmd.append(f"--database={db_type}")
-                run_subproc(cfg_cmd, target_dir, dialog)
-                
-                set_st("Iniciando contenedores DDEV...")
-                run_subproc(["ddev", "start", "-y"], target_dir, dialog)
-                
-                set_st("Creando entorno virtual Python (.venv)...")
-                run_subproc(["ddev", "exec", "python3 -m venv /var/www/html/.venv"], target_dir, dialog)
-                
-                set_st("Instalando Django y conectores de base de datos...")
-                pip_pkgs = "django"
-                if db_type != "sqlite":
-                    pip_pkgs += " PyMySQL cryptography psycopg2-binary"
-                run_subproc(["ddev", "exec", f"/var/www/html/.venv/bin/pip install {pip_pkgs}"], target_dir, dialog)
-                
-                set_st("Generando estructura inicial de Django...")
-                run_subproc(["ddev", "exec", "/var/www/html/.venv/bin/django-admin startproject app ."], target_dir, dialog)
-                
-                set_st("Configurando base de datos y ALLOWED_HOSTS...")
-                settings_py_path = os.path.join(target_dir, "app", "settings.py")
-                if os.path.exists(settings_py_path):
-                    try:
-                        with open(settings_py_path, "r") as sf:
-                            s_code = sf.read()
-                        s_code = s_code.replace("ALLOWED_HOSTS = []", "ALLOWED_HOSTS = ['*']")
-                        if db_type == "sqlite":
-                            # Django ya viene preconfigurado con SQLite por defecto
-                            pass
-                        elif "postgres" in db_type:
-                            db_block = """DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'db',
-        'USER': 'db',
-        'PASSWORD': 'db',
-        'HOST': 'db',
-        'PORT': '5432',
-    }
-}"""
-                            s_code = re.sub(r'DATABASES\s*=\s*\{.*?\n\}', db_block, s_code, flags=re.DOTALL)
-                        else:
-                            db_block = """import pymysql
-pymysql.install_as_MySQLdb()
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'db',
-        'USER': 'db',
-        'PASSWORD': 'db',
-        'HOST': 'db',
-        'PORT': '3306',
-    }
-}"""
-                            s_code = re.sub(r'DATABASES\s*=\s*\{.*?\n\}', db_block, s_code, flags=re.DOTALL)
-                        with open(settings_py_path, "w") as sf:
-                            sf.write(s_code)
-                    except Exception as ex:
-                        log(f"Nota en settings.py: {ex}")
-                        
-                set_st("Ejecutando migraciones de base de datos...")
-                run_subproc(["ddev", "exec", "/var/www/html/.venv/bin/python manage.py migrate"], target_dir, dialog)
-                
-                if auto_install:
-                    set_st("Creando superusuario administrador (admin / admin)...")
-                    superuser_script = "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').exists() or User.objects.create_superuser('admin', 'admin@example.com', 'admin')"
-                    run_subproc(["ddev", "exec", f'/var/www/html/.venv/bin/python manage.py shell -c "{superuser_script}"'], target_dir, dialog)
-                    log("\n👑 Superusuario creado: admin / admin (Panel en /admin)")
-                    
-                set_st("Configurando Nginx Reverse Proxy y daemon de fondo...")
-                nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
-                os.makedirs(nginx_full_dir, exist_ok=True)
-                with open(os.path.join(nginx_full_dir, "nginx-site.conf"), "w") as nf:
-                    nf.write("""server {
-    listen 80 default_server;
-    listen 443 ssl default_server;
-
-    root /var/www/html;
-
-    ssl_certificate /etc/ssl/certs/master.crt;
-    ssl_certificate_key /etc/ssl/certs/master.key;
-
-    include /etc/nginx/monitoring.conf;
-
-    error_log /dev/stdout info;
-    access_log /var/log/nginx/access.log;
-
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 600s;
-    }
-
-    include /etc/nginx/common.d/*.conf;
-    include /mnt/ddev_config/nginx/*.conf;
-}
-""")
-                with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
-                    df.write("""#ddev-silent-no-warn
-web_extra_daemons:
-  - name: django
-    command: "/var/www/html/.venv/bin/python manage.py runserver 0.0.0.0:8000"
-    directory: /var/www/html
-""")
-                set_st("Reiniciando servidor DDEV para activar Django...")
-                run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
-                log("\n🎉 Proyecto Django listo y corriendo!")
-
-            elif fw_id == "flask":
-                set_st("Configurando DDEV para Flask...")
-                cfg_cmd = [
-                    "ddev", "config",
-                    f"--project-name={slug}",
-                    "--project-type=generic",
-                    "--docroot=.",
-                    "--webimage-extra-packages=python3-venv,python3-pip"
-                ]
-                if db_type in ["none", "sqlite"]:
-                    cfg_cmd.append("--omit-containers=db")
-                else:
-                    cfg_cmd.append(f"--database={db_type}")
-                run_subproc(cfg_cmd, target_dir, dialog)
-                
-                set_st("Iniciando contenedores DDEV...")
-                run_subproc(["ddev", "start", "-y"], target_dir, dialog)
-                
-                set_st("Creando entorno virtual Python (.venv)...")
-                run_subproc(["ddev", "exec", "python3 -m venv /var/www/html/.venv"], target_dir, dialog)
-                
-                set_st("Instalando Flask y conectores...")
-                run_subproc(["ddev", "exec", "/var/www/html/.venv/bin/pip install flask pymysql psycopg2-binary cryptography python-dotenv"], target_dir, dialog)
-                
-                set_st("Creando aplicación inicial app.py...")
-                app_py_path = os.path.join(target_dir, "app.py")
-                flask_code = f"""from flask import Flask, render_template_string
-
-app = Flask(__name__)
-
-HTML_TEMPLATE = \"\"\"<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{slug} - Flask en DDEV</title>
-    <style>
-        body {{ font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
-        .card {{ background: #1e293b; padding: 2.5rem; border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; max-width: 500px; border: 1px solid rgba(255,255,255,0.1); }}
-        h1 {{ color: #38bdf8; margin-top: 0; }}
-        .badge {{ background: #0284c7; padding: 4px 12px; border-radius: 9999px; font-size: 0.85rem; font-weight: bold; display: inline-block; margin-top: 10px; }}
-        p {{ color: #94a3b8; line-height: 1.5; }}
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h1>¡Flask en DDEV Studio! 🚀</h1>
-        <p>Tu aplicación <b>{slug}</b> con microframework Flask está corriendo exitosamente.</p>
-        <span class="badge">Python 3 + Flask + DDEV</span>
-    </div>
-</body>
-</html>\"\"\"
-
-@app.route('/')
-def home():
-    return render_template_string(HTML_TEMPLATE)
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-"""
-                with open(app_py_path, "w") as f:
-                    f.write(flask_code)
-
-                set_st("Configurando Nginx Reverse Proxy y daemon de fondo...")
-                nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
-                os.makedirs(nginx_full_dir, exist_ok=True)
-                with open(os.path.join(nginx_full_dir, "nginx-site.conf"), "w") as nf:
-                    nf.write("""server {
-    listen 80 default_server;
-    listen 443 ssl default_server;
-
-    root /var/www/html;
-
-    ssl_certificate /etc/ssl/certs/master.crt;
-    ssl_certificate_key /etc/ssl/certs/master.key;
-
-    include /etc/nginx/monitoring.conf;
-
-    error_log /dev/stdout info;
-    access_log /var/log/nginx/access.log;
-
-    location / {
-        proxy_pass http://127.0.0.1:5000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 600s;
-    }
-
-    include /etc/nginx/common.d/*.conf;
-    include /mnt/ddev_config/nginx/*.conf;
-}
-""")
-                with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
-                    df.write("""#ddev-silent-no-warn
-web_extra_daemons:
-  - name: flask
-    command: "/var/www/html/.venv/bin/python app.py"
-    directory: /var/www/html
-""")
-                set_st("Reiniciando servidor DDEV para activar Flask...")
-                run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
-                log("\n🎉 Proyecto Flask listo y corriendo!")
-
-            elif fw_id == "angular":
-                set_st("Configurando DDEV para Angular...")
-                cfg_cmd = [
-                    "ddev", "config",
-                    f"--project-name={slug}",
-                    "--project-type=generic",
-                    "--docroot=.",
-                    f"--nodejs-version={node_version}",
-                    "--web-environment-add=NG_CLI_ANALYTICS=false"
-                ]
-                if db_type in ["none", "sqlite"]:
-                    cfg_cmd.append("--omit-containers=db")
-                else:
-                    cfg_cmd.append(f"--database={db_type}")
-                run_subproc(cfg_cmd, target_dir, dialog)
-
-                set_st("Iniciando contenedores DDEV...")
-                run_subproc(["ddev", "start", "-y"], target_dir, dialog)
-                
-                set_st("Creando proyecto Angular con @angular/cli...")
-                run_subproc(["ddev", "exec", "NG_CLI_ANALYTICS=false npx -y @angular/cli new tmp-ng --routing --style=css --skip-git --defaults"], target_dir, dialog)
-                run_subproc(["ddev", "exec", "sh -c 'cp -a tmp-ng/. . && rm -rf tmp-ng'"], target_dir, dialog)
-                
-                set_st("Configurando Nginx Reverse Proxy y Live Dev Server...")
-                nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
-                os.makedirs(nginx_full_dir, exist_ok=True)
-                with open(os.path.join(nginx_full_dir, "nginx-site.conf"), "w") as nf:
-                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=4200))
-                with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
-                    df.write("""#ddev-silent-no-warn
-web_extra_daemons:
-  - name: angular
-    command: "npx ng serve --host 0.0.0.0 --port 4200 --allowed-hosts"
-    directory: /var/www/html
-""")
-                set_st("Reiniciando DDEV para activar Angular Live Dev Server...")
-                run_subproc(["ddev", "restart", "-y"], target_dir, dialog)
-                log("\n🎉 Proyecto Angular listo y corriendo!")
-
-            elif fw_id == "symfony":
-                set_st("Configurando DDEV para Symfony...")
-                cfg_cmd = [
-                    "ddev", "config",
-                    f"--project-name={slug}",
-                    "--project-type=php",
-                    "--docroot=public",
-                    f"--php-version={php_version}",
-                    f"--database={db_type}"
-                ]
-                run_subproc(cfg_cmd, target_dir, dialog)
-                
-                set_st("Levantando contenedores DDEV...")
-                run_subproc(["ddev", "start", "-y"], target_dir, dialog)
-                
-                set_st("Descargando e instalando Symfony Skeleton...")
-                run_subproc(["ddev", "composer", "create-project", "symfony/skeleton", "."], target_dir, dialog)
-                
-                set_st("Instalando componentes web (webapp)...")
-                run_subproc(["ddev", "composer", "require", "webapp", "-n"], target_dir, dialog)
-                
-                set_st("Configurando conexión a base de datos DDEV...")
-                env_local_file = os.path.join(target_dir, ".env.local")
-                with open(env_local_file, "w") as ef:
-                    ef.write('DATABASE_URL="mysql://db:db@db:3306/db?serverVersion=mariadb-10.11.8&charset=utf8mb4"\n')
-                
-                log("\n🎉 ¡Proyecto Symfony listo y conectado a la base de datos!")
-
-            else:  # Generic PHP
-                set_st("Configurando DDEV PHP...")
-                cfg_cmd = [
-                    "ddev", "config",
-                    f"--project-name={slug}",
-                    "--project-type=php",
-                    "--docroot=.",
-                    f"--php-version={php_version}"
-                ]
-                if db_type in ["none", "sqlite"]:
-                    cfg_cmd.append("--omit-containers=db")
-                else:
-                    cfg_cmd.append(f"--database={db_type}")
-                run_subproc(cfg_cmd, target_dir, dialog)
-                
-                index_path = os.path.join(target_dir, "index.php")
-                if not os.path.exists(index_path):
-                    with open(index_path, "w") as f:
-                        f.write(f"""<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>{slug} - DDEV Studio</title>
-    <style>
-        body {{ font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
-        .card {{ background: #1e293b; padding: 2.5rem; border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; max-width: 500px; }}
-        h1 {{ color: #38bdf8; margin-top: 0; }}
-        .badge {{ background: #0284c7; padding: 4px 12px; border-radius: 9999px; font-size: 0.85rem; }}
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h1>¡Proyecto {slug} Activo! 🚀</h1>
-        <p>Tu entorno DDEV está corriendo perfectamente</p>
-        <p><span class="badge">PHP <?php echo phpversion(); ?></span></p>
-    </div>
-</body>
-</html>""")
-                
-                set_st("Levantando contenedores DDEV...")
-                run_subproc(["ddev", "start", "-y"], target_dir, dialog)
-                log("\n🎉 Proyecto PHP listo!")
-
-            log("\n" + "="*50)
-            log(f"URL: {primary_url}")
-            log("¡Completado con éxito!")
+            ctx.log("\n" + "="*50)
+            ctx.log(f"URL: {primary_url}")
+            ctx.log("¡Completado con éxito!")
             GLib.idle_add(dialog.finish, True, f"¡Proyecto '{slug}' creado con éxito!", primary_url, target_dir)
             if on_success_callback:
                 GLib.idle_add(on_success_callback)
-            
+
         except Exception as e:
-            log(f"\n❌ ERROR: {str(e)}")
+            logger.error(f"Error creando proyecto '{slug}': {e}", exc_info=True)
+            ctx.log(f"\n❌ ERROR: {str(e)}")
             GLib.idle_add(dialog.finish, False, f"Error en la creación: {str(e)}", "", target_dir)
-            
+
     threading.Thread(target=run_creation, daemon=True).start()
 
 
-def run_import_project(parent_window, target_dir, slug, p_type, docroot, php_ver, node_ver, db_type, is_multisite, do_composer, on_success_callback=None):
+def run_import_project(
+    parent_window,
+    target_dir,
+    slug,
+    p_type,
+    docroot,
+    php_ver,
+    node_ver,
+    db_type,
+    is_multisite,
+    do_composer,
+    on_success_callback=None
+):
     """
     Ejecuta el flujo de importación y configuración de un proyecto local existente en DDEV.
     """
     slug = sanitize_project_name(slug or os.path.basename(target_dir.rstrip("/")))
     node_ver = re.sub(r'[^\d]', '', str(node_ver or '')) or "22"
-    
+
     is_php = ("drupal" in p_type) or p_type in ["laravel", "php", "symfony", "wordpress"]
     is_node = p_type in ["angular", "react", "vue", "nextjs", "generic"]
     is_python = p_type in ["django", "flask"]
-    
+
     dialog = ProgressDialog(parent_window, title=f"Importando Proyecto: {slug}")
     dialog.set_status(f"Configurando DDEV en {target_dir}...")
-    
+
     def run_import():
         try:
             def log(text):
                 GLib.idle_add(dialog.append_log, text + "\n")
+
             def set_st(st):
                 GLib.idle_add(dialog.set_status, st)
-                
+
             log(f"📁 Directorio base: {target_dir}")
             log(f"🚀 Tecnología: {p_type} | Docroot: {docroot}")
             if is_php:
@@ -887,7 +158,7 @@ def run_import_project(parent_window, target_dir, slug, p_type, docroot, php_ver
             elif is_python:
                 log(f"🐍 Python 3 + venv | BD: {db_type}")
             log("="*50)
-            
+
             # 1. ddev config
             set_st("Configurando DDEV en el proyecto...")
             ddev_type = p_type
@@ -895,14 +166,14 @@ def run_import_project(parent_window, target_dir, slug, p_type, docroot, php_ver
                 ddev_type = "generic"
             elif p_type == "symfony":
                 ddev_type = "php"
-                
+
             cfg_cmd = [
                 "ddev", "config",
                 f"--project-name={slug}",
                 f"--project-type={ddev_type}",
                 f"--docroot={docroot}"
             ]
-            
+
             if is_php:
                 cfg_cmd.append(f"--php-version={php_ver}")
             elif is_node:
@@ -911,60 +182,36 @@ def run_import_project(parent_window, target_dir, slug, p_type, docroot, php_ver
                     cfg_cmd.append("--web-environment-add=NG_CLI_ANALYTICS=false")
             elif is_python:
                 cfg_cmd.append("--webimage-extra-packages=python3-venv,python3-pip")
-                
+
             if db_type == "none":
                 cfg_cmd.append("--omit-containers=db")
             else:
                 cfg_cmd.append(f"--database={db_type}")
-                
+
             run_subproc(cfg_cmd, target_dir, dialog)
-            
+
             # Daemon & Reverse Proxy for non-PHP stacks if needed
-            if p_type == "django":
-                os.makedirs(os.path.join(target_dir, ".ddev", "nginx_full"), exist_ok=True)
-                with open(os.path.join(target_dir, ".ddev", "nginx_full", "nginx-site.conf"), "w") as nf:
-                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=8000))
-                with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
-                    df.write("""#ddev-silent-no-warn
+            daemon_map = {
+                "django": (8000, "django-server", "/var/www/html/.venv/bin/python manage.py runserver 0.0.0.0:8000"),
+                "flask": (5000, "flask-server", "/var/www/html/.venv/bin/python app.py"),
+                "angular": (4200, "angular-dev-server", "npx ng serve --host 0.0.0.0 --port 4200 --allowed-hosts"),
+                "nextjs": (3000, "nextjs-dev-server", "npm run dev"),
+            }
+
+            if p_type in daemon_map:
+                port, daemon_name, daemon_cmd = daemon_map[p_type]
+                nginx_full_dir = os.path.join(target_dir, ".ddev", "nginx_full")
+                os.makedirs(nginx_full_dir, exist_ok=True)
+                with open(os.path.join(nginx_full_dir, "nginx-site.conf"), "w", encoding="utf-8") as nf:
+                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=port))
+                with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w", encoding="utf-8") as df:
+                    df.write(f"""#ddev-silent-no-warn
 web_extra_daemons:
-  - name: django-server
-    command: "/var/www/html/.venv/bin/python manage.py runserver 0.0.0.0:8000"
+  - name: {daemon_name}
+    command: "{daemon_cmd}"
     directory: /var/www/html
 """)
-            elif p_type == "flask":
-                os.makedirs(os.path.join(target_dir, ".ddev", "nginx_full"), exist_ok=True)
-                with open(os.path.join(target_dir, ".ddev", "nginx_full", "nginx-site.conf"), "w") as nf:
-                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=5000))
-                with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
-                    df.write("""#ddev-silent-no-warn
-web_extra_daemons:
-  - name: flask-server
-    command: "/var/www/html/.venv/bin/python app.py"
-    directory: /var/www/html
-""")
-            elif p_type == "angular":
-                os.makedirs(os.path.join(target_dir, ".ddev", "nginx_full"), exist_ok=True)
-                with open(os.path.join(target_dir, ".ddev", "nginx_full", "nginx-site.conf"), "w") as nf:
-                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=4200))
-                with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
-                    df.write("""#ddev-silent-no-warn
-web_extra_daemons:
-  - name: angular-dev-server
-    command: "npx ng serve --host 0.0.0.0 --port 4200 --allowed-hosts"
-    directory: /var/www/html
-""")
-            elif p_type == "nextjs":
-                os.makedirs(os.path.join(target_dir, ".ddev", "nginx_full"), exist_ok=True)
-                with open(os.path.join(target_dir, ".ddev", "nginx_full", "nginx-site.conf"), "w") as nf:
-                    nf.write(NGINX_FULL_PROXY_TEMPLATE.format(port=3000))
-                with open(os.path.join(target_dir, ".ddev", "config.daemon.yaml"), "w") as df:
-                    df.write("""#ddev-silent-no-warn
-web_extra_daemons:
-  - name: nextjs-dev-server
-    command: "npm run dev"
-    directory: /var/www/html
-""")
-            
+
             # 2. Dynamic sites.php if Drupal Multisite
             if is_multisite:
                 set_st("Configurando enrutador dinámico Drupal Multisite...")
@@ -972,7 +219,7 @@ web_extra_daemons:
                 os.makedirs(sites_dir, exist_ok=True)
                 sites_php_file = os.path.join(sites_dir, "sites.php")
                 if not os.path.exists(sites_php_file):
-                    with open(sites_php_file, "w") as sf:
+                    with open(sites_php_file, "w", encoding="utf-8") as sf:
                         sf.write(SITES_PHP_TEMPLATE)
                     log("✓ Archivo sites.php con mapeo dinámico multisite creado.")
                 else:
@@ -981,7 +228,7 @@ web_extra_daemons:
             # 3. Start containers
             set_st("Iniciando contenedores DDEV...")
             run_subproc(["ddev", "start", "-y"], target_dir, dialog)
-            
+
             # 4. Dependency install if requested and needed
             if do_composer:
                 vendor_dir = os.path.join(target_dir, "vendor")
@@ -991,7 +238,7 @@ web_extra_daemons:
                     log("📦 Ejecutando 'ddev composer install'...")
                     run_subproc(["ddev", "composer", "install"], target_dir, dialog)
                     log("✓ Dependencias de Composer instaladas.")
-                    
+
                 node_modules = os.path.join(target_dir, "node_modules")
                 package_json = os.path.join(target_dir, "package.json")
                 if os.path.exists(package_json) and not os.path.exists(node_modules) and not os.path.exists(composer_json):
@@ -999,7 +246,7 @@ web_extra_daemons:
                     log("📦 Ejecutando 'ddev npm install'...")
                     run_subproc(["ddev", "npm", "install"], target_dir, dialog)
                     log("✓ Dependencias de Node.js instaladas.")
-                    
+
                 req_txt = os.path.join(target_dir, "requirements.txt")
                 venv_dir = os.path.join(target_dir, ".venv")
                 if os.path.exists(req_txt) and not os.path.exists(venv_dir):
@@ -1007,18 +254,19 @@ web_extra_daemons:
                     log("🐍 Creando .venv e instalando dependencias...")
                     run_subproc(["ddev", "exec", "python3 -m venv /var/www/html/.venv && /var/www/html/.venv/bin/pip install -r requirements.txt"], target_dir, dialog)
                     log("✓ Dependencias de Python instaladas.")
-                    
+
             primary_url = f"https://{slug}.ddev.site"
             log("\n" + "="*50)
             log(f"¡Proyecto '{slug}' importado y activado con éxito!")
             log(f"🌐 URL: {primary_url}")
-            
+
             GLib.idle_add(dialog.finish, True, f"¡Proyecto '{slug}' listo!", primary_url, target_dir)
             if on_success_callback:
                 GLib.idle_add(on_success_callback)
-            
+
         except Exception as ex:
+            logger.error(f"Error importando proyecto '{slug}': {ex}", exc_info=True)
             log(f"\n❌ ERROR: {str(ex)}")
             GLib.idle_add(dialog.finish, False, f"Error importando proyecto: {str(ex)}", "", target_dir)
-            
+
     threading.Thread(target=run_import, daemon=True).start()
