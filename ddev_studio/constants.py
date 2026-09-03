@@ -275,6 +275,39 @@ CUSTOM_CSS = b"""
     font-weight: 600;
     border: 1px solid alpha(#f59e0b, 0.4);
 }
+
+.kpi-card {
+    border-radius: 12px;
+    border: 1px solid rgba(128, 128, 128, 0.22);
+    background: alpha(@theme_base_color, 0.5);
+    padding: 12px 14px;
+    min-height: 85px;
+}
+.kpi-title {
+    font-size: 11px;
+    font-weight: bold;
+    color: #94a3b8;
+}
+.kpi-val {
+    font-size: 19px;
+    font-weight: 800;
+    color: @theme_text_color;
+    margin: 2px 0;
+}
+.kpi-sub {
+    font-size: 11px;
+    color: #94a3b8;
+}
+.monitor-treeview {
+    border-radius: 8px;
+    border: 1px solid rgba(128, 128, 128, 0.18);
+    background: alpha(@theme_base_color, 0.4);
+}
+.badge-monitor-scope {
+    background-color: alpha(@theme_selected_bg_color, 0.2);
+    color: @theme_text_color;
+    font-weight: bold;
+}
 """
 
 FRAMEWORKS = [

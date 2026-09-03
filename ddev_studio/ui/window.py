@@ -31,6 +31,7 @@ from ddev_studio.ui.views.details import ProjectDetailsView
 from ddev_studio.ui.views.subsites import SubsitesManagerView
 from ddev_studio.ui.views.drupal_tools import DrupalToolsView
 from ddev_studio.ui.views.addons import AddonsMarketplaceView
+from ddev_studio.ui.views.docker_monitor import DockerMonitorView
 
 
 class DDEVManagerWindow(Gtk.Window):
@@ -47,12 +48,15 @@ class DDEVManagerWindow(Gtk.Window):
         self.combo_tech_filter_handler_id = None
         
         css_provider = Gtk.CssProvider()
-        css_provider.load_from_data(CUSTOM_CSS)
-        Gtk.StyleContext.add_provider_for_screen(
-            Gdk.Screen.get_default(),
-            css_provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
+        try:
+            css_provider.load_from_data(CUSTOM_CSS.encode("utf-8") if isinstance(CUSTOM_CSS, str) else CUSTOM_CSS)
+            Gtk.StyleContext.add_provider_for_screen(
+                Gdk.Screen.get_default(),
+                css_provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            )
+        except Exception as ex:
+            print("Aviso: No se pudo cargar el CSS personalizado:", ex)
         
         self.build_headerbar()
         self.build_main_layout()
@@ -125,6 +129,15 @@ class DDEVManagerWindow(Gtk.Window):
         lbl_addons.pack_start(Gtk.Label(label="Add-ons"), False, False, 0)
         lbl_addons.show_all()
         self.notebook.append_page(self.tab_addons, lbl_addons)
+        
+        self.notebook.connect("switch-page", self.on_notebook_page_switched)
+
+    def on_notebook_page_switched(self, notebook, page, page_num):
+        if hasattr(self, "docker_monitor_view"):
+            if page_num == 2:
+                self.docker_monitor_view.resume_polling()
+            else:
+                self.docker_monitor_view.pause_polling()
 
     def switch_to_new_project_tab(self, mode="create"):
         self.notebook.set_current_page(1)
@@ -847,6 +860,8 @@ class DDEVManagerWindow(Gtk.Window):
         
         if hasattr(self, "tab_addons"):
             self.tab_addons.update_projects(projects)
+        if hasattr(self, "docker_monitor_view"):
+            self.docker_monitor_view.update_projects(projects)
         
         # Calcular conteos por categoría de tecnología
         cat_counts = {"all": len(projects)}
@@ -1503,11 +1518,16 @@ class DDEVManagerWindow(Gtk.Window):
             self.execute_simple_action("delete -O", proj)
 
     def build_tab_tools(self):
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_vexpand(True)
+        
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        box.set_margin_start(24)
-        box.set_margin_end(24)
-        box.set_margin_top(20)
-        box.set_margin_bottom(24)
+        box.set_margin_start(20)
+        box.set_margin_end(20)
+        box.set_margin_top(16)
+        box.set_margin_bottom(20)
+        scrolled.add(box)
         
         lbl_title = Gtk.Label()
         lbl_title.set_markup("<b>Herramientas Globales de DDEV</b>")
@@ -1555,12 +1575,20 @@ class DDEVManagerWindow(Gtk.Window):
         btn_router.connect("clicked", lambda b: webbrowser.open("http://127.0.0.1:10999"))
         grid.attach(btn_router, 1, 1, 1, 1)
         
-        info_frame = Gtk.Frame(label=" Estado del Sistema ")
-        info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        info_box.set_margin_start(12)
-        info_box.set_margin_end(12)
-        info_box.set_margin_top(12)
-        info_box.set_margin_bottom(12)
+        # Separador y Monitor de Recursos Docker en Vivo
+        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        box.pack_start(sep, False, False, 4)
+        
+        self.docker_monitor_view = DockerMonitorView(self)
+        box.pack_start(self.docker_monitor_view, True, True, 0)
+        
+        # Estado básico del sistema
+        info_frame = Gtk.Frame(label=" Versiones del Entorno ")
+        info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        info_box.set_margin_start(10)
+        info_box.set_margin_end(10)
+        info_box.set_margin_top(8)
+        info_box.set_margin_bottom(8)
         
         self.lbl_system_info = Gtk.Label()
         self.lbl_system_info.set_halign(Gtk.Align.START)
@@ -1570,7 +1598,7 @@ class DDEVManagerWindow(Gtk.Window):
         box.pack_start(info_frame, False, False, 0)
         
         self.update_system_info()
-        return box
+        return scrolled
 
     def update_system_info(self):
         def task():

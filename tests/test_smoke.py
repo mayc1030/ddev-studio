@@ -237,6 +237,8 @@ class TestImports(unittest.TestCase):
         import ddev_studio.ui.views.subsites
         import ddev_studio.ui.views.drupal_tools
         import ddev_studio.ui.views.addons
+        import ddev_studio.core.docker_monitor
+        import ddev_studio.ui.views.docker_monitor
         import ddev_studio.ui.window
         import ddev_studio.main
         self.assertIsNotNone(ddev_studio.__version__)
@@ -266,6 +268,17 @@ class TestImports(unittest.TestCase):
         ]
         view.update_projects(demo_projects)
         self.assertEqual(len(view.projects), 1)
+
+    def test_docker_monitor_view_instantiation(self):
+        from ddev_studio.ui.views.docker_monitor import DockerMonitorView
+        view = DockerMonitorView(main_app=None)
+        self.assertIsNotNone(view)
+        demo_projects = [
+            {"name": "multisitio", "status": "running", "approot": "/tmp/multisitio"}
+        ]
+        view.update_projects(demo_projects)
+        self.assertIn("multisitio", view.known_projects)
+        view.stop_polling()
 
 
 if __name__ == "__main__":
