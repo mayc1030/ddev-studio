@@ -656,7 +656,7 @@ class DDEVManagerWindow(Gtk.Window):
             menu_btn_drush.add(b_drush_lbl)
             
             drush_menu = Gtk.Menu()
-            drush_menu.append(create_icon_menu_item("system-run-symbolic", "🛠️ Asistente de Código y APIs Drupal...", lambda w, pr=proj: self.open_drupal_tools(pr, from_view="list")))
+            drush_menu.append(create_icon_menu_item("system-run-symbolic", "Asistente de Código y APIs Drupal...", lambda w, pr=proj: self.open_drupal_tools(pr, from_view="list")))
             drush_menu.append(Gtk.SeparatorMenuItem())
             drush_menu.append(create_icon_menu_item("dialog-password-symbolic", "Iniciar Sesión Admin (drush uli)", lambda w, pr=proj: self.execute_drush_action("uli", pr)))
             drush_menu.append(create_icon_menu_item("view-refresh-symbolic", "Limpiar / Reconstruir Caché (drush cr)", lambda w, pr=proj: self.execute_drush_action("cr", pr)))

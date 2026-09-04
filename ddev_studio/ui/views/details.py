@@ -910,7 +910,7 @@ class ProjectDetailsView(Gtk.Box):
             btn_d_modal = Gtk.Button()
             b_dm = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
             b_dm.pack_start(Gtk.Image.new_from_icon_name("system-run-symbolic", Gtk.IconSize.MENU), False, False, 0)
-            b_dm.pack_start(Gtk.Label(label="🛠️ Abrir Asistente de Código y APIs Drupal..."), False, False, 0)
+            b_dm.pack_start(Gtk.Label(label="Abrir Asistente de Código y APIs Drupal..."), False, False, 0)
             btn_d_modal.add(b_dm)
             btn_d_modal.get_style_context().add_class("btn-drupal")
             btn_d_modal.connect("clicked", lambda b: self.show_drupal_tools_dialog())

@@ -625,7 +625,7 @@ class SubsitesManagerView(Gtk.Box):
         menu_btn_drush.add(b_drush_lbl)
         
         drush_menu = Gtk.Menu()
-        drush_menu.append(create_icon_menu_item("system-run-symbolic", "🛠️ Asistente de Código y APIs Drupal...", lambda w, s=subsite: self.open_subsite_drupal_tools(s)))
+        drush_menu.append(create_icon_menu_item("system-run-symbolic", "Asistente de Código y APIs Drupal...", lambda w, s=subsite: self.open_subsite_drupal_tools(s)))
         drush_menu.append(Gtk.SeparatorMenuItem())
         drush_menu.append(create_icon_menu_item("dialog-password-symbolic", "Iniciar Sesión Admin (drush uli)", lambda w: self.execute_subsite_drush_action("uli", subsite["name"], subsite_url, base_dir)))
         drush_menu.append(create_icon_menu_item("view-refresh-symbolic", "Limpiar / Reconstruir Caché (drush cr)", lambda w: self.execute_subsite_drush_action("cr", subsite["name"], subsite_url, base_dir)))
