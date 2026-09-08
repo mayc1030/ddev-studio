@@ -321,6 +321,27 @@ class TestDrupalTools(unittest.TestCase):
         self.assertIn("drush theme:enable admin_subtheme -y", cmd2[4])
         self.assertIn("drush config-set system.theme admin admin_subtheme -y", cmd2[4])
 
+    def test_drupal_uninstall_helpers(self):
+        from ddev_studio.core.drupal_tools import get_drupal_uninstall_anchor, get_drupal_uninstall_url
+
+        self.assertEqual(get_drupal_uninstall_anchor("token"), "edit-uninstall-token")
+        self.assertEqual(get_drupal_uninstall_anchor("simple_oauth"), "edit-uninstall-simple-oauth")
+        self.assertEqual(get_drupal_uninstall_anchor("jsonapi_extras"), "edit-uninstall-jsonapi-extras")
+        self.assertEqual(get_drupal_uninstall_anchor("devel_php"), "edit-uninstall-devel-php")
+
+        self.assertEqual(
+            get_drupal_uninstall_url("https://mysite.ddev.site"),
+            "https://mysite.ddev.site/admin/modules/uninstall"
+        )
+        self.assertEqual(
+            get_drupal_uninstall_url("https://mysite.ddev.site/", "token"),
+            "https://mysite.ddev.site/admin/modules/uninstall#edit-uninstall-token"
+        )
+        self.assertEqual(
+            get_drupal_uninstall_url("https://mysite.ddev.site", "simple_oauth"),
+            "https://mysite.ddev.site/admin/modules/uninstall#edit-uninstall-simple-oauth"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

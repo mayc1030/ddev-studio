@@ -25,7 +25,9 @@ from ddev_studio.core.drupal_tools import (
     scaffold_custom_module,
     scaffold_custom_theme,
     scaffold_custom_component,
-    scaffold_rest_resource
+    scaffold_rest_resource,
+    get_drupal_uninstall_anchor,
+    get_drupal_uninstall_url
 )
 from ddev_studio.core.terminal import open_terminal
 from ddev_studio.core.process import run_subproc
@@ -651,6 +653,19 @@ class DrupalToolsDialog(Gtk.Dialog):
         lbl_info.set_markup("<b>Suite de Módulos Fundamentales y Bundles para Drupal 10/11:</b>")
         top_bar.pack_start(lbl_info, True, True, 0)
         
+        btn_uninstall_page = Gtk.Button()
+        btn_un_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        btn_un_box.pack_start(Gtk.Image.new_from_icon_name("edit-delete-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+        btn_un_box.pack_start(Gtk.Label(label="Desinstalar en Drupal"), False, False, 0)
+        btn_uninstall_page.add(btn_un_box)
+        btn_uninstall_page.get_style_context().add_class("btn-quick")
+        btn_uninstall_page.set_tooltip_text("Abrir la página oficial de desinstalación de Drupal (/admin/modules/uninstall)")
+        btn_uninstall_page.connect(
+            "clicked",
+            lambda b: webbrowser.open(get_drupal_uninstall_url(self.primary_url or f"https://{self.project_name}.ddev.site"))
+        )
+        top_bar.pack_start(btn_uninstall_page, False, False, 0)
+
         btn_refresh_api = Gtk.Button()
         btn_refresh_api.add(Gtk.Image.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON))
         btn_refresh_api.set_tooltip_text("Actualizar estado de módulos")
@@ -662,7 +677,7 @@ class DrupalToolsDialog(Gtk.Dialog):
         self.card_seo = self.create_bundle_card(
             title="🔍 Suite SEO & Posicionamiento en Buscadores",
             desc="Metatag (OpenGraph + Twitter Cards), Pathauto (URLs limpias), Token, Simple XML Sitemap y Redirects automáticos.",
-            status_keys=["metatag", "pathauto", "token"],
+            status_keys=["token", "pathauto", "metatag", "simple_sitemap", "redirect"],
             btn_install_label="📦 Instalar Suite SEO Completa",
             cmd_install=[
                 "ddev", "exec", "bash", "-c",
@@ -673,6 +688,13 @@ class DrupalToolsDialog(Gtk.Dialog):
                 ("⚙️ Metatags", lambda: webbrowser.open(f"{self.primary_url}/admin/config/search/metatag")),
                 ("🔗 Patrones Pathauto", lambda: webbrowser.open(f"{self.primary_url}/admin/config/search/path/patterns")),
                 ("🗺️ Sitemap (/sitemap.xml)", lambda: webbrowser.open(f"{self.primary_url}/sitemap.xml")),
+            ],
+            modules_meta=[
+                ("token", "Token"),
+                ("pathauto", "Pathauto"),
+                ("metatag", "Metatag"),
+                ("simple_sitemap", "Simple Sitemap"),
+                ("redirect", "Redirect"),
             ]
         )
         main_box.pack_start(self.card_seo, False, False, 0)
@@ -681,7 +703,7 @@ class DrupalToolsDialog(Gtk.Dialog):
         self.card_paragraphs = self.create_bundle_card(
             title="🧩 Arquitectura Modular & Paragraphs Suite",
             desc="Paragraphs, Paragraphs Library, Entity Usage, Field Group e Inline Entity Form para modelado de páginas por componentes reutilizables y serialización en APIs.",
-            status_keys=["paragraphs", "field_group"],
+            status_keys=["paragraphs", "field_group", "entity_usage", "inline_entity_form"],
             btn_install_label="📦 Instalar Paragraphs & Componentes",
             cmd_install=[
                 "ddev", "exec", "bash", "-c",
@@ -692,6 +714,13 @@ class DrupalToolsDialog(Gtk.Dialog):
                 ("🧩 Paragraph Types", lambda: webbrowser.open(f"{self.primary_url}/admin/structure/paragraphs_type")),
                 ("📚 Paragraphs Library", lambda: webbrowser.open(f"{self.primary_url}/admin/content/paragraphs-library")),
                 ("📊 Entity Usage", lambda: webbrowser.open(f"{self.primary_url}/admin/config/entity-usage")),
+            ],
+            modules_meta=[
+                ("paragraphs", "Paragraphs"),
+                ("paragraphs_library", "Paragraphs Library"),
+                ("field_group", "Field Group"),
+                ("entity_usage", "Entity Usage"),
+                ("inline_entity_form", "Inline Entity Form"),
             ]
         )
         main_box.pack_start(self.card_paragraphs, False, False, 0)
@@ -700,7 +729,7 @@ class DrupalToolsDialog(Gtk.Dialog):
         self.card_admin_media = self.create_bundle_card(
             title="⚡ Administración Avanzada & Gestión de Medios (DX / UX)",
             desc="Admin Toolbar (Tools + Search multinivel), Focal Point (recortes inteligentes de imágenes) y soporte nativo para logotipos SVG.",
-            status_keys=["admin_toolbar", "focal_point"],
+            status_keys=["admin_toolbar", "focal_point", "crop", "svg_image"],
             btn_install_label="📦 Instalar Admin Toolbar & Medios",
             cmd_install=[
                 "ddev", "exec", "bash", "-c",
@@ -710,6 +739,12 @@ class DrupalToolsDialog(Gtk.Dialog):
             extra_actions=[
                 ("⚙️ Admin Toolbar", lambda: webbrowser.open(f"{self.primary_url}/admin/config/user-interface/admin-toolbar")),
                 ("🎯 Focal Point", lambda: webbrowser.open(f"{self.primary_url}/admin/config/media/crop-widget")),
+            ],
+            modules_meta=[
+                ("admin_toolbar", "Admin Toolbar"),
+                ("focal_point", "Focal Point"),
+                ("crop", "Crop API"),
+                ("svg_image", "SVG Image"),
             ]
         )
         main_box.pack_start(self.card_admin_media, False, False, 0)
@@ -718,7 +753,7 @@ class DrupalToolsDialog(Gtk.Dialog):
         self.card_api_headless = self.create_bundle_card(
             title="🌐 Suite de APIs REST, JSON:API & Headless (Decoupled)",
             desc="JSON:API (Core), JSON:API Extras (personalización de esquemas), Simple OAuth (tokens JWT para React/Vue/Next.js), REST Core y GraphQL.",
-            status_keys=["jsonapi", "simple_oauth"],
+            status_keys=["jsonapi", "jsonapi_extras", "simple_oauth"],
             btn_install_label="📦 Instalar Suite de APIs & OAuth",
             cmd_install=[
                 "ddev", "exec", "bash", "-c",
@@ -733,6 +768,11 @@ class DrupalToolsDialog(Gtk.Dialog):
                     ["ddev", "exec", "bash", "-c", "mkdir -p ../oauth_keys && openssl genrsa -out ../oauth_keys/private.key 2048 && openssl rsa -in ../oauth_keys/private.key -pubout -out ../oauth_keys/public.key && chmod 600 ../oauth_keys/private.key"],
                     "Claves RSA generadas en ../oauth_keys/"
                 )),
+            ],
+            modules_meta=[
+                ("jsonapi", "JSON:API"),
+                ("jsonapi_extras", "JSON:API Extras"),
+                ("simple_oauth", "Simple OAuth"),
             ]
         )
         main_box.pack_start(self.card_api_headless, False, False, 0)
@@ -741,7 +781,7 @@ class DrupalToolsDialog(Gtk.Dialog):
         self.card_devel_stage = self.create_bundle_card(
             title="🐞 Depuración, Consola PHP & Rendimiento Local (DDEV)",
             desc="Devel + Kint, Consola PHP interactiva (/devel/php) y Stage File Proxy (descarga de imágenes bajo demanda desde producción).",
-            status_keys=["devel", "devel_php"],
+            status_keys=["devel", "devel_php", "stage_file_proxy"],
             btn_install_label="📦 Instalar Devel + Stage File Proxy",
             cmd_install=[
                 "ddev", "exec", "bash", "-c",
@@ -751,13 +791,18 @@ class DrupalToolsDialog(Gtk.Dialog):
             extra_actions=[
                 ("⚡ Abrir Consola PHP (/devel/php)", lambda: webbrowser.open(f"{self.primary_url}/devel/php")),
                 ("🖼️ Stage File Proxy", lambda: webbrowser.open(f"{self.primary_url}/admin/config/development/stage_file_proxy")),
+            ],
+            modules_meta=[
+                ("devel", "Devel"),
+                ("devel_php", "Devel PHP"),
+                ("stage_file_proxy", "Stage File Proxy"),
             ]
         )
         main_box.pack_start(self.card_devel_stage, False, False, 0)
         
         return scrolled
 
-    def create_bundle_card(self, title, desc, status_keys, btn_install_label, cmd_install, success_msg, extra_actions=None):
+    def create_bundle_card(self, title, desc, status_keys, btn_install_label, cmd_install, success_msg, extra_actions=None, modules_meta=None):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         card.get_style_context().add_class("project-card")
         
@@ -812,9 +857,34 @@ class DrupalToolsDialog(Gtk.Dialog):
                 
         card.pack_start(act_row, False, False, 0)
         
-        # Store badge reference
+        # Active modules uninstall shortcuts (Direct navigation to Drupal web UI row)
+        box_active = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box_active.set_margin_top(4)
+        box_active.set_no_show_all(True)
+        box_active.hide()
+        
+        lbl_active_hdr = Gtk.Label()
+        lbl_active_hdr.set_markup("<span size='small' color='#94a3b8'>Módulos activos (clic para abrir desinstalador de Drupal):</span>")
+        lbl_active_hdr.set_halign(Gtk.Align.START)
+        box_active.pack_start(lbl_active_hdr, False, False, 0)
+        
+        flow_active = Gtk.FlowBox()
+        flow_active.set_valign(Gtk.Align.START)
+        flow_active.set_max_children_per_line(15)
+        flow_active.set_selection_mode(Gtk.SelectionMode.NONE)
+        flow_active.set_homogeneous(False)
+        flow_active.set_row_spacing(4)
+        flow_active.set_column_spacing(6)
+        box_active.pack_start(flow_active, False, False, 0)
+        
+        card.pack_start(box_active, False, False, 0)
+        
+        # Store references
         card._status_badge = badge
         card._status_keys = status_keys
+        card._modules_meta = modules_meta or []
+        card._box_active = box_active
+        card._flow_active = flow_active
         return card
 
     def refresh_api_status(self):
@@ -824,11 +894,11 @@ class DrupalToolsDialog(Gtk.Dialog):
         threading.Thread(target=task, daemon=True).start()
 
     def update_api_status_ui(self, status):
-        self.api_status = status
+        self.api_status = status or {}
         cards = [self.card_seo, self.card_paragraphs, self.card_admin_media, self.card_api_headless, self.card_devel_stage]
         for c in cards:
             keys = getattr(c, "_status_keys", [])
-            active_count = sum(1 for k in keys if status.get(k, False))
+            active_count = sum(1 for k in keys if self.api_status.get(k, False))
             badge = c._status_badge
             ctx = badge.get_style_context()
             ctx.remove_class("badge-running")
@@ -844,6 +914,51 @@ class DrupalToolsDialog(Gtk.Dialog):
             else:
                 badge.set_text("INACTIVO")
                 ctx.add_class("badge-stopped")
+                
+            # Actualizar accesos directos de desinstalación para módulos activos
+            box_active = getattr(c, "_box_active", None)
+            flow_active = getattr(c, "_flow_active", None)
+            modules_meta = getattr(c, "_modules_meta", [])
+            
+            if box_active and flow_active and modules_meta:
+                for child in flow_active.get_children():
+                    flow_active.remove(child)
+                    
+                has_active = False
+                for mod_machine, mod_label in modules_meta:
+                    if self.api_status.get(mod_machine, False):
+                        has_active = True
+                        btn_un = Gtk.Button()
+                        btn_un.get_style_context().add_class("btn-quick")
+                        btn_un.get_style_context().add_class("btn-quick-uninstall")
+                        
+                        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+                        icon = Gtk.Image.new_from_icon_name("application-x-addon-symbolic", Gtk.IconSize.BUTTON)
+                        lbl = Gtk.Label(label=f"🌐 Desinstalar {mod_label}")
+                        btn_box.pack_start(icon, False, False, 0)
+                        btn_box.pack_start(lbl, False, False, 0)
+                        btn_un.add(btn_box)
+                        
+                        anchor = get_drupal_uninstall_anchor(mod_machine)
+                        btn_un.set_tooltip_text(
+                            f"Abrir Drupal en /admin/modules/uninstall#{anchor}\n"
+                            f"Te posiciona directamente en la fila de '{mod_label}' para desinstalar de forma segura desde la web."
+                        )
+                        
+                        def make_cb(machine):
+                            return lambda b: webbrowser.open(
+                                get_drupal_uninstall_url(
+                                    self.primary_url or f"https://{self.project_name}.ddev.site",
+                                    machine
+                                )
+                            )
+                        btn_un.connect("clicked", make_cb(mod_machine))
+                        flow_active.add(btn_un)
+                        
+                if has_active:
+                    box_active.show_all()
+                else:
+                    box_active.hide()
 
     # -------------------------------------------------------------------------
     # TAB 3: ENDPOINTS PERSONALIZADOS (@RestResource)

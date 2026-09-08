@@ -1004,3 +1004,24 @@ def scaffold_rest_resource(
     created_files.append(os.path.relpath(file_path, approot))
     return created_files
 
+
+def get_drupal_uninstall_anchor(module_machine_name: str) -> str:
+    """
+    Retorna el ancla HTML de Drupal para el módulo en /admin/modules/uninstall.
+    En Drupal, los guiones bajos se convierten en guiones medios (ej. 'simple_oauth' -> 'edit-uninstall-simple-oauth').
+    """
+    clean_name = module_machine_name.strip().replace('_', '-')
+    return f"edit-uninstall-{clean_name}"
+
+
+def get_drupal_uninstall_url(base_url: str, module_machine_name: str = "") -> str:
+    """
+    Construye la URL directa a la página de desinstalación de Drupal (/admin/modules/uninstall),
+    opcionalmente posicionando en el módulo específico con su ancla.
+    """
+    base = base_url.rstrip("/") if base_url else ""
+    if module_machine_name:
+        anchor = get_drupal_uninstall_anchor(module_machine_name)
+        return f"{base}/admin/modules/uninstall#{anchor}"
+    return f"{base}/admin/modules/uninstall"
+

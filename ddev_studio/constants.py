@@ -192,6 +192,15 @@ CUSTOM_CSS = b"""
     background-color: alpha(#f59e0b, 0.3);
     border-color: #f59e0b;
 }
+.btn-quick-uninstall {
+    background-color: alpha(#ef4444, 0.12);
+    color: @theme_text_color;
+    border: 1px solid alpha(#ef4444, 0.35);
+}
+.btn-quick-uninstall:hover {
+    background-color: alpha(#ef4444, 0.28);
+    border-color: #ef4444;
+}
 .loader-card {
     border-radius: 14px;
     border: 1px solid rgba(56, 189, 248, 0.35);
