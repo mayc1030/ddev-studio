@@ -254,6 +254,34 @@ def build_drush_generate_command(generator_id: str, answers: dict = None) -> lis
     return cmd
 
 
+def build_starterkit_theme_command(
+    machine_name: str,
+    name: str = "",
+    docroot: str = "web",
+    subsite_url: str = ""
+) -> list:
+    """
+    Construye el comando resiliente para generar un tema Starterkit en Drupal (Drupal 10, 11+).
+    Detecta dinámicamente si se debe invocar vendor/bin/dr o core/scripts/drupal según la versión y estructura,
+    y asegura la colocación en themes/custom y reconstrucción de caché con drush cr.
+    """
+    clean_docroot = (docroot or "web").strip().strip("/")
+    safe_name = name.replace("'", "\\'") if name else machine_name
+    uri_flag = f"--uri={subsite_url} " if subsite_url else ""
+    script_sh = (
+        f'if [ -f "vendor/bin/dr" ]; then '
+        f'vendor/bin/dr generate-theme {machine_name} --name=\'{safe_name}\' --path=themes/custom; '
+        f'elif [ -f "{clean_docroot}/core/scripts/drupal" ]; then '
+        f'php {clean_docroot}/core/scripts/drupal generate-theme {machine_name} --name=\'{safe_name}\' --path=themes/custom; '
+        f'elif [ -f "core/scripts/drupal" ]; then '
+        f'php core/scripts/drupal generate-theme {machine_name} --name=\'{safe_name}\' --path=themes/custom; '
+        f'else '
+        f'echo "Error: no se encontró el script de generación de temas (vendor/bin/dr o core/scripts/drupal)" >&2; exit 1; '
+        f'fi && drush {uri_flag}cr'
+    )
+    return ["ddev", "exec", "bash", "-c", script_sh]
+
+
 def scaffold_custom_module(
     approot: str,
     docroot: str,

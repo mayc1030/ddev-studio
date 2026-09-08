@@ -20,6 +20,7 @@ from ddev_studio.core.drupal_tools import (
     scan_custom_themes,
     parse_pm_list_output,
     build_drush_generate_command,
+    build_starterkit_theme_command,
     scaffold_custom_module,
     scaffold_custom_theme,
     scaffold_custom_component,
@@ -160,6 +161,17 @@ class TestDrupalTools(unittest.TestCase):
         self.assertEqual(cmd2[3], "controller")
         self.assertTrue(cmd2[4].startswith("--answers="))
         self.assertIn('"machine_name": "test"', cmd2[4])
+
+    def test_build_starterkit_theme_command(self):
+        cmd = build_starterkit_theme_command("my_theme", "My Theme", "web")
+        self.assertEqual(cmd[0], "ddev")
+        self.assertEqual(cmd[1], "exec")
+        self.assertEqual(cmd[2], "bash")
+        self.assertEqual(cmd[3], "-c")
+        self.assertIn("vendor/bin/dr generate-theme my_theme", cmd[4])
+        self.assertIn("web/core/scripts/drupal generate-theme my_theme", cmd[4])
+        self.assertIn("--path=themes/custom", cmd[4])
+        self.assertIn("drush cr", cmd[4])
 
     def test_scaffold_custom_module(self):
         files = scaffold_custom_module(

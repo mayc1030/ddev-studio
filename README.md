@@ -6,7 +6,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 ![GTK3](https://img.shields.io/badge/GTK-3.0-4E9A06?logo=gnome&logoColor=white)
 ![DDEV](https://img.shields.io/badge/DDEV-v1.23+-0074D9?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-Passing%20(61%2F61)-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-Passing%20(62%2F62)-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
 ---
@@ -144,7 +144,7 @@ Puedes iniciar **DDEV Studio** de 3 maneras:
 
 ## 🧪 Pruebas Automatizadas
 
-El proyecto incluye una suite completa de **61 pruebas unitarias** que validan la robustez de la arquitectura:
+El proyecto incluye una suite completa de **62 pruebas unitarias** que validan la robustez de la arquitectura:
 
 ```bash
 # Ejecutar todas las pruebas unitarias

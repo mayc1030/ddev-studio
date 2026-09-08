@@ -11,12 +11,14 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
 
+from ddev_studio.core.detector import read_ddev_config
 from ddev_studio.core.drupal_tools import (
     sanitize_machine_name,
     scan_custom_modules,
     scan_custom_themes,
     check_drupal_api_status,
     build_drush_generate_command,
+    build_starterkit_theme_command,
     scaffold_custom_module,
     scaffold_custom_theme,
     scaffold_custom_component,
@@ -40,8 +42,13 @@ class DrupalToolsDialog(Gtk.Dialog):
         
         self.proj = proj
         self.project_name = proj.get("name", "")
+        self.subsite_url = proj.get("subsite_url", "")
         self.approot = proj.get("approot", "")
-        self.docroot = proj.get("docroot", "web") or "web"
+        cfg = read_ddev_config(self.approot) if self.approot else None
+        if cfg and cfg.get("docroot"):
+            self.docroot = str(cfg.get("docroot")).strip()
+        else:
+            self.docroot = proj.get("docroot") or ("web" if self.approot and os.path.isdir(os.path.join(self.approot, "web")) else ("docroot" if self.approot and os.path.isdir(os.path.join(self.approot, "docroot")) else "web"))
         self.primary_url = f"https://{self.project_name}.ddev.site"
         
         self.api_status = {
@@ -444,11 +451,11 @@ class DrupalToolsDialog(Gtk.Dialog):
             base = self.entry_thm_base.get_text().strip() or "olivero"
             
             if thm_type == "starterkit":
-                cmd = ["ddev", "exec", f"php core/scripts/drupal generate-theme {machine} --name='{name}' --starterkit"]
+                cmd = build_starterkit_theme_command(machine, name, self.docroot, self.subsite_url)
                 self.run_task_with_progress(
                     f"Generando Starterkit: {machine}",
                     cmd,
-                    f"Tema Starterkit '{machine}' creado en web/themes/custom/{machine}"
+                    f"Tema Starterkit '{machine}' creado exitosamente en {self.docroot}/themes/custom/{machine}"
                 )
             else:
                 def do_scaffold_theme(log):
