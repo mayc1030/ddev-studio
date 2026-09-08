@@ -207,6 +207,13 @@ class DrupalToolsView(Gtk.Box):
         self.populate_custom_modules()
         self.refresh_api_status()
 
+    def on_theme_scaffold_completed(self):
+        """
+        Callback ejecutado al finalizar la generación de un tema/subtema.
+        """
+        self.refresh_view()
+        self.update_preset_ui()
+
     # -------------------------------------------------------------------------
     # TAB 1: GENERADOR DE CÓDIGO (SCAFFOLDING)
     # -------------------------------------------------------------------------
@@ -633,7 +640,7 @@ class DrupalToolsView(Gtk.Box):
                     f"Generando Starterkit: {machine}",
                     cmd,
                     f"Tema Starterkit '{machine}' creado exitosamente en {self.docroot}/themes/custom/{machine}",
-                    on_complete=self.populate_custom_themes
+                    on_complete=self.on_theme_scaffold_completed
                 )
             else:
                 already_installed = is_theme_installed(self.approot, self.docroot, base)
@@ -662,7 +669,7 @@ class DrupalToolsView(Gtk.Box):
                     cmd,
                     f"Subtema '{machine}' ({base}) configurado exitosamente en {self.docroot}/themes/custom/{machine}",
                     pre_action=do_scaffold_theme,
-                    on_complete=self.populate_custom_themes
+                    on_complete=self.on_theme_scaffold_completed
                 )
             
         elif self.btn_gen_component.get_active():
@@ -1051,6 +1058,7 @@ class DrupalToolsView(Gtk.Box):
     def run_task_with_progress(self, title, cmd_list, success_msg, pre_action=None, on_complete=None):
         dialog = ProgressDialog(self.main_app, title=title)
         dialog.set_status(f"Ejecutando: {' '.join(cmd_list[:3])}...")
+        dialog.present()
         
         def run_thread():
             try:

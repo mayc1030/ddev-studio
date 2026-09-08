@@ -489,6 +489,14 @@ class DrupalToolsDialog(Gtk.Dialog):
             self.combo_cmp_module.append("none", "No hay módulos en web/modules/custom (Crea uno primero)")
             self.combo_cmp_module.set_active(0)
 
+    def on_theme_scaffold_completed(self):
+        """
+        Callback ejecutado al finalizar la generación de un tema/subtema en el diálogo.
+        """
+        self.populate_custom_modules()
+        self.refresh_api_status()
+        self.update_preset_ui()
+
     def on_scaffold_mode_changed(self, btn):
         if self.btn_gen_module.get_active():
             self.stack_scaffold.set_visible_child_name("module")
@@ -566,7 +574,7 @@ class DrupalToolsDialog(Gtk.Dialog):
                     f"Generando Starterkit: {machine}",
                     cmd,
                     f"Tema Starterkit '{machine}' creado exitosamente en {self.docroot}/themes/custom/{machine}",
-                    on_complete=self.populate_custom_themes
+                    on_complete=self.on_theme_scaffold_completed
                 )
             else:
                 already_installed = is_theme_installed(self.approot, self.docroot, base)
@@ -595,7 +603,7 @@ class DrupalToolsDialog(Gtk.Dialog):
                     cmd,
                     f"Subtema '{machine}' ({base}) configurado exitosamente en {self.docroot}/themes/custom/{machine}",
                     pre_action=do_scaffold_theme,
-                    on_complete=self.populate_custom_themes
+                    on_complete=self.on_theme_scaffold_completed
                 )
             
         elif self.btn_gen_component.get_active():
@@ -978,6 +986,7 @@ class DrupalToolsDialog(Gtk.Dialog):
     def run_task_with_progress(self, title, cmd_list, success_msg, pre_action=None, on_complete=None):
         dialog = ProgressDialog(self, title=title)
         dialog.set_status(f"Ejecutando: {' '.join(cmd_list[:3])}...")
+        dialog.present()
         
         def run_thread():
             try:

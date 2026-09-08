@@ -75,6 +75,7 @@ class ProgressDialog(Gtk.Dialog):
         self.project_path = ""
         
         self.show_all()
+        self.present()
         
     def append_log(self, text):
         end_iter = self.text_buffer.get_end_iter()
