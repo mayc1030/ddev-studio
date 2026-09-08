@@ -416,6 +416,23 @@ class TestImports(unittest.TestCase):
         view.switch_mode("import")
         self.assertTrue(view.btn_mode_import.get_active())
 
+    def test_window_init_state_and_busy_controls(self):
+        from ddev_studio.ui.window import DDEVManagerWindow
+        window = DDEVManagerWindow()
+        self.assertIsNotNone(window)
+        window.show_all()
+        # Test init_state
+        window.init_state()
+        self.assertEqual(window.stack_projects_tab.get_visible_child_name(), "list")
+        
+        # Test busy project controls
+        self.assertFalse(window.is_project_busy("my-test-proj"))
+        window.set_project_busy_state("my-test-proj", True)
+        self.assertTrue(window.is_project_busy("my-test-proj"))
+        window.set_project_busy_state("my-test-proj", False)
+        self.assertFalse(window.is_project_busy("my-test-proj"))
+        window.destroy()
+
 
 
 class TestLogger(unittest.TestCase):

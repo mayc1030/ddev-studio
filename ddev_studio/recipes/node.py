@@ -36,7 +36,7 @@ class NextjsRecipe(BaseRecipe):
         ])
 
         ctx.set_status("Organizando estructura del proyecto...")
-        ctx.run_cmd(["ddev", "exec", "sh -c 'cp -a tmp-next/. . && rm -rf tmp-next'"])
+        ctx.run_cmd(["ddev", "exec", "bash", "-c", "cp -a tmp-next/. . && rm -rf tmp-next"])
         ctx.run_cmd(["ddev", "exec", "sed -i 's/\"dev\": \"next dev\"/\"dev\": \"next dev -H 0.0.0.0 -p 3000\"/g' package.json"])
 
         ctx.set_status("Configurando Nginx Reverse Proxy y daemon en segundo plano...")
@@ -64,7 +64,7 @@ class ReactRecipe(BaseRecipe):
         ctx.run_cmd(["ddev", "npx", "--yes", "create-vite@latest", "tmp-vite", "--template", "react-ts"])
 
         ctx.set_status("Organizando estructura del proyecto...")
-        ctx.run_cmd(["ddev", "exec", "sh -c 'cp -a tmp-vite/. . && rm -rf tmp-vite'"])
+        ctx.run_cmd(["ddev", "exec", "bash", "-c", "cp -a tmp-vite/. . && rm -rf tmp-vite"])
         ctx.run_cmd(["ddev", "exec", "sed -i 's/\"dev\": \"vite\"/\"dev\": \"vite --host 0.0.0.0 --port 5173\"/g' package.json"])
 
         ctx.set_status("Configurando Vite para DDEV (allowedHosts y HMR)...")
@@ -117,7 +117,7 @@ class VueRecipe(BaseRecipe):
         ctx.run_cmd(["ddev", "npx", "--yes", "create-vite@latest", "tmp-vite", "--template", "vue-ts"])
 
         ctx.set_status("Organizando estructura del proyecto...")
-        ctx.run_cmd(["ddev", "exec", "sh -c 'cp -a tmp-vite/. . && rm -rf tmp-vite'"])
+        ctx.run_cmd(["ddev", "exec", "bash", "-c", "cp -a tmp-vite/. . && rm -rf tmp-vite"])
         ctx.run_cmd(["ddev", "exec", "sed -i 's/\"dev\": \"vite\"/\"dev\": \"vite --host 0.0.0.0 --port 5173\"/g' package.json"])
 
         ctx.set_status("Configurando Vite para DDEV (allowedHosts y HMR)...")
@@ -169,7 +169,7 @@ class AngularRecipe(BaseRecipe):
 
         ctx.set_status("Creando proyecto Angular con @angular/cli...")
         ctx.run_cmd(["ddev", "exec", "NG_CLI_ANALYTICS=false npx -y @angular/cli new tmp-ng --routing --style=css --skip-git --defaults"])
-        ctx.run_cmd(["ddev", "exec", "sh -c 'cp -a tmp-ng/. . && rm -rf tmp-ng'"])
+        ctx.run_cmd(["ddev", "exec", "bash", "-c", "cp -a tmp-ng/. . && rm -rf tmp-ng"])
 
         ctx.set_status("Configurando Nginx Reverse Proxy y Live Dev Server...")
         self.setup_nginx_proxy(ctx, port=4200)

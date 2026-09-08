@@ -48,6 +48,7 @@ class DDEVManagerWindow(Gtk.Window):
             
         self.active_category = "all"
         self.combo_tech_filter_handler_id = None
+        self.busy_projects = set()
         
         css_provider = Gtk.CssProvider()
         try:
@@ -96,6 +97,40 @@ class DDEVManagerWindow(Gtk.Window):
 
     def refresh_all(self):
         self.refresh_projects()
+
+    def init_state(self):
+        """
+        Inicializa el estado visual por defecto de la aplicación de forma limpia y encapsulada.
+        """
+        if hasattr(self, "stack_projects_tab"):
+            self.stack_projects_tab.set_visible_child_name("list")
+
+        if hasattr(self, "tab_new") and hasattr(self.tab_new, "flowbox_fw"):
+            first_child = self.tab_new.flowbox_fw.get_child_at_index(0)
+            if first_child:
+                self.tab_new.on_framework_selected(self.tab_new.flowbox_fw, first_child)
+            if hasattr(self.tab_new, "combo_import_type"):
+                self.tab_new.on_import_type_changed(self.tab_new.combo_import_type)
+
+    def is_project_busy(self, pname: str) -> bool:
+        """Retorna True si el proyecto tiene una tarea o acción en curso."""
+        return bool(pname and pname in self.busy_projects)
+
+    def set_project_busy_state(self, pname: str, is_busy: bool):
+        """Actualiza el estado de proyecto ocupado y refleja la sensibilidad en la UI."""
+        if not pname:
+            return
+        if is_busy:
+            self.busy_projects.add(pname)
+        else:
+            self.busy_projects.discard(pname)
+
+        if hasattr(self, "projects_list_box"):
+            for child in self.projects_list_box.get_children():
+                if hasattr(child, "project_data") and child.project_data.get("name") == pname:
+                    if hasattr(child, "actions_box"):
+                        child.actions_box.set_sensitive(not is_busy)
+                    break
 
     def build_main_layout(self):
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -564,6 +599,11 @@ class DDEVManagerWindow(Gtk.Window):
         
         actions_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         actions_box.set_valign(Gtk.Align.CENTER)
+        card.actions_box = actions_box
+
+        pname = proj.get("name", "")
+        if self.is_project_busy(pname):
+            actions_box.set_sensitive(False)
         
         if is_missing:
             btn_del_orphan = Gtk.Button()
@@ -832,6 +872,10 @@ class DDEVManagerWindow(Gtk.Window):
         action_title = cfg["title"]
         success_default_msg = cfg["success_msg"]
 
+        if self.is_project_busy(pname):
+            logger.warning(f"La acción Drush '{action_key}' para '{pname}' fue ignorada porque ya hay una operación en curso.")
+            return
+
         if not is_running:
             confirm = Gtk.MessageDialog(
                 transient_for=self,
@@ -848,6 +892,7 @@ class DDEVManagerWindow(Gtk.Window):
             if res != Gtk.ResponseType.OK:
                 return
 
+        self.set_project_busy_state(pname, True)
         dialog = ProgressDialog(self, title=f"Drush: {action_title} ({pname})")
         dialog.set_status(f"Ejecutando {cmd_desc} en {pname}...")
 
@@ -915,12 +960,18 @@ class DDEVManagerWindow(Gtk.Window):
             except Exception as ex:
                 GLib.idle_add(dialog.append_log, f"\nExcepción: {str(ex)}\n")
                 GLib.idle_add(dialog.finish, False, f"Error: {str(ex)}", "", approot)
+            finally:
+                GLib.idle_add(self.set_project_busy_state, pname, False)
 
         threading.Thread(target=task, daemon=True).start()
 
     def execute_simple_action(self, action, proj):
         approot = proj.get("approot", "")
         pname = proj.get("name", "")
+        if self.is_project_busy(pname):
+            logger.warning(f"La acción '{action}' para '{pname}' fue ignorada porque ya hay una operación en curso.")
+            return
+        self.set_project_busy_state(pname, True)
         exists_on_disk = bool(approot and os.path.exists(approot))
         
         dialog = ProgressDialog(self, title=f"{action.capitalize()} {pname}")
@@ -973,11 +1024,16 @@ class DDEVManagerWindow(Gtk.Window):
                 GLib.idle_add(dialog.append_log, f"\nExcepción: {str(ex)}\n")
                 GLib.idle_add(dialog.finish, False, f"Error: {str(ex)}", "", approot)
                 GLib.idle_add(self.refresh_projects)
+            finally:
+                GLib.idle_add(self.set_project_busy_state, pname, False)
             
         threading.Thread(target=task, daemon=True).start()
 
     def confirm_delete_project(self, proj):
         pname = proj.get("name", "")
+        if self.is_project_busy(pname):
+            logger.warning(f"No se puede eliminar '{pname}' porque ya hay una operación en curso.")
+            return
         approot = proj.get("approot", "")
         exists_on_disk = bool(approot and os.path.exists(approot))
         

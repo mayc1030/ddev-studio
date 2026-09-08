@@ -601,7 +601,7 @@ class DrupalToolsView(Gtk.Box):
             status_keys=["metatag", "pathauto", "token"],
             btn_install_label="📦 Instalar Suite SEO Completa",
             cmd_install=[
-                "ddev", "exec",
+                "ddev", "exec", "bash", "-c",
                 "composer require drupal/metatag drupal/pathauto drupal/token drupal/simple_sitemap drupal/redirect --no-interaction && drush pm:enable metatag metatag_open_graph metatag_twitter_cards pathauto token simple_sitemap redirect -y && drush cr"
             ],
             success_msg="¡Suite SEO completa instalada y configurada!",
@@ -620,7 +620,7 @@ class DrupalToolsView(Gtk.Box):
             status_keys=["paragraphs", "field_group"],
             btn_install_label="📦 Instalar Paragraphs & Componentes",
             cmd_install=[
-                "ddev", "exec",
+                "ddev", "exec", "bash", "-c",
                 "composer require drupal/paragraphs drupal/entity_reference_revisions drupal/field_group drupal/inline_entity_form drupal/entity_usage --no-interaction && drush pm:enable paragraphs entity_usage paragraphs_library entity_reference_revisions field_group inline_entity_form -y && drush cr"
             ],
             success_msg="¡Suite de Paragraphs y Componentes instalada!",
@@ -639,7 +639,7 @@ class DrupalToolsView(Gtk.Box):
             status_keys=["admin_toolbar", "focal_point"],
             btn_install_label="📦 Instalar Admin Toolbar & Medios",
             cmd_install=[
-                "ddev", "exec",
+                "ddev", "exec", "bash", "-c",
                 "composer require drupal/admin_toolbar drupal/focal_point drupal/crop drupal/svg_image --no-interaction && drush pm:enable admin_toolbar admin_toolbar_tools admin_toolbar_search focal_point crop svg_image -y && drush cr"
             ],
             success_msg="¡Admin Toolbar, Focal Point y SVG Image instalados!",
@@ -657,7 +657,7 @@ class DrupalToolsView(Gtk.Box):
             status_keys=["jsonapi", "simple_oauth"],
             btn_install_label="📦 Instalar Suite de APIs & OAuth",
             cmd_install=[
-                "ddev", "exec",
+                "ddev", "exec", "bash", "-c",
                 "composer require drupal/jsonapi_extras drupal/simple_oauth --no-interaction && drush pm:enable jsonapi jsonapi_extras simple_oauth -y && drush cr"
             ],
             success_msg="¡Suite de APIs REST, JSON:API Extras y Simple OAuth instalados!",
@@ -666,7 +666,7 @@ class DrupalToolsView(Gtk.Box):
                 ("⚙️ JSON:API Extras", lambda: webbrowser.open(f"{self.primary_url}/admin/config/services/jsonapi")),
                 ("🗝️ Generar Claves RSA", lambda: self.run_task_with_progress(
                     "Generando par de claves RSA para OAuth",
-                    ["ddev", "exec", "mkdir -p ../oauth_keys && openssl genrsa -out ../oauth_keys/private.key 2048 && openssl rsa -in ../oauth_keys/private.key -pubout -out ../oauth_keys/public.key && chmod 600 ../oauth_keys/private.key"],
+                    ["ddev", "exec", "bash", "-c", "mkdir -p ../oauth_keys && openssl genrsa -out ../oauth_keys/private.key 2048 && openssl rsa -in ../oauth_keys/private.key -pubout -out ../oauth_keys/public.key && chmod 600 ../oauth_keys/private.key"],
                     "Claves RSA generadas en ../oauth_keys/"
                 )),
             ]
@@ -680,7 +680,7 @@ class DrupalToolsView(Gtk.Box):
             status_keys=["devel", "devel_php"],
             btn_install_label="📦 Instalar Devel + Stage File Proxy",
             cmd_install=[
-                "ddev", "exec",
+                "ddev", "exec", "bash", "-c",
                 "composer require --dev drupal/devel drupal/devel_php kint-php/kint drupal/stage_file_proxy --no-interaction && drush pm:enable devel devel_php stage_file_proxy -y && drush cr"
             ],
             success_msg="¡Devel, Kint y Stage File Proxy instalados con éxito!",

@@ -19,16 +19,7 @@ def main():
     app = DDEVManagerWindow()
     app.connect("destroy", Gtk.main_quit)
     app.show_all()
-    app.stack_projects_tab.set_visible_child_name("list")
-
-    
-    # Ensure proper initial framework visibility
-    first_child = app.flowbox_fw.get_child_at_index(0)
-    if first_child:
-        app.on_framework_selected(app.flowbox_fw, first_child)
-    if hasattr(app, "combo_import_type"):
-        app.on_import_type_changed(app.combo_import_type)
-        
+    app.init_state()
     Gtk.main()
 
 

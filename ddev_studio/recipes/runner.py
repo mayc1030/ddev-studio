@@ -252,7 +252,7 @@ web_extra_daemons:
                 if os.path.exists(req_txt) and not os.path.exists(venv_dir):
                     set_st("Configurando entorno virtual Python e instalando dependencias...")
                     log("🐍 Creando .venv e instalando dependencias...")
-                    run_subproc(["ddev", "exec", "python3 -m venv /var/www/html/.venv && /var/www/html/.venv/bin/pip install -r requirements.txt"], target_dir, dialog)
+                    run_subproc(["ddev", "exec", "bash", "-c", "python3 -m venv /var/www/html/.venv && /var/www/html/.venv/bin/pip install -r requirements.txt"], target_dir, dialog)
                     log("✓ Dependencias de Python instaladas.")
 
             primary_url = f"https://{slug}.ddev.site"
