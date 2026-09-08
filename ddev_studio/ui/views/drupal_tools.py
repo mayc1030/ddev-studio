@@ -20,6 +20,9 @@ from ddev_studio.core.drupal_tools import (
     check_drupal_api_status,
     build_drush_generate_command,
     build_starterkit_theme_command,
+    build_subtheme_command,
+    is_theme_installed,
+    DRUPAL_BASE_THEMES_PRESETS,
     scaffold_custom_module,
     scaffold_custom_theme,
     scaffold_custom_component,
@@ -174,13 +177,14 @@ class DrupalToolsView(Gtk.Box):
         self.ptype = str(self.proj.get("type", "")).lower()
         if "drupal8" in self.ptype:
             self.combo_thm_type.set_active_id("subtheme")
-            self.entry_thm_base.set_text("classy")
+            self.combo_thm_preset.set_active_id("classy")
         elif "drupal7" in self.ptype:
             self.combo_thm_type.set_active_id("subtheme")
-            self.entry_thm_base.set_text("bartik")
+            self.combo_thm_preset.set_active_id("bartik")
         else:
             self.combo_thm_type.set_active_id("starterkit")
-            self.entry_thm_base.set_text("olivero")
+            self.combo_thm_preset.set_active_id("olivero")
+        self.update_preset_ui()
         
         # Refrescar listas de módulos/temas y estado de APIs
         self.refresh_view()
@@ -359,26 +363,110 @@ class DrupalToolsView(Gtk.Box):
         self.entry_thm_machine.set_hexpand(True)
         grid.attach(self.entry_thm_machine, 1, 1, 1, 1)
         
-        # Tipo de Tema
-        lbl3 = Gtk.Label(label="Tipo de Tema:")
+        # Tipo de Generador
+        lbl3 = Gtk.Label(label="Generador / Modo:")
         lbl3.set_halign(Gtk.Align.END)
         grid.attach(lbl3, 0, 2, 1, 1)
         self.combo_thm_type = Gtk.ComboBoxText()
-        self.combo_thm_type.append("starterkit", "Starterkit Moderno (Drupal 10/11 - Recomendado)")
-        self.combo_thm_type.append("subtheme", "Subtema Clásico (Hereda de Base Theme)")
+        self.combo_thm_type.append("starterkit", "Starterkit Moderno (Drupal 10/11 - Clon Autónomo)")
+        self.combo_thm_type.append("subtheme", "Subtema Guiado (Bootstrap 5, Barrio, Radix, Olivero, Gin...)")
         self.combo_thm_type.set_active(0)
+        self.combo_thm_type.connect("changed", self.on_thm_type_changed)
         grid.attach(self.combo_thm_type, 1, 2, 1, 1)
         
-        # Tema Base
+        # Tema Base (Selector de Preset)
         lbl4 = Gtk.Label(label="Tema Base:")
         lbl4.set_halign(Gtk.Align.END)
         grid.attach(lbl4, 0, 3, 1, 1)
+        
+        base_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        
+        self.combo_thm_preset = Gtk.ComboBoxText()
+        for p_id, p_data in DRUPAL_BASE_THEMES_PRESETS.items():
+            self.combo_thm_preset.append(p_id, p_data["label"])
+        self.combo_thm_preset.set_active_id("olivero")
+        self.combo_thm_preset.connect("changed", self.on_thm_preset_changed)
+        base_box.pack_start(self.combo_thm_preset, False, False, 0)
+        
+        # Entrada manual cuando se elige "custom"
         self.entry_thm_base = Gtk.Entry()
-        self.entry_thm_base.set_text("olivero")
-        self.entry_thm_base.set_placeholder_text("olivero, claro, stable9")
-        grid.attach(self.entry_thm_base, 1, 3, 1, 1)
+        self.entry_thm_base.set_placeholder_text("Escribe el machine_name del tema base...")
+        self.entry_thm_base.set_no_show_all(True)
+        self.entry_thm_base.hide()
+        base_box.pack_start(self.entry_thm_base, False, False, 0)
+        
+        # Etiqueta de estado del tema base (disponible vs requiere composer)
+        self.lbl_base_status = Gtk.Label()
+        self.lbl_base_status.set_xalign(0.0)
+        base_box.pack_start(self.lbl_base_status, False, False, 0)
+        
+        grid.attach(base_box, 1, 3, 1, 1)
+        
+        # Opciones avanzadas de despliegue
+        lbl5 = Gtk.Label(label="Opciones:")
+        lbl5.set_halign(Gtk.Align.END)
+        grid.attach(lbl5, 0, 4, 1, 1)
+        
+        opts_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        
+        self.chk_thm_install_base = Gtk.CheckButton(label="Descargar e instalar tema base con Composer si falta (ddev composer require)")
+        self.chk_thm_install_base.set_active(True)
+        opts_box.pack_start(self.chk_thm_install_base, False, False, 0)
+        
+        self.chk_thm_set_default = Gtk.CheckButton(label="Establecer como tema predeterminado del sitio tras crearlo")
+        self.chk_thm_set_default.set_active(True)
+        opts_box.pack_start(self.chk_thm_set_default, False, False, 0)
+        
+        grid.attach(opts_box, 1, 4, 1, 1)
         
         return grid
+
+    def on_thm_type_changed(self, combo):
+        is_subtheme = combo.get_active_id() == "subtheme"
+        self.combo_thm_preset.set_sensitive(is_subtheme)
+        self.chk_thm_install_base.set_sensitive(is_subtheme)
+        if not is_subtheme:
+            self.lbl_base_status.set_markup("<span color='#94a3b8' size='small'>ℹ Starterkit genera un clon independiente de starterkit_theme</span>")
+        else:
+            self.update_preset_ui()
+
+    def on_thm_preset_changed(self, combo):
+        self.update_preset_ui()
+
+    def update_preset_ui(self):
+        preset_id = self.combo_thm_preset.get_active_id() or "olivero"
+        preset_info = DRUPAL_BASE_THEMES_PRESETS.get(preset_id, {})
+        is_custom = preset_id == "custom"
+        
+        if is_custom:
+            self.entry_thm_base.show()
+        else:
+            self.entry_thm_base.hide()
+            
+        base_name = preset_info.get("base_theme", preset_id)
+        pkg = preset_info.get("composer_pkg")
+        is_admin = preset_info.get("type") == "admin"
+        
+        # Ajustar label de tema predeterminado
+        if is_admin:
+            self.chk_thm_set_default.set_label("Establecer como tema de administración predeterminado (system.theme admin)")
+        else:
+            self.chk_thm_set_default.set_label("Establecer como tema predeterminado del sitio (system.theme default)")
+            
+        # Comprobar si está instalado
+        if is_custom:
+            self.lbl_base_status.set_markup("<span color='#94a3b8' size='small'>Escribe el machine_name del tema que servirá de base</span>")
+            self.chk_thm_install_base.set_sensitive(False)
+        elif preset_info.get("is_core"):
+            self.lbl_base_status.set_markup("<span color='#10b981' size='small'>✓ Tema del Core de Drupal (no requiere Composer)</span>")
+            self.chk_thm_install_base.set_sensitive(False)
+        else:
+            installed = is_theme_installed(self.approot, self.docroot, base_name)
+            self.chk_thm_install_base.set_sensitive(True)
+            if installed:
+                self.lbl_base_status.set_markup(f"<span color='#10b981' size='small'>✓ <b>{base_name}</b> ya está instalado en el proyecto</span>")
+            else:
+                self.lbl_base_status.set_markup(f"<span color='#f59e0b' size='small'>📦 Requiere descargar paquete Composer: <b>{pkg}</b></span>")
 
     def build_component_form(self):
         grid = Gtk.Grid()
@@ -528,32 +616,53 @@ class DrupalToolsView(Gtk.Box):
             if not machine:
                 return
             thm_type = self.combo_thm_type.get_active_id()
-            base = self.entry_thm_base.get_text().strip() or "olivero"
-            
+            preset_id = self.combo_thm_preset.get_active_id() or "olivero"
+            preset_info = DRUPAL_BASE_THEMES_PRESETS.get(preset_id, {})
+            if preset_id == "custom":
+                base = self.entry_thm_base.get_text().strip() or "olivero"
+                composer_pkg = None
+                is_admin = False
+            else:
+                base = preset_info.get("base_theme") or preset_id
+                composer_pkg = preset_info.get("composer_pkg")
+                is_admin = preset_info.get("type") == "admin"
+
             if thm_type == "starterkit":
                 cmd = build_starterkit_theme_command(machine, name, self.docroot, self.subsite_url)
                 self.run_task_with_progress(
                     f"Generando Starterkit: {machine}",
                     cmd,
-                    f"Tema Starterkit '{machine}' creado exitosamente en {self.docroot}/themes/custom/{machine}"
+                    f"Tema Starterkit '{machine}' creado exitosamente en {self.docroot}/themes/custom/{machine}",
+                    on_complete=self.populate_custom_themes
                 )
             else:
+                already_installed = is_theme_installed(self.approot, self.docroot, base)
+                need_install = bool(composer_pkg and not already_installed and self.chk_thm_install_base.get_active())
+                set_as_default = self.chk_thm_set_default.get_active()
+                
                 def do_scaffold_theme(log):
-                    log("🎨 Generando estructura de archivos para tema personalizado...")
+                    log(f"🎨 Generando estructura del subtema '{machine}' basado en '{base}'...")
                     files = scaffold_custom_theme(self.approot, self.docroot, machine, name, base)
                     for f in files:
                         log(f"  ✓ Creado: {f}")
                 
-                cmd = ["ddev", "drush"]
-                if self.subsite_url:
-                    cmd.append(f"--uri={self.subsite_url}")
-                cmd.append("cr")
+                cmd = build_subtheme_command(
+                    machine_name=machine,
+                    base_theme=base,
+                    composer_pkg=composer_pkg,
+                    install_base=need_install,
+                    enable_theme=True,
+                    set_as_default=set_as_default,
+                    is_admin_theme=is_admin,
+                    subsite_url=self.subsite_url
+                )
                 
                 self.run_task_with_progress(
-                    f"Generando Tema: {machine}",
+                    f"Generando Subtema: {machine}",
                     cmd,
-                    f"Tema '{machine}' creado exitosamente en web/themes/custom/{machine}",
-                    pre_action=do_scaffold_theme
+                    f"Subtema '{machine}' ({base}) configurado exitosamente en {self.docroot}/themes/custom/{machine}",
+                    pre_action=do_scaffold_theme,
+                    on_complete=self.populate_custom_themes
                 )
             
         elif self.btn_gen_component.get_active():

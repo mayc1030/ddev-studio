@@ -282,6 +282,252 @@ def build_starterkit_theme_command(
     return ["ddev", "exec", "bash", "-c", script_sh]
 
 
+DRUPAL_BASE_THEMES_PRESETS = {
+    "olivero": {
+        "label": "Olivero (Core - Drupal 10/11 Estándar)",
+        "base_theme": "olivero",
+        "composer_pkg": None,
+        "is_core": True,
+        "type": "frontend",
+        "regions": {
+            "header": "Header",
+            "primary_menu": "Primary menu",
+            "secondary_menu": "Secondary menu",
+            "breadcrumb": "Breadcrumb",
+            "highlighted": "Highlighted",
+            "content": "Content",
+            "sidebar": "Sidebar",
+            "footer_top": "Footer Top",
+            "footer_bottom": "Footer Bottom",
+        },
+    },
+    "bootstrap5": {
+        "label": "Bootstrap 5 (Limpio & Moderno - Contrib)",
+        "base_theme": "bootstrap5",
+        "composer_pkg": "drupal/bootstrap5",
+        "is_core": False,
+        "type": "frontend",
+        "drush_gen_cmd": "bootstrap5:generate-subtheme",
+        "regions": {
+            "header": "Header",
+            "nav_branding": "Navigation Branding",
+            "nav_main": "Main Navigation",
+            "breadcrumb": "Breadcrumb",
+            "highlighted": "Highlighted",
+            "content": "Content",
+            "sidebar_first": "Sidebar First",
+            "sidebar_second": "Sidebar Second",
+            "footer": "Footer",
+        },
+    },
+    "bootstrap_barrio": {
+        "label": "Bootstrap Barrio (SASS & Avanzado - Contrib)",
+        "base_theme": "bootstrap_barrio",
+        "composer_pkg": "drupal/bootstrap_barrio",
+        "is_core": False,
+        "type": "frontend",
+        "regions": {
+            "top_header": "Top Header",
+            "top_header_form": "Top Header Form",
+            "header": "Header",
+            "header_form": "Header Form",
+            "primary_menu": "Primary menu",
+            "secondary_menu": "Secondary menu",
+            "page_top": "Page top",
+            "page_bottom": "Page bottom",
+            "highlighted": "Highlighted",
+            "featured_top": "Featured top",
+            "breadcrumb": "Breadcrumb",
+            "content": "Content",
+            "sidebar_first": "Sidebar first",
+            "sidebar_second": "Sidebar second",
+            "featured_bottom_first": "Featured bottom first",
+            "featured_bottom_second": "Featured bottom second",
+            "featured_bottom_third": "Featured bottom third",
+            "footer_first": "Footer first",
+            "footer_second": "Footer second",
+            "footer_third": "Footer third",
+            "footer_fourth": "Footer fourth",
+            "footer_fifth": "Footer fifth",
+        },
+    },
+    "radix": {
+        "label": "Radix (Componentes SDC & Vite - Contrib)",
+        "base_theme": "radix",
+        "composer_pkg": "drupal/radix",
+        "is_core": False,
+        "type": "frontend",
+        "drush_gen_cmd": "radix:create",
+        "regions": {
+            "navbar": "Navbar",
+            "header": "Header",
+            "breadcrumb": "Breadcrumb",
+            "highlighted": "Highlighted",
+            "content": "Content",
+            "sidebar": "Sidebar",
+            "footer": "Footer",
+        },
+    },
+    "gin": {
+        "label": "Gin Admin (Tema de Administración Moderno)",
+        "base_theme": "gin",
+        "composer_pkg": "drupal/gin",
+        "is_core": False,
+        "type": "admin",
+        "regions": {
+            "header": "Header",
+            "pre_content": "Pre-content",
+            "breadcrumb": "Breadcrumb",
+            "highlighted": "Highlighted",
+            "help": "Help",
+            "content": "Content",
+            "page_top": "Page top",
+            "page_bottom": "Page bottom",
+            "sidebar": "Sidebar",
+        },
+    },
+    "claro": {
+        "label": "Claro (Core - Administración Drupal 9/10/11)",
+        "base_theme": "claro",
+        "composer_pkg": None,
+        "is_core": True,
+        "type": "admin",
+        "regions": {
+            "header": "Header",
+            "pre_content": "Pre-content",
+            "breadcrumb": "Breadcrumb",
+            "highlighted": "Highlighted",
+            "help": "Help",
+            "content": "Content",
+            "page_top": "Page top",
+            "page_bottom": "Page bottom",
+            "sidebar": "Sidebar",
+        },
+    },
+    "bartik": {
+        "label": "Bartik (Core Legacy - Drupal 7 / 8)",
+        "base_theme": "bartik",
+        "composer_pkg": None,
+        "is_core": True,
+        "type": "frontend_legacy",
+        "regions": {
+            "header": "Header",
+            "primary_menu": "Primary menu",
+            "secondary_menu": "Secondary menu",
+            "breadcrumb": "Breadcrumb",
+            "highlighted": "Highlighted",
+            "content": "Content",
+            "sidebar_first": "Sidebar first",
+            "sidebar_second": "Sidebar second",
+            "footer": "Footer",
+        },
+    },
+    "classy": {
+        "label": "Classy (Core Legacy - Drupal 8 / 9)",
+        "base_theme": "classy",
+        "composer_pkg": None,
+        "is_core": True,
+        "type": "frontend_legacy",
+        "regions": {
+            "header": "Header",
+            "primary_menu": "Primary menu",
+            "secondary_menu": "Secondary menu",
+            "breadcrumb": "Breadcrumb",
+            "highlighted": "Highlighted",
+            "content": "Content",
+            "sidebar_first": "Sidebar first",
+            "sidebar_second": "Sidebar second",
+            "footer": "Footer",
+        },
+    },
+    "custom": {
+        "label": "Personalizado (Ingresar nombre manualmente...)",
+        "base_theme": "",
+        "composer_pkg": None,
+        "is_core": False,
+        "type": "custom",
+        "regions": None,
+    }
+}
+
+
+def is_theme_installed(approot: str, docroot: str = "web", theme_name: str = "") -> bool:
+    """
+    Comprueba si un tema base está instalado o presente en el proyecto Drupal,
+    revisando en core/themes, themes/contrib, themes/custom o en composer.json.
+    """
+    if not approot or not theme_name:
+        return False
+    clean_docroot = (docroot or "web").strip().strip("/")
+
+    # 1. Verificar directorios físicos
+    check_dirs = [
+        os.path.join(approot, clean_docroot, "core", "themes", theme_name),
+        os.path.join(approot, clean_docroot, "themes", "contrib", theme_name),
+        os.path.join(approot, clean_docroot, "themes", "custom", theme_name),
+        os.path.join(approot, clean_docroot, "themes", theme_name),
+        os.path.join(approot, "themes", "contrib", theme_name),
+        os.path.join(approot, "themes", theme_name),
+        os.path.join(approot, "core", "themes", theme_name),
+    ]
+    for d in check_dirs:
+        if os.path.isdir(d):
+            return True
+
+    # 2. Verificar en composer.json si existe la dependencia
+    composer_json = os.path.join(approot, "composer.json")
+    if os.path.isfile(composer_json):
+        try:
+            with open(composer_json, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            reqs = data.get("require", {})
+            dev_reqs = data.get("require-dev", {})
+            pkg_target = f"drupal/{theme_name.replace('_', '-')}"
+            pkg_target_under = f"drupal/{theme_name}"
+            for r in (reqs, dev_reqs):
+                if pkg_target in r or pkg_target_under in r or f"drupal/{theme_name}" in r:
+                    return True
+        except Exception:
+            pass
+
+    return False
+
+
+def build_subtheme_command(
+    machine_name: str,
+    base_theme: str = "olivero",
+    composer_pkg: str = None,
+    install_base: bool = False,
+    enable_theme: bool = True,
+    set_as_default: bool = True,
+    is_admin_theme: bool = False,
+    subsite_url: str = ""
+) -> list:
+    """
+    Construye la secuencia de comandos DDEV para requerir el paquete del tema base vía Composer
+    (si es contrib y se solicita), habilitar el tema base, habilitar el nuevo subtema,
+    establecerlo opcionalmente como predeterminado y reconstruir la caché de Drupal.
+    """
+    uri_flag = f"--uri={subsite_url} " if subsite_url else ""
+    steps = []
+
+    if install_base and composer_pkg:
+        steps.append(f"composer require '{composer_pkg}'")
+        if base_theme:
+            steps.append(f"drush {uri_flag}theme:enable {base_theme} -y")
+
+    if enable_theme and machine_name:
+        steps.append(f"drush {uri_flag}theme:enable {machine_name} -y")
+        if set_as_default:
+            config_key = "admin" if is_admin_theme else "default"
+            steps.append(f"drush {uri_flag}config-set system.theme {config_key} {machine_name} -y")
+
+    steps.append(f"drush {uri_flag}cr")
+
+    script_sh = " && ".join(steps)
+    return ["ddev", "exec", "bash", "-c", script_sh]
+
+
 def scaffold_custom_module(
     approot: str,
     docroot: str,
@@ -391,10 +637,12 @@ def scaffold_custom_theme(
     docroot: str,
     machine_name: str,
     name: str,
-    base_theme: str = "olivero"
+    base_theme: str = "olivero",
+    regions: dict = None
 ) -> list:
     """
-    Crea la estructura estándar para un tema personalizado de Drupal 10/11.
+    Crea la estructura estándar para un tema/subtema personalizado de Drupal (Drupal 8, 9, 10, 11).
+    Soporta presets específicos (Bootstrap 5, Barrio, Radix, Olivero, Gin, Claro, Bartik).
     Retorna la lista de rutas relativas de los archivos creados.
     """
     created_files = []
@@ -410,6 +658,28 @@ def scaffold_custom_theme(
     name = name or machine_name
     base_theme = base_theme or "olivero"
 
+    # Resolver regiones según preset si no fueron provistas
+    if regions is None:
+        preset_info = DRUPAL_BASE_THEMES_PRESETS.get(base_theme)
+        if preset_info and preset_info.get("regions"):
+            regions = preset_info["regions"]
+        else:
+            regions = {
+                "header": "Header",
+                "primary_menu": "Primary menu",
+                "secondary_menu": "Secondary menu",
+                "breadcrumb": "Breadcrumb",
+                "highlighted": "Highlighted",
+                "content": "Content",
+                "sidebar_first": "Sidebar first",
+                "sidebar_second": "Sidebar second",
+                "footer": "Footer",
+            }
+
+    regions_yaml = "regions:\n"
+    for r_key, r_label in regions.items():
+        regions_yaml += f"  {r_key}: '{r_label}'\n"
+
     # 1. .info.yml
     info_path = os.path.join(thm_dir, f"{machine_name}.info.yml")
     info_content = (
@@ -421,16 +691,7 @@ def scaffold_custom_theme(
         f"base theme: '{base_theme}'\n"
         f"libraries:\n"
         f"  - {machine_name}/global-styling\n\n"
-        f"regions:\n"
-        f"  header: 'Header'\n"
-        f"  primary_menu: 'Primary menu'\n"
-        f"  secondary_menu: 'Secondary menu'\n"
-        f"  breadcrumb: 'Breadcrumb'\n"
-        f"  highlighted: 'Highlighted'\n"
-        f"  content: 'Content'\n"
-        f"  sidebar_first: 'Sidebar first'\n"
-        f"  sidebar_second: 'Sidebar second'\n"
-        f"  footer: 'Footer'\n"
+        f"{regions_yaml}"
     )
     with open(info_path, "w", encoding="utf-8") as f:
         f.write(info_content)
@@ -450,6 +711,10 @@ def scaffold_custom_theme(
     created_files.append(os.path.relpath(thm_path, approot))
 
     # 3. .libraries.yml
+    base_dep = ""
+    if base_theme in ("bootstrap5", "bootstrap_barrio", "gin", "radix"):
+        base_dep = f"  dependencies:\n    - {base_theme}/global-styling\n"
+
     lib_path = os.path.join(thm_dir, f"{machine_name}.libraries.yml")
     lib_content = (
         "global-styling:\n"
@@ -459,6 +724,7 @@ def scaffold_custom_theme(
         "      css/style.css: {}\n"
         "  js:\n"
         "    js/script.js: {}\n"
+        f"{base_dep}"
     )
     with open(lib_path, "w", encoding="utf-8") as f:
         f.write(lib_content)

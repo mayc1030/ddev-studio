@@ -21,6 +21,9 @@ from ddev_studio.core.drupal_tools import (
     parse_pm_list_output,
     build_drush_generate_command,
     build_starterkit_theme_command,
+    build_subtheme_command,
+    is_theme_installed,
+    DRUPAL_BASE_THEMES_PRESETS,
     scaffold_custom_module,
     scaffold_custom_theme,
     scaffold_custom_component,
@@ -223,6 +226,100 @@ class TestDrupalTools(unittest.TestCase):
             code = f.read()
         self.assertIn("@RestResource", code)
         self.assertIn("class ProductsApiResource extends ResourceBase", code)
+
+    def test_drupal_base_themes_presets(self):
+        self.assertIn("olivero", DRUPAL_BASE_THEMES_PRESETS)
+        self.assertIn("bootstrap5", DRUPAL_BASE_THEMES_PRESETS)
+        self.assertIn("bootstrap_barrio", DRUPAL_BASE_THEMES_PRESETS)
+        self.assertIn("radix", DRUPAL_BASE_THEMES_PRESETS)
+        self.assertIn("gin", DRUPAL_BASE_THEMES_PRESETS)
+        self.assertIn("claro", DRUPAL_BASE_THEMES_PRESETS)
+        self.assertIn("bartik", DRUPAL_BASE_THEMES_PRESETS)
+        self.assertEqual(DRUPAL_BASE_THEMES_PRESETS["bootstrap5"]["composer_pkg"], "drupal/bootstrap5")
+        self.assertEqual(DRUPAL_BASE_THEMES_PRESETS["gin"]["type"], "admin")
+
+    def test_is_theme_installed(self):
+        # Empty dir
+        self.assertFalse(is_theme_installed(self.test_dir, "web", "bootstrap5"))
+
+        # Core theme in web/core/themes/olivero
+        olivero_dir = os.path.join(self.test_dir, "web", "core", "themes", "olivero")
+        os.makedirs(olivero_dir, exist_ok=True)
+        self.assertTrue(is_theme_installed(self.test_dir, "web", "olivero"))
+
+        # Contrib theme in web/themes/contrib/bootstrap5
+        b5_dir = os.path.join(self.test_dir, "web", "themes", "contrib", "bootstrap5")
+        os.makedirs(b5_dir, exist_ok=True)
+        self.assertTrue(is_theme_installed(self.test_dir, "web", "bootstrap5"))
+
+        # Theme defined in composer.json
+        composer_file = os.path.join(self.test_dir, "composer.json")
+        with open(composer_file, "w", encoding="utf-8") as f:
+            json.dump({"require": {"drupal/bootstrap_barrio": "^5.5"}}, f)
+        self.assertTrue(is_theme_installed(self.test_dir, "web", "bootstrap_barrio"))
+
+    def test_scaffold_custom_theme_presets(self):
+        # Scaffold Bootstrap 5 subtheme
+        files = scaffold_custom_theme(
+            self.test_dir, "web", "b5_subtheme", "B5 Subtheme", "bootstrap5"
+        )
+        self.assertGreaterEqual(len(files), 5)
+        info_path = os.path.join(self.test_dir, "web", "themes", "custom", "b5_subtheme", "b5_subtheme.info.yml")
+        with open(info_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        self.assertIn("base theme: 'bootstrap5'", content)
+        self.assertIn("nav_branding: 'Navigation Branding'", content)
+        self.assertIn("nav_main: 'Main Navigation'", content)
+
+        lib_path = os.path.join(self.test_dir, "web", "themes", "custom", "b5_subtheme", "b5_subtheme.libraries.yml")
+        with open(lib_path, "r", encoding="utf-8") as f:
+            lib_content = f.read()
+        self.assertIn("bootstrap5/global-styling", lib_content)
+
+        # Scaffold Gin admin subtheme
+        files_gin = scaffold_custom_theme(
+            self.test_dir, "web", "gin_subtheme", "Gin Subtheme", "gin"
+        )
+        info_gin_path = os.path.join(self.test_dir, "web", "themes", "custom", "gin_subtheme", "gin_subtheme.info.yml")
+        with open(info_gin_path, "r", encoding="utf-8") as f:
+            gin_content = f.read()
+        self.assertIn("base theme: 'gin'", gin_content)
+        self.assertIn("pre_content: 'Pre-content'", gin_content)
+
+    def test_build_subtheme_command(self):
+        # Frontend theme with composer install and set default
+        cmd1 = build_subtheme_command(
+            machine_name="my_subtheme",
+            base_theme="bootstrap5",
+            composer_pkg="drupal/bootstrap5",
+            install_base=True,
+            enable_theme=True,
+            set_as_default=True,
+            is_admin_theme=False
+        )
+        self.assertEqual(cmd1[0], "ddev")
+        self.assertEqual(cmd1[1], "exec")
+        self.assertEqual(cmd1[2], "bash")
+        self.assertEqual(cmd1[3], "-c")
+        self.assertIn("composer require 'drupal/bootstrap5'", cmd1[4])
+        self.assertIn("drush theme:enable bootstrap5 -y", cmd1[4])
+        self.assertIn("drush theme:enable my_subtheme -y", cmd1[4])
+        self.assertIn("drush config-set system.theme default my_subtheme -y", cmd1[4])
+        self.assertIn("drush cr", cmd1[4])
+
+        # Admin theme without composer install
+        cmd2 = build_subtheme_command(
+            machine_name="admin_subtheme",
+            base_theme="gin",
+            composer_pkg="drupal/gin",
+            install_base=False,
+            enable_theme=True,
+            set_as_default=True,
+            is_admin_theme=True
+        )
+        self.assertNotIn("composer require", cmd2[4])
+        self.assertIn("drush theme:enable admin_subtheme -y", cmd2[4])
+        self.assertIn("drush config-set system.theme admin admin_subtheme -y", cmd2[4])
 
 
 if __name__ == "__main__":
