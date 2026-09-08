@@ -170,6 +170,18 @@ class DrupalToolsView(Gtk.Box):
             self.lbl_title.set_markup(f"<span size='large' weight='bold'>Drupal Studio — {GLib.markup_escape_text(self.project_name)}</span>")
             self.lbl_sub.set_markup(f"<span color='#94a3b8' size='small'>Docroot: <tt>{self.docroot}</tt> | URL: <tt>{self.primary_url}</tt></span>")
         
+        # Configurar generador de temas según versión de Drupal
+        self.ptype = str(self.proj.get("type", "")).lower()
+        if "drupal8" in self.ptype:
+            self.combo_thm_type.set_active_id("subtheme")
+            self.entry_thm_base.set_text("classy")
+        elif "drupal7" in self.ptype:
+            self.combo_thm_type.set_active_id("subtheme")
+            self.entry_thm_base.set_text("bartik")
+        else:
+            self.combo_thm_type.set_active_id("starterkit")
+            self.entry_thm_base.set_text("olivero")
+        
         # Refrescar listas de módulos/temas y estado de APIs
         self.refresh_view()
 

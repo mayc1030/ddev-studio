@@ -312,7 +312,6 @@ class DrupalToolsDialog(Gtk.Dialog):
         self.combo_thm_type = Gtk.ComboBoxText()
         self.combo_thm_type.append("starterkit", "Starterkit Moderno (Drupal 10/11 - Recomendado)")
         self.combo_thm_type.append("subtheme", "Subtema Clásico (Hereda de Base Theme)")
-        self.combo_thm_type.set_active(0)
         grid.attach(self.combo_thm_type, 1, 2, 1, 1)
         
         # Tema Base
@@ -320,9 +319,20 @@ class DrupalToolsDialog(Gtk.Dialog):
         lbl4.set_halign(Gtk.Align.END)
         grid.attach(lbl4, 0, 3, 1, 1)
         self.entry_thm_base = Gtk.Entry()
-        self.entry_thm_base.set_text("olivero")
-        self.entry_thm_base.set_placeholder_text("olivero, claro, stable9")
+        self.entry_thm_base.set_placeholder_text("olivero, claro, stable9, classy")
         grid.attach(self.entry_thm_base, 1, 3, 1, 1)
+        
+        # Configurar según versión de Drupal
+        ptype = str(self.proj.get("type", "")).lower()
+        if "drupal8" in ptype:
+            self.combo_thm_type.set_active_id("subtheme")
+            self.entry_thm_base.set_text("classy")
+        elif "drupal7" in ptype:
+            self.combo_thm_type.set_active_id("subtheme")
+            self.entry_thm_base.set_text("bartik")
+        else:
+            self.combo_thm_type.set_active_id("starterkit")
+            self.entry_thm_base.set_text("olivero")
         
         return grid
 

@@ -276,7 +276,7 @@ def build_starterkit_theme_command(
         f'elif [ -f "core/scripts/drupal" ]; then '
         f'php core/scripts/drupal generate-theme {machine_name} --name=\'{safe_name}\' --path=themes/custom; '
         f'else '
-        f'echo "Error: no se encontró el script de generación de temas (vendor/bin/dr o core/scripts/drupal)" >&2; exit 1; '
+        f'echo "Error: el generador Starterkit requiere Drupal 10 o Drupal 11 (o 9.3+). Para Drupal 8 usa la opción \'Subtema Clásico\'." >&2; exit 1; '
         f'fi && drush {uri_flag}cr'
     )
     return ["ddev", "exec", "bash", "-c", script_sh]
@@ -315,7 +315,7 @@ def scaffold_custom_module(
         f"type: module\n"
         f"description: '{description}'\n"
         f"package: '{package}'\n"
-        f"core_version_requirement: ^9 || ^10 || ^11\n"
+        f"core_version_requirement: ^8 || ^9 || ^10 || ^11\n"
     )
     with open(info_path, "w", encoding="utf-8") as f:
         f.write(info_content)
@@ -417,7 +417,7 @@ def scaffold_custom_theme(
         f"type: theme\n"
         f"description: 'Tema personalizado {name} basado en {base_theme}.'\n"
         f"package: 'Custom'\n"
-        f"core_version_requirement: ^9 || ^10 || ^11\n"
+        f"core_version_requirement: ^8 || ^9 || ^10 || ^11\n"
         f"base theme: '{base_theme}'\n"
         f"libraries:\n"
         f"  - {machine_name}/global-styling\n\n"
