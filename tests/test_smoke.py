@@ -377,6 +377,15 @@ class TestImports(unittest.TestCase):
         self.assertEqual(view.from_view, "details")
         self.assertEqual(view.btn_back_lbl.get_text(), "Volver a Detalles")
 
+        # Test uninstall box visibility update
+        view.update_api_status_ui({"admin_toolbar": True})
+        self.assertTrue(view.card_admin_media._box_active.get_visible())
+        self.assertFalse(view.card_seo._box_active.get_visible())
+
+        # Test uninstall box visibility hidden when empty
+        view.update_api_status_ui({})
+        self.assertFalse(view.card_admin_media._box_active.get_visible())
+
     def test_addons_view_instantiation(self):
         from ddev_studio.ui.views.addons import AddonsMarketplaceView
         view = AddonsMarketplaceView(main_app=None)

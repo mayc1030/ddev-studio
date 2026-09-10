@@ -956,8 +956,10 @@ class DrupalToolsDialog(Gtk.Dialog):
                         flow_active.add(btn_un)
                         
                 if has_active:
+                    box_active.set_no_show_all(False)
                     box_active.show_all()
                 else:
+                    box_active.set_no_show_all(True)
                     box_active.hide()
 
     # -------------------------------------------------------------------------
