@@ -23,10 +23,11 @@ class N8nRecipe(BaseRecipe):
             ctx,
             project_type="generic",
             docroot=".",
-            node_version="22",
+            node_version="24",
             db_type="none",
             extra_args=[
-                f"--web-environment-add=N8N_PORT=5678,N8N_EDITOR_BASE_URL=https://{ctx.slug}.ddev.site/,WEBHOOK_URL=https://{ctx.slug}.ddev.site/,N8N_PROTOCOL=https"
+                f"--web-environment-add=N8N_PORT=5678,N8N_EDITOR_BASE_URL=https://{ctx.slug}.ddev.site/,WEBHOOK_URL=https://{ctx.slug}.ddev.site/,N8N_PROTOCOL=https",
+                "--webimage-extra-packages=python3-setuptools,build-essential"
             ]
         )
         self.start_ddev(ctx)
@@ -34,12 +35,12 @@ class N8nRecipe(BaseRecipe):
         ctx.set_status("Inicializando espacio de trabajo para n8n...")
         ctx.run_cmd(["ddev", "exec", "npm", "init", "-y"])
 
-        ctx.set_status("Instalando plataforma n8n...")
+        ctx.set_status("Instalando plataforma n8n (compilando módulos nativos C++)...")
         ctx.run_cmd(["ddev", "exec", "npm", "install", "n8n@latest", "--save"])
 
         ctx.set_status("Configurando Nginx Reverse Proxy y daemon en segundo plano...")
         self.setup_nginx_proxy(ctx, port=5678)
-        self.setup_daemon(ctx, name="n8n-server", command="npx n8n start")
+        self.setup_daemon(ctx, name="n8n-server", command="bash -lc 'npx n8n start'")
 
         self.restart_ddev(ctx, "Reiniciando DDEV para activar el servidor n8n...")
         ctx.log(f"\n🎉 ¡n8n instalado y listo en https://{ctx.slug}.ddev.site!")
@@ -61,7 +62,8 @@ class OpenClawRecipe(BaseRecipe):
             node_version="22",
             db_type="none",
             extra_args=[
-                "--web-environment-add=OPENCLAW_GATEWAY_PORT=18789,OPENCLAW_STATE_DIR=/var/www/html/.openclaw,OLLAMA_BASE_URL=http://host.docker.internal:11434"
+                "--web-environment-add=OPENCLAW_GATEWAY_PORT=18789,OPENCLAW_STATE_DIR=/var/www/html/.openclaw,OLLAMA_BASE_URL=http://host.docker.internal:11434",
+                "--webimage-extra-packages=python3-setuptools,build-essential"
             ]
         )
         self.start_ddev(ctx)
@@ -74,7 +76,7 @@ class OpenClawRecipe(BaseRecipe):
 
         ctx.set_status("Configurando Nginx Reverse Proxy y daemon en segundo plano...")
         self.setup_nginx_proxy(ctx, port=18789)
-        self.setup_daemon(ctx, name="openclaw-gateway", command="npx openclaw gateway --port 18789")
+        self.setup_daemon(ctx, name="openclaw-gateway", command="bash -lc 'npx openclaw gateway --port 18789'")
 
         self.restart_ddev(ctx, "Reiniciando DDEV para activar el gateway de OpenClaw...")
         ctx.log(f"\n🎉 ¡OpenClaw instalado y listo en https://{ctx.slug}.ddev.site!")

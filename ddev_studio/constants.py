@@ -492,7 +492,7 @@ FRAMEWORKS = [
         "desc": "Plataforma de automatización de flujos de trabajo basada en nodos, webhooks e integraciones con IA/Ollama.",
         "icon": "n8n.svg",
         "php": "8.3",
-        "nodejs": "22",
+        "nodejs": "24",
         "docroot": ".",
         "db": "none",
     },

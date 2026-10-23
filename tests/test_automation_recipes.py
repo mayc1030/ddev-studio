@@ -71,12 +71,13 @@ class TestAutomationRecipes(unittest.TestCase):
         mock_cfg.assert_called_once()
         args, kwargs = mock_cfg.call_args
         self.assertEqual(kwargs.get("project_type"), "generic")
-        self.assertEqual(kwargs.get("node_version"), "22")
+        self.assertEqual(kwargs.get("node_version"), "24")
         self.assertEqual(kwargs.get("db_type"), "none")
+        self.assertIn("--webimage-extra-packages=python3-setuptools,build-essential", kwargs.get("extra_args", []))
 
         mock_start.assert_called_once_with(ctx)
         mock_proxy.assert_called_once_with(ctx, port=5678)
-        mock_daemon.assert_called_once_with(ctx, name="n8n-server", command="npx n8n start")
+        mock_daemon.assert_called_once_with(ctx, name="n8n-server", command="bash -lc 'npx n8n start'")
         mock_restart.assert_called_once()
         self.assertGreaterEqual(mock_run_cmd.call_count, 2)
 
@@ -111,10 +112,11 @@ class TestAutomationRecipes(unittest.TestCase):
         self.assertEqual(kwargs.get("project_type"), "generic")
         self.assertEqual(kwargs.get("node_version"), "22")
         self.assertEqual(kwargs.get("db_type"), "none")
+        self.assertIn("--webimage-extra-packages=python3-setuptools,build-essential", kwargs.get("extra_args", []))
 
         mock_start.assert_called_once_with(ctx)
         mock_proxy.assert_called_once_with(ctx, port=18789)
-        mock_daemon.assert_called_once_with(ctx, name="openclaw-gateway", command="npx openclaw gateway --port 18789")
+        mock_daemon.assert_called_once_with(ctx, name="openclaw-gateway", command="bash -lc 'npx openclaw gateway --port 18789'")
         mock_restart.assert_called_once()
         self.assertGreaterEqual(mock_run_cmd.call_count, 2)
 
