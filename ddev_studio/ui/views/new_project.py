@@ -250,6 +250,8 @@ class NewProjectView(Gtk.ScrolledWindow):
         exp_box.pack_start(self.chk_auto_install, False, False, 0)
 
         self.expander_new_project.add(exp_box)
+        self.expander_new_project.show_all()
+        self.expander_new_project.set_no_show_all(True)
         box.pack_start(self.expander_new_project, False, False, 0)
 
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
@@ -469,6 +471,14 @@ class NewProjectView(Gtk.ScrolledWindow):
             is_php = fw_id in ["drupal", "wordpress", "laravel", "symfony", "php"]
             is_node = fw_id in ["nextjs", "angular", "react", "vue", "generic", "n8n", "openclaw"]
             is_python = fw_id in ["django", "flask"]
+            is_automation = fw_id in ["n8n", "openclaw"]
+
+            if hasattr(self, "expander_new_project"):
+                if is_automation:
+                    self.expander_new_project.set_expanded(False)
+                    self.expander_new_project.set_visible(False)
+                else:
+                    self.expander_new_project.set_visible(True)
 
             if hasattr(self, "drupal_version_box"):
                 self.drupal_version_box.set_visible(is_drupal)

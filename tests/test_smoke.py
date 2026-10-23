@@ -438,8 +438,24 @@ class TestImports(unittest.TestCase):
         self.assertIsNotNone(view.btn_mode_import)
         self.assertEqual(len(view.fw_widgets), 13)
         self.assertIn("n8n", view.fw_widgets)
-        self.assertIn("openclaw", view.fw_widgets)
         self.assertTrue(view.btn_mode_create.get_active())
+        self.assertTrue(view.expander_new_project.get_visible())
+
+        # Seleccionar n8n -> expander de opciones avanzadas debe ocultarse
+        n8n_card = view.fw_widgets["n8n"]
+        view.on_framework_selected(view.flowbox_fw, n8n_card.get_parent())
+        self.assertFalse(view.expander_new_project.get_visible())
+
+        # Seleccionar openclaw -> expander de opciones avanzadas debe ocultarse
+        openclaw_card = view.fw_widgets["openclaw"]
+        view.on_framework_selected(view.flowbox_fw, openclaw_card.get_parent())
+        self.assertFalse(view.expander_new_project.get_visible())
+
+        # Seleccionar laravel -> expander de opciones avanzadas debe reaparecer
+        laravel_card = view.fw_widgets["laravel"]
+        view.on_framework_selected(view.flowbox_fw, laravel_card.get_parent())
+        self.assertTrue(view.expander_new_project.get_visible())
+
         view.switch_mode("import")
         self.assertTrue(view.btn_mode_import.get_active())
 

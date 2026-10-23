@@ -249,8 +249,8 @@ Implementado en `ddev_studio/core/ai_client.py` y `ddev_studio/ui/views/ai_assis
 
 ## 10. Registro de Cambios Recientes (Changelog de Contexto)
 
-| Commit / Versión | Tipo | Descripción | Componentes Afectados |
-| *Actual* | `feat` | Recetas de aprovisionamiento desatendido, detección heurística y Framework Developer Toolkits para n8n y OpenClaw (Automatización & Agentes IA), ampliando a 13 plataformas y 116 pruebas unitarias | `recipes/automation.py`, `constants.py`, `core/detector.py`, `core/framework_tools.py`, `ui/views/new_project.py`, `tests/` |
+| *Actual* | `feat(ui)` | Ocultamiento dinámico del expander de opciones avanzadas (entorno, BD) en el asistente de creación para n8n y OpenClaw, simplificando la UI a un flujo directo de 1 clic sin distracciones técnicas innecesarias | `ui/views/new_project.py`, `tests/test_smoke.py` |
+| `f4dcd0f` | `feat` | Recetas de aprovisionamiento desatendido, detección heurística y Framework Developer Toolkits para n8n y OpenClaw (Automatización & Agentes IA), ampliando a 13 plataformas y 116 pruebas unitarias | `recipes/automation.py`, `constants.py`, `core/detector.py`, `core/framework_tools.py`, `ui/views/new_project.py`, `tests/` |
 | `5a9e689` | `legal/feat` | Transición a Licencia Apache 2.0 con archivo `NOTICE` y atribución obligatoria a Maycol Sanchez Salazar (`mayc1030@gmail.com`), permitiendo uso y venta comercial con reconocimiento mandatorio de autoría en GUI y documentación | `LICENSE`, `NOTICE`, `README.md`, `ui/window.py` (Gtk.AboutDialog) |
 | `3a53b50` | `feat` | Asistente IA local Ollama, Framework Developer Toolkits, diagnóstico SSL, desinstalación de módulos Drupal y 108 pruebas | `core/`, `ui/`, `tests/`, `docs/`, `PROJECT_CONTEXT.md`, `README.md` |
 | `3a53b50` | `docs/feat` | Manual Oficial de Usuario y Arquitectura Técnica en PDF (`docs/manual/manual_ddev_studio.pdf`, `manual_ddev_studio.html`) con 20 capturas de pantalla de alta fidelidad (`docs/generate_screenshots.py`), 21 secciones arquitectónicas centradas en funcionalidades, sin sección de instalación externa | `docs/manual/`, `docs/generate_screenshots.py`, `ui/dialogs/ci_dialog.py`, `ui/dialogs/progress.py` |
