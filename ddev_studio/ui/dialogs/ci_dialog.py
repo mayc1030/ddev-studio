@@ -59,7 +59,7 @@ class CIDialog(Gtk.Dialog):
             
         if self.existing_wf:
             wf_names = ", ".join([w["filename"] for w in self.existing_wf])
-            git_desc += f"<br/><span color='#22c55e'>✔ Flujos de trabajo activos detectados: <b>{wf_names}</b></span>"
+            git_desc += f"\n<span color='#22c55e'>✔ Flujos de trabajo activos detectados: <b>{wf_names}</b></span>"
             
         lbl_sub = Gtk.Label()
         lbl_sub.set_markup(f"<small>{git_desc}</small>")

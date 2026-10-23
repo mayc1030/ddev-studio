@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Manual Oficial de Usuario y Arquitectura Técnica — DDEV Studio</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    @page {
+      size: A4;
+      margin: 18mm 16mm 18mm 16mm;
+      @bottom-right {
+        content: counter(page);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.58;
+      color: #1e293b;
+      background-color: #ffffff;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Portada */
+    .cover-page {
+      page-break-after: always;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 40px 20px;
+      background: linear-gradient(145deg, #0f172a 0%, #1e293b 50%, #0369a1 100%);
+      color: #ffffff;
+      border-radius: 12px;
+    }
+
+    .cover-header {
+      border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+      padding-bottom: 20px;
+    }
+
+    .cover-badge {
+      display: inline-block;
+      background: rgba(56, 189, 248, 0.2);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 9pt;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 15px;
+    }
+
+    .cover-title {
+      font-size: 32pt;
+      font-weight: 800;
+      line-height: 1.15;
+      margin: 10px 0 15px 0;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+    }
+
+    .cover-subtitle {
+      font-size: 14pt;
+      font-weight: 400;
+      color: #94a3b8;
+      max-width: 600px;
+      line-height: 1.45;
+    }
+
+    .cover-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 20px;
+      border-radius: 8px;
+      backdrop-filter: blur(10px);
+    }
+
+    .cover-meta-item strong {
+      display: block;
+      color: #38bdf8;
+      font-size: 8.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .cover-meta-item span {
+      font-size: 11pt;
+      color: #f1f5f9;
+      font-weight: 500;
+    }
+
+    .cover-footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      padding-top: 15px;
+      font-size: 9pt;
+      color: #94a3b8;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Tabla de Contenido */
+    .toc-page {
+      page-break-after: always;
+      padding-top: 10px;
+    }
+
+    .toc-title {
+      font-size: 20pt;
+      font-weight: 700;
+      color: #0f172a;
+      border-bottom: 3px solid #0284c7;
+      padding-bottom: 8px;
+      margin-bottom: 25px;
+    }
+
+    .toc-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .toc-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 6px 0;
+      border-bottom: 1px dotted #cbd5e1;
+      font-size: 10pt;
+    }
+
+    .toc-item strong {
+      color: #0f172a;
+    }
+
+    .toc-item span.sec-num {
+      color: #0284c7;
+      font-weight: 700;
+      width: 28px;
+      display: inline-block;
+    }
+
+    .toc-item span.page-num {
+      color: #64748b;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Secciones y Contenido */
+    .section {
+      page-break-before: always;
+      padding-top: 10px;
+    }
+
+    .section-first {
+      page-break-before: auto;
+    }
+
+    h1 {
+      font-size: 16pt;
+      font-weight: 800;
+      color: #0f172a;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 6px;
+      margin-top: 0;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h1 .sec-badge {
+      background: #0284c7;
+      color: #ffffff;
+      font-size: 9.5pt;
+      padding: 2px 9px;
+      border-radius: 6px;
+      font-weight: 700;
+    }
+
+    h2 {
+      font-size: 12pt;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 14px;
+      margin-bottom: 8px;
+      border-left: 4px solid #0284c7;
+      padding-left: 8px;
+    }
+
+    h3 {
+      font-size: 10.5pt;
+      font-weight: 600;
+      color: #334155;
+      margin-top: 12px;
+      margin-bottom: 6px;
+    }
+
+    p {
+      margin-top: 0;
+      margin-bottom: 8px;
+      text-align: justify;
+    }
+
+    /* Cajas de llamada (Callouts) */
+    .callout {
+      margin: 12px 0;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 9pt;
+      border-left: 4px solid;
+    }
+
+    .callout-note {
+      background-color: #f0f9ff;
+      border-color: #0284c7;
+      color: #0369a1;
+    }
+
+    .callout-tip {
+      background-color: #f0fdf4;
+      border-color: #22c55e;
+      color: #15803d;
+    }
+
+    .callout-warning {
+      background-color: #fffbeb;
+      border-color: #f59e0b;
+      color: #b45309;
+    }
+
+    .callout-architect {
+      background-color: #f8fafc;
+      border-color: #64748b;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+      border-left: 4px solid #0f172a;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      margin-bottom: 3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      text-transform: uppercase;
+      font-size: 8pt;
+      letter-spacing: 0.05em;
+    }
+
+    /* Imágenes de Captura */
+    .figure-box {
+      margin: 10px 0 8px 0;
+      text-align: center;
+      page-break-inside: avoid;
+    }
+
+    .figure-box img {
+      max-width: 95%;
+      max-height: 350px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+      display: block;
+      margin: 0 auto;
+    }
+
+    .figure-caption {
+      font-size: 8.5pt;
+      color: #64748b;
+      margin-top: 8px;
+      font-weight: 500;
+    }
+
+    .figure-caption strong {
+      color: #0f172a;
+    }
+
+    /* Código */
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8.5pt;
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 2px 5px;
+      border-radius: 4px;
+      border: 1px solid #e2e8f0;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #f8fafc;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8.5pt;
+      padding: 12px 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      line-height: 1.45;
+      margin: 12px 0;
+      border: 1px solid #334155;
+    }
+
+    pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      border: none;
+    }
+
+    /* Tablas */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 9pt;
+      page-break-inside: avoid;
+    }
+
+    th, td {
+      border: 1px solid #e2e8f0;
+      padding: 8px 12px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f8fafc;
+      font-weight: 700;
+      color: #0f172a;
+      border-bottom: 2px solid #cbd5e1;
+    }
+
+    tr:nth-child(even) td {
+      background-color: #f8fafc;
+    }
+
+    /* Listas de pasos */
+    ol.steps {
+      padding-left: 20px;
+      margin: 12px 0;
+    }
+
+    ol.steps li {
+      margin-bottom: 8px;
+      padding-left: 4px;
+    }
+
+    ul.features {
+      padding-left: 20px;
+      margin: 10px 0;
+    }
+
+    ul.features li {
+      margin-bottom: 6px;
+    }
+
+    .badge-pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 8pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-blue { background: #e0f2fe; color: #075985; }
+    .badge-amber { background: #fef3c7; color: #92400e; }
+    .badge-purple { background: #f3e8ff; color: #6b21a8; }
+  </style>
+</head>
+<body>
+
+  <!-- ===================================================================== -->
+  <!-- PORTADA DEL MANUAL                                                    -->
+  <!-- ===================================================================== -->
+  <div class="cover-page">
+    <div class="cover-header">
+      <span class="cover-badge">Manual Oficial de Usuario y Arquitectura Técnica</span>
+      <h1 class="cover-title">DDEV Studio</h1>
+      <p class="cover-subtitle">
+        Estación de Trabajo Visual y DevOps Integral para Entornos Contenerizados en Linux (GTK+ 3 & Python 3).
+      </p>
+    </div>
+
+    <div class="cover-meta-grid">
+      <div class="cover-meta-item">
+        <strong>Versión del Software</strong>
+        <span>DDEV Studio v1.2.0 (LTS)</span>
+      </div>
+      <div class="cover-meta-item">
+        <strong>Rol / Perspectiva Técnica</strong>
+        <span>Senior Full-Stack & DevOps Architect</span>
+      </div>
+      <div class="cover-meta-item">
+        <strong>Ecosistema Soportado</strong>
+        <span>Drupal 7-11, WP, Laravel, Symfony, Next.js, Django, Ollama</span>
+      </div>
+      <div class="cover-meta-item">
+        <strong>Arquitectura del Núcleo</strong>
+        <span>Separación Estricta de Responsabilidades (SoC) + GTK3 PyGObject</span>
+      </div>
+    </div>
+
+    <div class="cover-footer">
+      <span>DDEV Studio Project — Software Libre y de Código Abierto</span>
+      <span>Documento Técnico Maestro</span>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- TABLA DE CONTENIDO                                                    -->
+  <!-- ===================================================================== -->
+  <div class="toc-page">
+    <div class="toc-title">Tabla de Contenido</div>
+    <ul class="toc-list">
+      <li class="toc-item"><span><span class="sec-num">1</span> <strong>Visión General, Filosofía de Diseño y Arquitectura</strong></span> <span class="page-num">Pág. 3</span></li>
+      <li class="toc-item"><span><span class="sec-num">2</span> <strong>Pestaña "Mis Proyectos": Catálogo y Gestión en Vivo</strong></span> <span class="page-num">Pág. 4</span></li>
+      <li class="toc-item"><span><span class="sec-num">3</span> <strong>Detalles Técnicos: Runtimes, Xdebug y Respaldos DB</strong></span> <span class="page-num">Pág. 5</span></li>
+      <li class="toc-item"><span><span class="sec-num">4</span> <strong>Bases de Datos & Gestores Web (SQLite, MySQL, Postgres)</strong></span> <span class="page-num">Pág. 6</span></li>
+      <li class="toc-item"><span><span class="sec-num">5</span> <strong>Framework Developer Toolkits (Laravel, Django, Node, etc.)</strong></span> <span class="page-num">Pág. 7</span></li>
+      <li class="toc-item"><span><span class="sec-num">6</span> <strong>Nuevo Proyecto: Creación Desatendida (11 Tecnologías)</strong></span> <span class="page-num">Pág. 8</span></li>
+      <li class="toc-item"><span><span class="sec-num">7</span> <strong>Nuevo Proyecto: Importación con Detector Heurístico</strong></span> <span class="page-num">Pág. 9</span></li>
+      <li class="toc-item"><span><span class="sec-num">8</span> <strong>Pestaña "Herramientas": Control Global y Estado del Sistema</strong></span> <span class="page-num">Pág. 10</span></li>
+      <li class="toc-item"><span><span class="sec-num">9</span> <strong>Monitor de Recursos Docker en Tiempo Real</strong></span> <span class="page-num">Pág. 11</span></li>
+      <li class="toc-item"><span><span class="sec-num">10</span> <strong>Marketplace de Add-ons (Redis, Solr, Cron, RabbitMQ, etc.)</strong></span> <span class="page-num">Pág. 12</span></li>
+      <li class="toc-item"><span><span class="sec-num">11</span> <strong>Suite Drupal: Generador de Código (Drush Scaffolding)</strong></span> <span class="page-num">Pág. 13</span></li>
+      <li class="toc-item"><span><span class="sec-num">12</span> <strong>Suite Drupal: Generador de Temas Starterkit y Presets</strong></span> <span class="page-num">Pág. 14</span></li>
+      <li class="toc-item"><span><span class="sec-num">13</span> <strong>Suite Drupal: APIs REST, JSON:API y Módulos Fundamentales</strong></span> <span class="page-num">Pág. 15</span></li>
+      <li class="toc-item"><span><span class="sec-num">14</span> <strong>Gestor de Drupal Multisitio Nativo</strong></span> <span class="page-num">Pág. 16</span></li>
+      <li class="toc-item"><span><span class="sec-num">15</span> <strong>Asistente IA Local (Ollama): Chat Técnico Interactivo</strong></span> <span class="page-num">Pág. 17</span></li>
+      <li class="toc-item"><span><span class="sec-num">16</span> <strong>Asistente IA: Onboarding y Catálogo de Modelos</strong></span> <span class="page-num">Pág. 18</span></li>
+      <li class="toc-item"><span><span class="sec-num">17</span> <strong>Diagnóstico y Reparación de Certificados SSL (mkcert)</strong></span> <span class="page-num">Pág. 19</span></li>
+      <li class="toc-item"><span><span class="sec-num">18</span> <strong>Automatización CI/CD con GitHub Actions</strong></span> <span class="page-num">Pág. 20</span></li>
+      <li class="toc-item"><span><span class="sec-num">19</span> <strong>Desinstalación Segura de Módulos (CLI vs Web Asistida)</strong></span> <span class="page-num">Pág. 21</span></li>
+      <li class="toc-item"><span><span class="sec-num">20</span> <strong>Consola Asíncrona de Tareas en Vivo (ProgressDialog)</strong></span> <span class="page-num">Pág. 22</span></li>
+      <li class="toc-item"><span><span class="sec-num">21</span> <strong>Información del Sistema y Acerca de DDEV Studio</strong></span> <span class="page-num">Pág. 23</span></li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 1: VISIÓN GENERAL Y ARQUITECTURA                              -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">01</span> Visión General, Filosofía de Diseño y Arquitectura</h1>
+    <p>
+      <strong>DDEV Studio</strong> es una estación de trabajo gráfica de nivel empresarial construida en <strong>Python 3</strong> y <strong>GTK+ 3 (PyGObject)</strong> concebida para transformar radicalmente la experiencia de desarrollo local con Docker y DDEV en entornos GNU/Linux (Ubuntu, Debian, Fedora, Arch Linux).
+    </p>
+
+    <div class="callout callout-architect">
+      <div class="callout-title">Arquitectura del Sistema & Separación de Responsabilidades (SoC)</div>
+      El codebase está estructurado siguiendo una rigurosa separación modular:
+      <ul class="features">
+        <li><strong>Capa de UI (ddev_studio/ui/):</strong> Totalmente desacoplada ("tonta"). Maneja widgets GTK3, estilos CSS nativos y eventos de usuario. Nunca ejecuta comandos de bloqueo.</li>
+        <li><strong>Lógica de Negocio (ddev_studio/core/):</strong> Componentes puros ("ciegos" de la interfaz gráfica). Encapsulan detección de tecnologías, cálculo de métricas Docker, generación de plantillas CI/CD y comunicación HTTP REST con Ollama.</li>
+        <li><strong>Patrón Estrategia de Recetas (ddev_studio/recipes/):</strong> Automatización desatendida del ciclo de vida para 11 tecnologías distintas con inyección de proxies reversos Nginx y daemons de segundo plano.</li>
+      </ul>
+    </div>
+
+    <h2>Principios de Ingeniería Aplicados</h2>
+    <ul class="features">
+      <li><strong>Threading No Bloqueante:</strong> Cada comando shell (DDEV, Docker, Composer, Drush) se despacha en un hilo daemon secundario (<code>threading.Thread</code>) y canaliza eventos a GTK de manera segura exclusivamente mediante <code>GLib.idle_add()</code>.</li>
+      <li><strong>Sanitización Estricta de Procesos:</strong> Cero inyecciones de comandos shell arbitrarios. Todas las invocaciones externas utilizan listas vectorizadas o sanitización con <code>shlex.quote</code>.</li>
+      <li><strong>Cero Rutas Hardcodeadas:</strong> Portabilidad total sin dependencia del usuario del sistema mediante <code>DEFAULT_SITES_DIR</code> y variables de entorno estándar.</li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 2: PESTAÑA MIS PROYECTOS                                      -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">02</span> Módulo "Mis Proyectos": Catálogo y Gestión en Vivo</h1>
+    <p>
+      La vista central de la aplicación proporciona una vista unificada de todos los proyectos DDEV registrados en la máquina, monitoreando su estado en vivo mediante <code>ddev list -j</code>.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/01_proyectos_lista.png" alt="Vista Principal - Mis Proyectos">
+      <div class="figure-caption"><strong>Figura 2.1:</strong> Vista general de "Mis Proyectos" mostrando búsqueda reactiva, filtro por tecnología con iconos SVG oficiales, y tarjetas interactivas de proyectos en ejecución, detenidos o pausados.</div>
+    </div>
+
+    <h2>Funcionalidades Clave</h2>
+    <ul class="features">
+      <li><strong>Barra de Búsqueda Reactiva:</strong> Filtrado instantáneo por nombre de proyecto o tecnología conforme el desarrollador escribe en el campo de entrada.</li>
+      <li><strong>Filtro Desplegable por Tecnología:</strong> Selector visual con conteo dinámico e iconos SVG vectoriales oficiales (Drupal, WordPress, Laravel, Django, Next.js, etc.).</li>
+      <li><strong>Control de Proyectos Ocupados (Busy State):</strong> Prevención de condiciones de carrera; cuando un proyecto está iniciando o deteniéndose, sus controles se deshabilitan visualmente hasta completar la transacción.</li>
+      <li><strong>Acciones Rápidas con 1 Clic:</strong>
+        <code>Iniciar / Detener</code>, <code>Abrir Web</code> (HTTPS en el navegador predeterminado), <code>Terminal</code> (abre la terminal nativa del sistema en el docroot), <code>Carpeta</code> (gestor de archivos con <code>xdg-open</code>), <code>Detalles</code> y <code>Eliminar</code>.
+      </li>
+      <li><strong>Atajos Contextuales Inteligentes:</strong> Para sitios Drupal se revelan botones directos hacia el <em>Asistente Drupal</em> y <em>Subsitios</em>.</li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 3: DETALLES DEL PROYECTO                                      -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">03</span> Detalles Técnicos: Runtimes, Xdebug y Respaldos DB</h1>
+    <p>
+      Al seleccionar un proyecto, <code>ProjectDetailsView</code> ejecuta una inspección técnica profunda mediante <code>ddev describe -j</code>, parseando runtimes, servicios auxiliares, puertos mapeados y estado de depuración.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/02_detalles_proyecto_general.png" alt="Detalles Técnicos del Proyecto">
+      <div class="figure-caption"><strong>Figura 3.1:</strong> Panel de inspección técnica con runtimes (PHP 8.3 / Nginx), URL principal, servicio webmail Mailpit, conmutador de Xdebug en tiempo real y herramientas universales.</div>
+    </div>
+
+    <h2>Herramientas y Diagnóstico Avanzado</h2>
+    <ul class="features">
+      <li><strong>Conmutador de Xdebug en Tiempo Real:</strong> Conmutador interactivo <code>ON / OFF</code> que consulta y conmuta el estado de depuración paso a paso (<code>ddev xdebug on / off</code>) sin necesidad de reiniciar los contenedores.</li>
+      <li><strong>Acceso Webmail Mailpit:</strong> Detección automática del servicio de intercepción de correos salientes en el puerto <code>8026</code> con botón directo de apertura web.</li>
+      <li><strong>Herramientas Universales DDEV:</strong> Botones rápidos para inspeccionar logs en vivo (<code>ddev logs -f</code>), abrir consola web interactiva (<code>ddev ssh</code>) o lanzar una terminal en el directorio del proyecto.</li>
+      <li><strong>Exportación e Importación de Base de Datos:</strong>
+        <ul class="features">
+          <li><strong>Exportar BD:</strong> Abre selector nativo de guardado y ejecuta <code>ddev export-db --file=...</code> con compresión <code>.sql.gz</code> en segundo plano.</li>
+          <li><strong>Importar BD:</strong> Admite volcado de archivos <code>.sql</code>, <code>.sql.gz</code>, <code>.tar.gz</code> o <code>.zip</code> con advertencia preventiva de sobreescritura.</li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 4: BASE DE DATOS Y GESTORES WEB                               -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">04</span> Bases de Datos & Gestores Web (SQLite, MySQL, Postgres)</h1>
+    <p>
+      DDEV Studio cuenta con un subsistema inteligente de gestión de bases de datos que distingue entre bases de datos contenerizadas y bases de datos locales en archivo embebido.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/03_detalles_base_datos.png" alt="Tarjeta de Base de Datos y Gestores">
+      <div class="figure-caption"><strong>Figura 4.1:</strong> Tarjeta de base de datos detallando credenciales externas, botón para copiar cadena de conexión CLI y detección de gestores web (phpMyAdmin, Adminer, CloudBeaver).</div>
+    </div>
+
+    <h2>Características de la Capa de Datos</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Motor / Gestor</th>
+          <th>Tipo</th>
+          <th>Puerto Predeterminado</th>
+          <th>Comportamiento en DDEV Studio</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>MariaDB / MySQL</strong></td>
+          <td>Contenedor Docker</td>
+          <td>3306 / Asignado</td>
+          <td>Muestra host <code>127.0.0.1</code>, usuario, contraseña, BD y botón de copia CLI.</td>
+        </tr>
+        <tr>
+          <td><strong>PostgreSQL</strong></td>
+          <td>Contenedor Docker</td>
+          <td>5432 / Asignado</td>
+          <td>Soporte nativo con pooling y credenciales de conexión estructuradas.</td>
+        </tr>
+        <tr>
+          <td><strong>SQLite Local</strong></td>
+          <td>Archivo Embebido</td>
+          <td>Sin puerto (0 MB RAM)</td>
+          <td>Reporta 0 MB de consumo en Docker, ruta exacta del <code>.sqlite</code> y su tamaño en disco.</td>
+        </tr>
+        <tr>
+          <td><strong>phpMyAdmin</strong></td>
+          <td>Add-on Web</td>
+          <td>8037 (HTTPS)</td>
+          <td>Detección automática de instalación; 1 clic para abrir en navegador.</td>
+        </tr>
+        <tr>
+          <td><strong>Adminer</strong></td>
+          <td>Add-on Web</td>
+          <td>9101 (HTTPS)</td>
+          <td>Gestor ultraliviano para inspección rápida de esquemas SQL.</td>
+        </tr>
+        <tr>
+          <td><strong>CloudBeaver (DBeaver)</strong></td>
+          <td>Add-on Web</td>
+          <td>8979 (HTTPS)</td>
+          <td>IDE de base de datos moderno completo ejecutándose en contenedor.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 5: FRAMEWORK DEVELOPER TOOLKITS                               -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">05</span> Framework Developer Toolkits (Laravel, Django, Node)</h1>
+    <p>
+      Para evitar el cambio constante a la terminal en tareas repetitivas, la vista de Detalles detecta la tecnología del proyecto (<code>core/framework_tools.py</code>) y renderiza un panel de herramientas contextuales dedicado con iconos simbólicos y feedback visual.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/04_detalles_framework_toolkit.png" alt="Framework Developer Toolkit Laravel">
+      <div class="figure-caption"><strong>Figura 5.1:</strong> Toolkit de desarrollo para Laravel mostrando comandos de Artisan (migraciones, caché, rutas), consola Tinker interactiva y dump de Composer.</div>
+    </div>
+
+    <h2>Catálogo Canónico de Acciones por Stack</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Framework</th>
+          <th>Icono</th>
+          <th>Acciones de Terminal Interactivas</th>
+          <th>Acciones Asíncronas en Background</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Laravel</strong></td>
+          <td><code>laravel.svg</code></td>
+          <td><code>php artisan tinker</code></td>
+          <td><code>artisan migrate</code>, <code>migrate:status</code>, <code>optimize:clear</code>, <code>route:list</code>, <code>dump-autoload</code></td>
+        </tr>
+        <tr>
+          <td><strong>Django</strong></td>
+          <td><code>django.svg</code></td>
+          <td><code>manage.py createsuperuser</code>, <code>manage.py shell</code></td>
+          <td><code>manage.py migrate</code>, <code>makemigrations</code>, <code>showmigrations</code>, <code>collectstatic</code></td>
+        </tr>
+        <tr>
+          <td><strong>WordPress</strong></td>
+          <td><code>wordpress.svg</code></td>
+          <td><code>wp shell</code></td>
+          <td><code>wp cache flush</code>, <code>wp plugin list</code>, <code>wp plugin update --all</code>, <code>wp rewrite flush</code></td>
+        </tr>
+        <tr>
+          <td><strong>Symfony</strong></td>
+          <td><code>symfony.svg</code></td>
+          <td><code>bin/console</code> (shell interactivo)</td>
+          <td><code>cache:clear</code>, <code>doctrine:migrations:migrate</code>, <code>debug:router</code></td>
+        </tr>
+        <tr>
+          <td><strong>Frontend SPA / Node.js</strong></td>
+          <td><code>nextjs / react / vue.svg</code></td>
+          <td><code>ddev npm</code> (consola)</td>
+          <td><code>npm install</code>, <code>npm run build</code>, <code>npm test</code></td>
+        </tr>
+        <tr>
+          <td><strong>Python Genérico</strong></td>
+          <td><code>python / flask.svg</code></td>
+          <td><code>ddev exec python</code></td>
+          <td><code>pip list</code>, <code>pip install -r requirements.txt</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 6: NUEVO PROYECTO - DESCARGA                                  -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">06</span> Nuevo Proyecto: Creación Desatendida (11 Tecnologías)</h1>
+    <p>
+      El asistente de creación (<code>NewProjectView</code>) implementa el <strong>Patrón Estrategia</strong> para orquestar la descarga, configuración de contenedores, aprovisionamiento de dependencias e inicio desatendido de 11 plataformas tecnológicas.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/05_nuevo_proyecto_descarga.png" alt="Descarga y Creación de Nuevo Proyecto">
+      <div class="figure-caption"><strong>Figura 6.1:</strong> Asistente de descarga mostrando la cuadrícula de los 11 frameworks soportados, selectores de motor de base de datos, versiones de runtime y previsualización de ruta.</div>
+    </div>
+
+    <h2>Matriz de Estrategias Automatizadas</h2>
+    <ul class="features">
+      <li><strong>Drupal (11, 10, 9, 8, 7):</strong> Descarga vía Composer con <code>recommended-project</code>, instalación de Drush, ejecución de <code>drush site:install standard</code> con credenciales <code>admin/admin</code> y soporte multisitio.</li>
+      <li><strong>WordPress:</strong> Descarga del core con <code>wp core download</code> y provisión desatendida vía WP-CLI.</li>
+      <li><strong>Laravel:</strong> <code>composer create-project laravel/laravel .</code>, generación de <code>.env</code>, configuración de SQLite/MySQL y ejecución forzada de migraciones.</li>
+      <li><strong>Symfony:</strong> <code>symfony/skeleton</code> con Composer, instalación de <code>webapp-pack</code> y configuración de variables de entorno.</li>
+      <li><strong>Django & Flask (Python):</strong> Creación de virtualenv aislado (<code>.venv</code>), instalación de dependencias, reverse proxy Nginx hacia puerto 8000/5000 y daemon de segundo plano en <code>.ddev/config.daemon.yaml</code> ejecutando <code>runserver</code>.</li>
+      <li><strong>Next.js, Angular, React & Vue (Node.js):</strong> Creación con plantillas oficiales TypeScript, configuración de reverse proxy Nginx con <strong>soporte WebSockets / HMR</strong> en puerto 443 y daemons <code>npm run dev</code>.</li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 7: NUEVO PROYECTO - IMPORTAR                                  -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">07</span> Nuevo Proyecto: Importación con Detector Heurístico</h1>
+    <p>
+      El modo de importación permite incorporar cualquier código fuente o repositorio existente en el disco duro. El módulo <code>core/detector.py</code> analiza la estructura de archivos e infiere la configuración óptima.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/06_nuevo_proyecto_importar.png" alt="Importación de Proyecto con Heurística">
+      <div class="figure-caption"><strong>Figura 7.1:</strong> Modo de importación con detección automática del stack tecnológico (Drupal 11 con PHP 8.3), deducción del docroot ("web") y validación de nombres seguros.</div>
+    </div>
+
+    <h2>Lógica de Detección Heurística</h2>
+    <ul class="features">
+      <li><strong>Proyectos con configuración previa (.ddev/config.yaml):</strong> Lee directamente los parámetros existentes (nombre, tipo, docroot, php_version, database, omit_containers) sin alterar la configuración del equipo.</li>
+      <li><strong>Proyectos sin DDEV previo:</strong>
+        <ul class="features">
+          <li><code>artisan</code> ➔ Sugiere Laravel, PHP 8.2/8.3 y docroot <code>public</code>.</li>
+          <li><code>core/lib/Drupal.php</code> ➔ Sugiere Drupal con docroot <code>web</code> o <code>docroot</code>.</li>
+          <li><code>wp-config.php</code> o <code>wp-load.php</code> ➔ Sugiere WordPress y docroot adecuado.</li>
+          <li><code>manage.py</code> / <code>requirements.txt</code> ➔ Sugiere Django / Python con Nginx proxy.</li>
+          <li><code>next.config.*</code> / <code>vite.config.*</code> ➔ Sugiere Next.js, React o Vue con Node.js y proxy WebSocket.</li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 8: HERRAMIENTAS GLOBALES                                      -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">08</span> Pestaña "Herramientas": Control Global y Estado del Sistema</h1>
+    <p>
+      La pestaña <code>Herramientas</code> (<code>GlobalToolsView</code>) centraliza el mantenimiento y la supervisión del entorno Docker y DDEV en toda la máquina anfitriona.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/07_herramientas_globales.png" alt="Panel de Herramientas Globales">
+      <div class="figure-caption"><strong>Figura 8.1:</strong> Consola de herramientas globales mostrando controles de parada total, limpieza de cachés, acceso al router Traefik, diagnóstico SSL y reporte de versiones.</div>
+    </div>
+
+    <h2>Operaciones Administrativas Disponibles</h2>
+    <ul class="features">
+      <li><strong>Poweroff Global (ddev poweroff):</strong> Detiene todos los contenedores DDEV liberando memoria RAM y puertos del sistema.</li>
+      <li><strong>Iniciar Todos (ddev start -a):</strong> Reanuda todos los proyectos registrados en bloque.</li>
+      <li><strong>Limpiar DDEV (ddev clean -y):</strong> Purga imágenes intermedias de Docker, cachés temporales y archivos residuales.</li>
+      <li><strong>Panel Traefik Router:</strong> Abre la consola web de enrutamiento y balanceo en <code>http://127.0.0.1:10999</code>.</li>
+      <li><strong>Detener Contenedores Externos:</strong> Detecta y detiene de forma segura contenedores Docker independientes que no pertenecen a DDEV (previo diálogo con lista detallada).</li>
+      <li><strong>Detener TODO en Docker:</strong> Ejecuta simultáneamente <code>ddev poweroff</code> y detiene contenedores externos con un único clic.</li>
+      <li><strong>Reporte de Versiones en Vivo:</strong> Muestra versiones exactas instaladas de DDEV, Docker Engine, estado de los certificados SSL y ruta raíz (<code>~/sites</code>).</li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 9: MONITOR DE RECURSOS DOCKER                                 -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">09</span> Monitor de Recursos Docker en Tiempo Real</h1>
+    <p>
+      Implementado en <code>core/docker_monitor.py</code> y <code>ui/views/docker_monitor.py</code>, este monitor provee visibilidad total del consumo de hardware de los contenedores Docker mediante muestreo no bloqueante con <code>docker stats --no-stream --format '{{json .}}'</code>.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/08_docker_monitor.png" alt="Monitor de Recursos Docker en Vivo">
+      <div class="figure-caption"><strong>Figura 9.1:</strong> Métricas en tiempo real con barras de progreso de CPU %, uso y límite de memoria RAM, tráfico de Red I/O, Disco I/O y selector de ámbito.</div>
+    </div>
+
+    <h2>Capacidades del Monitor</h2>
+    <ul class="features">
+      <li><strong>Métricas Recolectadas:</strong> Porcentaje de CPU, Memoria consumida / Límite / %, Red entrante y saliente (I/O) y Lectura / Escritura en Disco (Block I/O).</li>
+      <li><strong>Selector de Ámbito (Scope Filter):</strong> Permite conmutar entre <em>Vista Global (Todos los contenedores)</em>, <em>DDEV Sistema (Router, SSH-Agent)</em>, <em>Contenedores Externos (No DDEV)</em> y proyectos específicos.</li>
+      <li><strong>Menú Contextual (Clic Derecho en Fila):</strong>
+        <ul class="features">
+          <li><code>⏹ Detener Contenedor</code> (<code>docker stop</code>).</li>
+          <li><code>🔄 Reiniciar Contenedor</code> (<code>docker restart</code>).</li>
+          <li><code>📋 Ver Logs Recientes</code> (abre visor con las últimas 150 líneas de salida estándar).</li>
+          <li><code>💻 Abrir Terminal (docker exec)</code> (lanza terminal interactiva dentro del contenedor).</li>
+        </ul>
+      </li>
+      <li><strong>Ahorro Inteligente de CPU (Battery Saver):</strong> El hilo de polling se pausa automáticamente cuando el usuario cambia de pestaña y se reanuda inmediatamente al regresar.</li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 10: ADD-ONS MARKETPLACE                                       -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">10</span> Marketplace de Add-ons (Redis, Solr, Cron, RabbitMQ)</h1>
+    <p>
+      La pestaña <code>Add-ons</code> (<code>ui/views/addons.py</code>) provee un catálogo visual para enriquecer cualquier proyecto con servicios auxiliares contenerizados mediante el ecosistema oficial y comunitario de complementos DDEV.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/09_addons_marketplace.png" alt="Marketplace de Add-ons DDEV">
+      <div class="figure-caption"><strong>Figura 10.1:</strong> Catálogo de add-ons con pestañas de categorías, insignias oficiales, descripciones técnicas y botones de instalación desatendida.</div>
+    </div>
+
+    <h2>Categorías y Servicios Principales</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Categoría</th>
+          <th>Add-on ID</th>
+          <th>Descripción y Caso de Uso</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Bases de Datos & Caché</strong></td>
+          <td><code>ddev-redis</code></td>
+          <td>Servidor Redis en memoria para caché de objetos, sesiones y colas de alta velocidad.</td>
+        </tr>
+        <tr>
+          <td><strong>Bases de Datos & Caché</strong></td>
+          <td><code>ddev-memcached</code></td>
+          <td>Caché distribuido en memoria tradicional para Drupal y WordPress.</td>
+        </tr>
+        <tr>
+          <td><strong>Bases de Datos & Caché</strong></td>
+          <td><code>ddev-mongo</code></td>
+          <td>Base de datos NoSQL documental MongoDB con soporte de extensión PHP.</td>
+        </tr>
+        <tr>
+          <td><strong>Motores de Búsqueda</strong></td>
+          <td><code>ddev-solr</code></td>
+          <td>Apache Solr preconfigurado para Drupal Search API y motores de indexación avanzada.</td>
+        </tr>
+        <tr>
+          <td><strong>Motores de Búsqueda</strong></td>
+          <td><code>ddev-elasticsearch</code></td>
+          <td>Cluster de Elasticsearch para búsqueda full-text y analítica de datos.</td>
+        </tr>
+        <tr>
+          <td><strong>DevOps & Colas</strong></td>
+          <td><code>ddev-cron</code></td>
+          <td>Ejecución periódica de tareas programadas tipo crontab en el contenedor web.</td>
+        </tr>
+        <tr>
+          <td><strong>DevOps & Colas</strong></td>
+          <td><code>ddev-rabbitmq</code></td>
+          <td>Broker de mensajería AMQP con panel de administración web integrado.</td>
+        </tr>
+        <tr>
+          <td><strong>Testing & QA</strong></td>
+          <td><code>ddev-selenium-standalone-chrome</code></td>
+          <td>Ejecución desatendida de pruebas funcionales y end-to-end con Chrome headless.</td>
+        </tr>
+        <tr>
+          <td><strong>Frontend & DX</strong></td>
+          <td><code>ddev-browsersync</code></td>
+          <td>Recarga automática del navegador al modificar hojas de estilo CSS o scripts JS.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 11: SUITE DRUPAL - SCAFFOLDING                                -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">11</span> Suite Drupal: Generador de Código (Drush Scaffolding)</h1>
+    <p>
+      Para proyectos basados en Drupal (versiones 7 a 11), DDEV Studio ofrece una suite de herramientas de nivel arquitectónico (<code>ui/views/drupal_tools.py</code>) que automatiza la generación de esqueletos de código limpio cumpliendo los estándares de la comunidad.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/10_drupal_tools_scaffold.png" alt="Generador de Código Drush Scaffolding">
+      <div class="figure-caption"><strong>Figura 11.1:</strong> Formulario interactivo para generar módulos custom, controladores (ControllerBase), formularios y plugins REST sin escribir archivos boilerplate a mano.</div>
+    </div>
+
+    <h2>Componentes Generables Asistidos</h2>
+    <ul class="features">
+      <li><strong>Módulo Personalizado (.info.yml):</strong> Genera la estructura básica en <code>modules/custom/&lt;nombre&gt;</code> con archivos <code>.info.yml</code>, <code>.module</code> y permisos.</li>
+      <li><strong>Controlador (ControllerBase):</strong> Esqueleto de controlador PHP con inyección de dependencias, definición de rutas en <code>.routing.yml</code> y retorno de render arrays.</li>
+      <li><strong>Formulario (FormBase):</strong> Formulario estructurado con métodos <code>getFormId()</code>, <code>buildForm()</code>, <code>validateForm()</code> y <code>submitForm()</code>.</li>
+      <li><strong>Servicio Symfony (.services.yml):</strong> Registro de clase de servicio en el contenedor de inyección de dependencias de Drupal.</li>
+      <li><strong>Plugin REST Resource (@RestResource):</strong> Endpoint API REST nativo con métodos GET, POST, PATCH y DELETE autenticados.</li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 12: SUITE DRUPAL - TEMAS                                      -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">12</span> Suite Drupal: Generador de Temas Starterkit y Presets</h1>
+    <p>
+      El generador de temas soporta tanto la herramienta moderna de Drupal 10/11 (<code>starterkit</code>) como subtemas clásicos para Drupal 8 y 9, integrando presets guiados para los frameworks CSS más populares.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/11_drupal_tools_themes.png" alt="Generador de Temas Starterkit y Presets">
+      <div class="figure-caption"><strong>Figura 12.1:</strong> Asistente de temas con selección de preset base (Bootstrap 5, Radix SDC, Olivero, Gin Admin, Claro) y automatización de descargas vía Composer.</div>
+    </div>
+
+    <h2>Presets Guiados Disponibles</h2>
+    <ul class="features">
+      <li><strong>Bootstrap 5:</strong> Tema base responsive con soporte moderno para el framework CSS líder; descarga automática vía Composer con <code>drupal/bootstrap5</code>.</li>
+      <li><strong>Bootstrap Barrio:</strong> Tema base flexible para Bootstrap 5 con soporte para layouts complejos de Drupal.</li>
+      <li><strong>Radix (Single Directory Components - SDC):</strong> Tema avanzado optimizado para componentes atómicos aislados y Vite/Webpack.</li>
+      <li><strong>Olivero Starterkit:</strong> Duplicación limpia y desacoplada del tema predeterminado accesible de Drupal para personalización total.</li>
+      <li><strong>Gin Admin Theme:</strong> Subtema de administración moderno, oscuro/claro, con UX superior para editores de contenido.</li>
+      <li><strong>Claro Admin / Classy / Bartik:</strong> Soporte completo para temas estándar en Drupal 8, 9 y 10.</li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 13: SUITE DRUPAL - APIS Y MÓDULOS                             -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">13</span> Suite Drupal: APIs REST, JSON:API y Módulos Fundamentales</h1>
+    <p>
+      La pestaña de APIs y Módulos Fundamentales escanea en vivo el estado de extensiones habilitadas mediante <code>drush pm:list --status=enabled --format=json</code> y presenta una matriz interactiva organizada por categorías en <code>Gtk.FlowBox</code>.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/12_drupal_tools_modules.png" alt="Suite de APIs y Módulos Fundamentales">
+      <div class="figure-caption"><strong>Figura 13.1:</strong> Matriz interactiva de módulos fundamentales (Core APIs, SEO, Devel, Admin Toolbar) con estados en tiempo real e instalación individual o en lote.</div>
+    </div>
+
+    <h2>Catálogo de Módulos Esenciales</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Paquete</th>
+          <th>Módulos Incluidos</th>
+          <th>Utilidad Técnica</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Core APIs (Headless)</strong></td>
+          <td><code>rest</code>, <code>jsonapi</code>, <code>serialization</code>, <code>basic_auth</code></td>
+          <td>Exposición inmediata de la arquitectura Decoupled / Headless con JSON:API y serialización nativa.</td>
+        </tr>
+        <tr>
+          <td><strong>Productividad & UX</strong></td>
+          <td><code>admin_toolbar</code>, <code>admin_toolbar_tools</code></td>
+          <td>Menús desplegables con caché optimizada para administración veloz.</td>
+        </tr>
+        <tr>
+          <td><strong>Desarrollo & Debugging</strong></td>
+          <td><code>devel</code>, <code>devel_generate</code>, <code>kint</code></td>
+          <td>Generación de datos dummy (nodos, usuarios, taxonomías) e inspección de variables PHP en vivo.</td>
+        </tr>
+        <tr>
+          <td><strong>SEO & Metadatos</strong></td>
+          <td><code>pathauto</code>, <code>token</code>, <code>metatag</code>, <code>redirect</code></td>
+          <td>Generación automática de URLs amigables, redirecciones 301 y etiquetas OpenGraph/Twitter Card.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 14: DRUPAL MULTISITIO                                         -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">14</span> Gestor de Drupal Multisitio Nativo</h1>
+    <p>
+      La vista <code>SubsitesManagerView</code> administra arquitecturas donde un único codebase central de Drupal sirve a múltiples dominios independientes con sus propias bases de datos y configuraciones aisladas en <code>sites/&lt;subsitio&gt;</code>.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/13_drupal_subsitios.png" alt="Gestor de Drupal Multisitio">
+      <div class="figure-caption"><strong>Figura 14.1:</strong> Panel de Drupal Multisitio mostrando subsitios detectados (portal-tienda, portal-blog), sincronización de dominios en DDEV y bases de datos independientes.</div>
+    </div>
+
+    <h2>Sincronización Atómica y Automatización</h2>
+    <ul class="features">
+      <li><strong>Sincronización de FQDNs en DDEV:</strong> Al agregar un nuevo subsitio (ej. <code>tienda</code>), DDEV Studio actualiza de forma atómica <code>additional_fqdns</code> en <code>.ddev/config.yaml</code>, habilitando <code>https://tienda.ddev.site</code>.</li>
+      <li><strong>Inyección en sites.php:</strong> Configura y mantiene el mapeo de dominios en <code>sites/sites.php</code> para que Drupal resuelva la carpeta correcta según el host entrante.</li>
+      <li><strong>Bases de Datos Aisladas:</strong> Cada subsitio cuenta con su propia base de datos dedicada (<code>db_subsitio</code>) sin colisionar con el sitio principal.</li>
+      <li><strong>Contexto Drush por Subsitio:</strong> Todos los comandos de limpieza de caché o ejecución de scripts respetan el parámetro contextual <code>--uri=https://&lt;subsitio&gt;.ddev.site</code>.</li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 15: ASISTENTE IA - CHAT                                       -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">15</span> Asistente IA Local (Ollama): Chat Técnico Interactivo</h1>
+    <p>
+      DDEV Studio incorpora una estación de asistencia con Inteligencia Artificial <strong>100% local, privada y offline</strong> conectándose directamente con el daemon de <strong>Ollama</strong> (puerto <code>11434</code>) mediante peticiones HTTP REST estándar, <em>sin dependencias pesadas de Machine Learning en Python</em>.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/14_asistente_ia_chat.png" alt="Chat Interactivo con Asistente IA Local">
+      <div class="figure-caption"><strong>Figura 15.1:</strong> Interfaz de conversación técnica con streaming token por token en tiempo real, renderizado de bloques de código y conmutador de contexto dinámico del proyecto.</div>
+    </div>
+
+    <h2>Características de la Experiencia de Chat</h2>
+    <ul class="features">
+      <li><strong>Streaming en Tiempo Real:</strong> Respuestas fluidas transmitidas palabra por palabra con indicador de carga y botón de parada (<code>stop_generation</code>).</li>
+      <li><strong>Inyección Dinámica de Contexto:</strong> Al activar la casilla <em>"Incluir contexto de..."</em>, la aplicación alimenta al modelo con metadatos técnicos exactos del proyecto seleccionado (nombre, docroot, versión de PHP/Node, URLs activas y base de datos) como <code>system_prompt</code>.</li>
+      <li><strong>Detección de Bloques de Código:</strong> Reconocimiento de código Markdown con botón de copia con 1 clic al portapapeles del sistema operativo.</li>
+      <li><strong>Atajos de Teclado de Alta Eficiencia:</strong> Envío rápido de mensajes con <code>Ctrl + Enter</code> o <code>Enter</code> y desplazamiento automático (autoscroll) fluido.</li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 16: ASISTENTE IA - ONBOARDING Y MODELOS                       -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">16</span> Asistente IA: Onboarding y Catálogo de Modelos</h1>
+    <p>
+      Si el usuario no tiene Ollama instalado o no ha descargado ningún modelo, la vista conmuta reactivamente a una pantalla guiada de instalación y descarga.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/15_asistente_ia_onboarding.png" alt="Onboarding y Catálogo de Modelos Ollama">
+      <div class="figure-caption"><strong>Figura 16.1:</strong> Flujo de bienvenida y configuración guiada con opciones de instalación mediante PolicyKit gráfico (pkexec) o terminal del sistema, y catálogo de modelos recomendados.</div>
+    </div>
+
+    <h2>Catálogo Canónico de Modelos Recomendados</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Modelo</th>
+          <th>Parámetros / Peso</th>
+          <th>Especialización Técnica</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>llama3.2:3b</strong></td>
+          <td>3B Parámetros (2.0 GB)</td>
+          <td>Excelente modelo multipropósito de Meta; óptimo en redacción, análisis y soporte en español.</td>
+        </tr>
+        <tr>
+          <td><strong>qwen2.5:3b</strong></td>
+          <td>3B Parámetros (2.3 GB)</td>
+          <td>Sobresaliente en DevOps, Docker, Nginx, scripts shell Linux, redes y solución de problemas técnicos.</td>
+        </tr>
+        <tr>
+          <td><strong>qwen2.5-coder:1.5b</strong></td>
+          <td>1.5B Parámetros (1.0 GB)</td>
+          <td>Ultra liviano y extremadamente rápido; ideal para equipos con recursos de hardware limitados.</td>
+        </tr>
+        <tr>
+          <td><strong>phi3.5:3.8b</strong></td>
+          <td>3.8B Parámetros (2.2 GB)</td>
+          <td>Modelo de Microsoft con alto poder de razonamiento lógico y explicaciones didácticas paso a paso.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 17: DIAGNÓSTICO SSL                                           -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">17</span> Diagnóstico y Reparación de Certificados SSL (mkcert)</h1>
+    <p>
+      Uno de los dolores de cabeza más comunes en el desarrollo web local con HTTPS es el error del navegador <code>NET::ERR_CERT_AUTHORITY_INVALID</code> ("La conexión no es privada"). El diálogo modal <code>SSLDiagDialog</code> provee un diagnóstico paso a paso y solución asistida en 1 clic.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/16_dialogo_ssl.png" alt="Diálogo de Diagnóstico y Certificados SSL">
+      <div class="figure-caption"><strong>Figura 17.1:</strong> Diagnóstico del estado de mkcert, certutil (libnss3-tools) y el almacén de autoridades de confianza en Chrome, Chromium y Firefox.</div>
+    </div>
+
+    <h2>Protocolo de Verificación del Diálogo</h2>
+    <ol class="steps">
+      <li><strong>Detección de mkcert:</strong> Verifica si la utilidad <code>mkcert</code> está disponible en el PATH del sistema (ej. <code>/usr/local/bin/mkcert</code>).</li>
+      <li><strong>Detección de libnss3-tools (certutil):</strong> Comprueba si la herramienta de gestión de certificados NSS está instalada para permitir que Chrome y Firefox reconozcan la autoridad raíz. Si no está instalada, ofrece un botón para instalar el paquete del sistema operativo.</li>
+      <li><strong>Registro de Autoridad Raíz Local:</strong> Ejecuta <code>mkcert -install</code> en segundo plano para registrar el certificado de DDEV en los almacenes locales del navegador, resolviendo el candado verde HTTPS de forma permanente.</li>
+    </ol>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 18: AUTOMATIZACIÓN CI/CD GITHUB ACTIONS                       -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">18</span> Automatización CI/CD con GitHub Actions</h1>
+    <p>
+      Para proyectos con repositorio Git (<code>.git</code>), <code>CIDialog</code> (<code>core/ci_templates.py</code>) detecta la tecnología en uso y genera workflows de GitHub Actions probados en contenedor con matrices de compatibilidad.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/17_dialogo_ci_cd.png" alt="Diálogo de Generación de CI/CD">
+      <div class="figure-caption"><strong>Figura 18.1:</strong> Modal de Integración Continua con detección de repositorio Git, rama activa, workflows preexistentes y visor de sintaxis YAML.</div>
+    </div>
+
+    <h2>Estructura del Flujo de Trabajo Generado</h2>
+    <p>
+      El archivo <code>.github/workflows/ddev-ci.yml</code> incluye:
+    </p>
+    <ul class="features">
+      <li>Instalación de Docker y DDEV en runners oficiales <code>ubuntu-latest</code> de GitHub.</li>
+      <li>Configuración de cachés para Composer, npm o pip para acelerar los tiempos de ejecución.</li>
+      <li>Arranque del proyecto en contenedor con <code>ddev start</code>.</li>
+      <li>Ejecución de validaciones de sintaxis (linter), pruebas unitarias (PHPUnit, Jest, PyTest) y comprobación de base de datos.</li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 19: DESINSTALACIÓN SEGURA DE MÓDULOS                          -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">19</span> Desinstalación Segura de Módulos (CLI vs Web Asistida)</h1>
+    <p>
+      En Drupal, desinstalar un módulo que posee dependencias activas puede romper la base de datos o el contenedor de dependencias. Para prevenir esto, DDEV Studio implementa el diálogo modal inteligente <code>DrupalUninstallDialog</code>.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/18_dialogo_desinstalacion_drupal.png" alt="Diálogo de Desinstalación Segura de Módulos">
+      <div class="figure-caption"><strong>Figura 19.1:</strong> Diálogo con flujo dual de desinstalación: Vía CLI directa con Drush o vía Web asistida con salto directo al ancla del módulo en Drupal.</div>
+    </div>
+
+    <h2>Flujo Dual de Desinstalación</h2>
+    <ul class="features">
+      <li><strong>Vía 1: Desinstalación Directa con Drush CLI:</strong> Ejecuta <code>drush pm:uninstall &lt;modulo&gt; -y</code> seguido de <code>drush cr</code> en segundo plano con control de errores. Si el módulo tiene dependencias bloqueantes, captura la salida y ofrece abrir la vía web.</li>
+      <li><strong>Vía 2: Vía Web Asistida en Drupal:</strong> Abre el navegador predeterminado en la URL exacta de desinstalación (<code>/admin/modules/uninstall#edit-uninstall-&lt;modulo&gt;</code>), permitiendo al desarrollador revisar en pantalla qué tablas o campos serán eliminados.</li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 20: CONSOLA DE PROGRESO                                       -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">20</span> Consola Asíncrona de Tareas en Vivo (ProgressDialog)</h1>
+    <p>
+      Todas las operaciones que consumen tiempo (descargas de paquetes Composer, instalación de add-ons, exportación de bases de datos, etc.) se presentan a través del diálogo modal unificado <code>ProgressDialog</code>.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/19_dialogo_progreso.png" alt="Consola de Progreso de Tareas">
+      <div class="figure-caption"><strong>Figura 20.1:</strong> Consola de ejecución en tiempo real con spinner animado, barra de progreso, streaming de logs monospace y botones de acción al finalizar.</div>
+    </div>
+
+    <h2>Diseño No Bloqueante</h2>
+    <ul class="features">
+      <li><strong>Salida Monospace en Vivo:</strong> Canalización de <code>stdout</code> y <code>stderr</code> en una vista de texto de consola con desplazamiento automático.</li>
+      <li><strong>Retroalimentación de Estado:</strong> Spinner activo durante la ejecución y cambio a icono de éxito (✔) o error (✗) al finalizar.</li>
+      <li><strong>Acciones Posteriores:</strong> Al completarse la tarea, se habilitan botones directos como <code>🌐 Abrir en Navegador</code> y <code>📁 Abrir Carpeta</code>.</li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SECCIÓN 21: ACERCA DE DDEV STUDIO                                     -->
+  <!-- ===================================================================== -->
+  <div class="section">
+    <h1><span class="sec-badge">21</span> Información del Sistema y Acerca de DDEV Studio</h1>
+    <p>
+      El diálogo de información de la aplicación resume la versión del software, licencia de distribución libre y atribución de tecnologías base.
+    </p>
+
+    <div class="figure-box">
+      <img src="screenshots/20_dialogo_acerca_de.png" alt="Diálogo Acerca de DDEV Studio">
+      <div class="figure-caption"><strong>Figura 21.1:</strong> Diálogo oficial de información con logotipo vectorial de DDEV, versión del producto, enlaces y metadatos del proyecto.</div>
+    </div>
+
+    <h2>Especificaciones de la Versión</h2>
+    <ul class="features">
+      <li><strong>Versión Actual:</strong> 1.2.0 (LTS).</li>
+      <li><strong>Plataforma Base:</strong> Python 3.10+ / GTK+ 3.24+ / PyGObject.</li>
+      <li><strong>Licencia:</strong> MIT License (Código Abierto y Libre para uso personal o corporativo).</li>
+    </ul>
+  </div>
+
+</body>
+</html>

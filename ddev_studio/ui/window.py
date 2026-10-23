@@ -33,6 +33,7 @@ from ddev_studio.ui.views.addons import AddonsMarketplaceView
 from ddev_studio.ui.views.docker_monitor import DockerMonitorView
 from ddev_studio.ui.views.tools import GlobalToolsView
 from ddev_studio.ui.views.new_project import NewProjectView
+from ddev_studio.ui.views.ai_assistant import AIAssistantView
 
 
 
@@ -168,6 +169,13 @@ class DDEVManagerWindow(Gtk.Window):
         lbl_addons.pack_start(Gtk.Label(label="Add-ons"), False, False, 0)
         lbl_addons.show_all()
         self.notebook.append_page(self.tab_addons, lbl_addons)
+
+        self.tab_ai = AIAssistantView(self)
+        lbl_ai = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        lbl_ai.pack_start(Gtk.Image.new_from_icon_name("help-browser-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        lbl_ai.pack_start(Gtk.Label(label="Asistente IA"), False, False, 0)
+        lbl_ai.show_all()
+        self.notebook.append_page(self.tab_ai, lbl_ai)
         
         self.notebook.connect("switch-page", self.on_notebook_page_switched)
 
@@ -177,6 +185,8 @@ class DDEVManagerWindow(Gtk.Window):
                 self.docker_monitor_view.resume_polling()
             else:
                 self.docker_monitor_view.pause_polling()
+        if hasattr(self, "tab_ai") and (page == self.tab_ai or page_num == 4):
+            self.tab_ai.populate_projects()
 
     def switch_to_new_project_tab(self, mode="create"):
         self.notebook.set_current_page(1)
@@ -383,6 +393,8 @@ class DDEVManagerWindow(Gtk.Window):
             self.tab_addons.update_projects(projects)
         if hasattr(self, "docker_monitor_view"):
             self.docker_monitor_view.update_projects(projects)
+        if hasattr(self, "tab_ai"):
+            self.tab_ai.populate_projects()
         
         # Calcular conteos por categoría de tecnología
         cat_counts = {"all": len(projects)}

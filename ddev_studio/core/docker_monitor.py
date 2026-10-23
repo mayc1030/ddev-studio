@@ -307,3 +307,106 @@ def get_live_docker_stats(timeout: int = 5) -> Dict[str, Any]:
         response["error_message"] = f"Error al consultar Docker: {str(ex)}"
         
     return response
+
+
+def stop_docker_container(container_id_or_name: str, timeout: int = 15) -> Tuple[bool, str]:
+    """
+    Detiene un contenedor Docker individual mediante `docker stop`.
+    Retorna una tupla (éxito, mensaje).
+    """
+    if not container_id_or_name:
+        return False, "Nombre o ID de contenedor no especificado."
+    try:
+        res = subprocess.run(
+            ["docker", "stop", str(container_id_or_name).strip()],
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+        if res.returncode == 0:
+            return True, f"Contenedor '{container_id_or_name}' detenido con éxito."
+        return False, res.stderr.strip() or f"Código de salida: {res.returncode}"
+    except subprocess.TimeoutExpired:
+        return False, f"Tiempo de espera agotado al detener '{container_id_or_name}'."
+    except Exception as ex:
+        return False, f"Error al detener contenedor: {str(ex)}"
+
+
+def restart_docker_container(container_id_or_name: str, timeout: int = 20) -> Tuple[bool, str]:
+    """
+    Reinicia un contenedor Docker individual mediante `docker restart`.
+    Retorna una tupla (éxito, mensaje).
+    """
+    if not container_id_or_name:
+        return False, "Nombre o ID de contenedor no especificado."
+    try:
+        res = subprocess.run(
+            ["docker", "restart", str(container_id_or_name).strip()],
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+        if res.returncode == 0:
+            return True, f"Contenedor '{container_id_or_name}' reiniciado con éxito."
+        return False, res.stderr.strip() or f"Código de salida: {res.returncode}"
+    except subprocess.TimeoutExpired:
+        return False, f"Tiempo de espera agotado al reiniciar '{container_id_or_name}'."
+    except Exception as ex:
+        return False, f"Error al reiniciar contenedor: {str(ex)}"
+
+
+def get_container_logs(container_id_or_name: str, tail: int = 150) -> str:
+    """
+    Obtiene las últimas líneas de logs de un contenedor Docker mediante `docker logs --tail`.
+    """
+    if not container_id_or_name:
+        return "Nombre o ID de contenedor no especificado."
+    try:
+        res = subprocess.run(
+            ["docker", "logs", f"--tail={tail}", str(container_id_or_name).strip()],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        output = res.stdout
+        if res.stderr:
+            output += "\n" + res.stderr
+        return output.strip() or "No se registraron logs recientes."
+    except Exception as ex:
+        return f"Error al obtener logs: {str(ex)}"
+
+
+def list_external_containers() -> List[Dict[str, str]]:
+    """
+    Retorna una lista de diccionarios con id y nombre de los contenedores que NO pertenecen a DDEV.
+    """
+    stats = get_live_docker_stats(timeout=4)
+    external = []
+    for c in stats.get("containers", []):
+        if c.get("scope") == "external":
+            external.append({
+                "id": c.get("id", ""),
+                "name": c.get("name", ""),
+                "service": c.get("service", "")
+            })
+    return external
+
+
+def stop_all_external_containers(containers: Optional[List[Dict[str, str]]] = None) -> Tuple[int, List[str]]:
+    """
+    Detiene todos los contenedores externos (no DDEV).
+    Retorna (cantidad_detenidos, lista_nombres_detenidos).
+    """
+    targets = containers if containers is not None else list_external_containers()
+    if not targets:
+        return 0, []
+
+    stopped = []
+    for target in targets:
+        cid = target.get("id") or target.get("name")
+        if cid:
+            ok, _ = stop_docker_container(cid, timeout=10)
+            if ok:
+                stopped.append(target.get("name") or cid)
+
+    return len(stopped), stopped

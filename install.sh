@@ -33,6 +33,16 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
+if ! command -v certutil &> /dev/null; then
+    echo -e "${YELLOW}⚠️  Aviso SSL: 'certutil' (paquete libnss3-tools) no está instalado.${NC}"
+    echo -e "   Para evitar el error 'La conexión no es privada' en Chrome/Firefox, ejecuta:"
+    echo -e "   ${BLUE}sudo apt update && sudo apt install -y libnss3-tools && mkcert -install${NC}"
+fi
+
+if ! command -v mkcert &> /dev/null; then
+    echo -e "${YELLOW}⚠️  Aviso SSL: 'mkcert' no fue detectado en PATH. Se recomienda para certificados HTTPS locales.${NC}"
+fi
+
 # 2. Crear carpetas necesarias y migrar versión previa si existe
 echo -e "${YELLOW}[2/5] Creando directorios de instalación...${NC}"
 if [ -d "$OLD_INSTALL_DIR" ] && [ "$OLD_INSTALL_DIR" != "$INSTALL_DIR" ]; then

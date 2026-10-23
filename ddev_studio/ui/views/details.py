@@ -5,6 +5,7 @@ Vista de inspección y detalles técnicos profundos del proyecto (servicios, run
 
 import json
 import os
+import shlex
 import subprocess
 import threading
 import webbrowser
@@ -16,6 +17,7 @@ from gi.repository import Gtk, Gdk, GLib
 
 from ddev_studio.core.detector import inspect_project_stack, detect_sqlite_database
 from ddev_studio.core.ci_templates import detect_git_repo, detect_existing_workflows
+from ddev_studio.core.framework_tools import get_framework_toolkit, get_universal_tools
 from ddev_studio.ui.helpers import load_icon
 from ddev_studio.ui.dialogs.progress import ProgressDialog
 from ddev_studio.ui.dialogs.db_containers import DBContainersDialog
@@ -919,6 +921,114 @@ class ProjectDetailsView(Gtk.Box):
             
             self.content_box.pack_start(drupal_card, False, False, 0)
             
+        # 7. Framework Developer Toolkit Card (Laravel, Django, WordPress, Symfony, Frontend, etc.)
+        toolkit = get_framework_toolkit(tech_type, approot)
+        if toolkit:
+            fw_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+            fw_card.get_style_context().add_class("project-card")
+            
+            fw_title_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            pix_fw = load_icon(toolkit.get("icon", "ddev.svg"), 20)
+            if pix_fw:
+                fw_title_row.pack_start(Gtk.Image.new_from_pixbuf(pix_fw), False, False, 0)
+            lbl_fw_t = Gtk.Label()
+            lbl_fw_t.set_markup(f"<b>{toolkit.get('title', 'Framework Developer Toolkit')}</b>")
+            fw_title_row.pack_start(lbl_fw_t, False, False, 0)
+            fw_card.pack_start(fw_title_row, False, False, 0)
+            
+            lbl_fw_desc = Gtk.Label(label=toolkit.get("desc", ""))
+            lbl_fw_desc.set_halign(Gtk.Align.START)
+            lbl_fw_desc.set_line_wrap(True)
+            fw_card.pack_start(lbl_fw_desc, False, False, 0)
+            
+            flow_box = Gtk.FlowBox()
+            flow_box.set_selection_mode(Gtk.SelectionMode.NONE)
+            flow_box.set_max_children_per_line(4)
+            flow_box.set_row_spacing(6)
+            flow_box.set_column_spacing(8)
+            flow_box.set_homogeneous(False)
+            flow_box.set_margin_top(4)
+            
+            for tool in toolkit.get("tools", []):
+                btn = Gtk.Button()
+                btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                if tool.get("icon"):
+                    btn_box.pack_start(Gtk.Image.new_from_icon_name(tool["icon"], Gtk.IconSize.MENU), False, False, 0)
+                btn_box.pack_start(Gtk.Label(label=tool.get("label", "Comando")), False, False, 0)
+                btn.add(btn_box)
+                
+                btn.get_style_context().add_class("btn-quick")
+                if tool.get("type") == "terminal":
+                    btn.get_style_context().add_class("btn-quick-term")
+                elif "clear" in tool.get("id", "") or "flush" in tool.get("id", ""):
+                    btn.get_style_context().add_class("btn-quick-cache")
+                    
+                if not is_running:
+                    btn.set_sensitive(False)
+                    btn.set_tooltip_text("Inicia el proyecto para ejecutar este comando")
+                else:
+                    if tool.get("tooltip"):
+                        btn.set_tooltip_text(tool["tooltip"])
+                    btn.connect("clicked", lambda b, t=tool, a=approot: self.execute_framework_tool(t, a))
+                
+                flow_box.add(btn)
+                
+            fw_card.pack_start(flow_box, False, False, 0)
+            self.content_box.pack_start(fw_card, False, False, 0)
+
+        # 8. Universal DDEV Tools (Live Logs, Web Shell, Describe)
+        univ_tools = get_universal_tools(tech_type, approot)
+        if univ_tools:
+            u_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+            u_card.get_style_context().add_class("project-card")
+            
+            u_title_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            pix_u = load_icon("ddev.svg", 20)
+            if pix_u:
+                u_title_row.pack_start(Gtk.Image.new_from_pixbuf(pix_u), False, False, 0)
+            lbl_u_t = Gtk.Label()
+            lbl_u_t.set_markup("<b>Herramientas Universales DDEV</b>")
+            u_title_row.pack_start(lbl_u_t, False, False, 0)
+            u_card.pack_start(u_title_row, False, False, 0)
+            
+            lbl_u_desc = Gtk.Label(label="Comandos directos de inspección y terminal aplicables a cualquier entorno DDEV.")
+            lbl_u_desc.set_halign(Gtk.Align.START)
+            lbl_u_desc.set_line_wrap(True)
+            u_card.pack_start(lbl_u_desc, False, False, 0)
+            
+            u_flow_box = Gtk.FlowBox()
+            u_flow_box.set_selection_mode(Gtk.SelectionMode.NONE)
+            u_flow_box.set_max_children_per_line(4)
+            u_flow_box.set_row_spacing(6)
+            u_flow_box.set_column_spacing(8)
+            u_flow_box.set_homogeneous(False)
+            u_flow_box.set_margin_top(4)
+            
+            for utool in univ_tools:
+                u_btn = Gtk.Button()
+                u_btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                if utool.get("icon"):
+                    u_btn_box.pack_start(Gtk.Image.new_from_icon_name(utool["icon"], Gtk.IconSize.MENU), False, False, 0)
+                u_btn_box.pack_start(Gtk.Label(label=utool.get("label", "Comando")), False, False, 0)
+                u_btn.add(u_btn_box)
+                
+                u_btn.get_style_context().add_class("btn-quick")
+                if utool.get("type") == "terminal":
+                    u_btn.get_style_context().add_class("btn-quick-term")
+                    
+                if not is_running:
+                    u_btn.set_sensitive(False)
+                    u_btn.set_tooltip_text("Inicia el proyecto para ejecutar este comando")
+                else:
+                    if utool.get("tooltip"):
+                        u_btn.set_tooltip_text(utool["tooltip"])
+                    u_btn.connect("clicked", lambda b, t=utool, a=approot: self.execute_framework_tool(t, a))
+                    
+                u_flow_box.add(u_btn)
+                
+            u_card.pack_start(u_flow_box, False, False, 0)
+            self.content_box.pack_start(u_card, False, False, 0)
+            
         self.content_box.show_all()
 
     def copy_to_clipboard(self, text, message="Copiado al portapapeles"):
@@ -961,6 +1071,51 @@ class ProjectDetailsView(Gtk.Box):
             except Exception as ex:
                 GLib.idle_add(dialog.finish, False, f"Error: {ex}")
                 
+        threading.Thread(target=task, daemon=True).start()
+
+    def execute_framework_tool(self, tool, approot):
+        tool_type = tool.get("type", "progress")
+        label = tool.get("label", "Comando")
+        raw_cmd = tool.get("cmd")
+        pname = self.proj_name
+
+        if tool_type == "terminal":
+            cmd_str = " ".join(raw_cmd) if isinstance(raw_cmd, list) else str(raw_cmd)
+            self.main_app.open_terminal(approot, cmd_str)
+            return
+
+        cmd_list = raw_cmd if isinstance(raw_cmd, list) else shlex.split(str(raw_cmd))
+        dialog = ProgressDialog(self.main_app, title=f"{label} ({pname})")
+        dialog.set_status(f"Ejecutando {label}...")
+
+        def task():
+            try:
+                def log(t):
+                    GLib.idle_add(dialog.append_log, t)
+
+                cmd_disp = " ".join(cmd_list)
+                log(f"⚡ Ejecutando '{cmd_disp}' en {pname}...\n\n")
+
+                p = subprocess.Popen(
+                    cmd_list,
+                    cwd=approot,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True
+                )
+                for line in iter(p.stdout.readline, ''):
+                    log(line)
+                p.stdout.close()
+                p.wait()
+
+                success = (p.returncode == 0)
+                success_msg = tool.get("success_msg", f"¡{label} completado!")
+                msg = success_msg if success else f"Error al ejecutar: {label} (código {p.returncode})"
+                GLib.idle_add(dialog.finish, success, msg, "", approot)
+                GLib.idle_add(self.refresh_details)
+            except Exception as ex:
+                GLib.idle_add(dialog.finish, False, f"Error: {ex}", "", approot)
+
         threading.Thread(target=task, daemon=True).start()
 
     def execute_action_and_refresh(self, action):

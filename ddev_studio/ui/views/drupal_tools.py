@@ -23,6 +23,10 @@ from ddev_studio.core.drupal_tools import (
     build_subtheme_command,
     is_theme_installed,
     DRUPAL_BASE_THEMES_PRESETS,
+    DRUPAL_ESSENTIAL_BUNDLES,
+    build_module_install_command,
+    build_module_uninstall_command,
+    build_bundle_install_command,
     scaffold_custom_module,
     scaffold_custom_theme,
     scaffold_custom_component,
@@ -33,6 +37,7 @@ from ddev_studio.core.drupal_tools import (
 from ddev_studio.core.terminal import open_terminal
 from ddev_studio.core.process import run_subproc
 from ddev_studio.ui.dialogs.progress import ProgressDialog
+from ddev_studio.ui.dialogs.drupal_uninstall import DrupalUninstallDialog
 from ddev_studio.ui.helpers import load_icon
 
 
@@ -744,135 +749,54 @@ class DrupalToolsView(Gtk.Box):
         main_box.pack_start(top_bar, False, False, 0)
         
         # 1. BUNDLE SEO: Metatag, Pathauto, Token, Simple Sitemap, Redirect
-        self.card_seo = self.create_bundle_card(
-            title="🔍 Suite SEO & Posicionamiento en Buscadores",
-            desc="Metatag (OpenGraph + Twitter Cards), Pathauto (URLs limpias), Token, Simple XML Sitemap y Redirects automáticos.",
-            status_keys=["token", "pathauto", "metatag", "simple_sitemap", "redirect"],
-            btn_install_label="📦 Instalar Suite SEO Completa",
-            cmd_install=[
-                "ddev", "exec", "bash", "-c",
-                "composer require drupal/metatag drupal/pathauto drupal/token drupal/simple_sitemap drupal/redirect --no-interaction && drush pm:enable metatag metatag_open_graph metatag_twitter_cards pathauto token simple_sitemap redirect -y && drush cr"
-            ],
-            success_msg="¡Suite SEO completa instalada y configurada!",
-            extra_actions=[
-                ("⚙️ Metatags", lambda: webbrowser.open(f"{self.primary_url}/admin/config/search/metatag")),
-                ("🔗 Patrones Pathauto", lambda: webbrowser.open(f"{self.primary_url}/admin/config/search/path/patterns")),
-                ("🗺️ Sitemap (/sitemap.xml)", lambda: webbrowser.open(f"{self.primary_url}/sitemap.xml")),
-            ],
-            modules_meta=[
-                ("token", "Token"),
-                ("pathauto", "Pathauto"),
-                ("metatag", "Metatag"),
-                ("simple_sitemap", "Simple Sitemap"),
-                ("redirect", "Redirect"),
-            ]
-        )
+        self.card_seo = self.create_bundle_card("seo")
         main_box.pack_start(self.card_seo, False, False, 0)
         
         # 2. BUNDLE ARQUITECTURA: Paragraphs, Paragraphs Library, Entity Usage, Field Group, Inline Entity Form
-        self.card_paragraphs = self.create_bundle_card(
-            title="🧩 Arquitectura Modular & Paragraphs Suite",
-            desc="Paragraphs, Paragraphs Library, Entity Usage, Field Group e Inline Entity Form para modelado de páginas por componentes reutilizables y serialización en APIs.",
-            status_keys=["paragraphs", "field_group", "entity_usage", "inline_entity_form"],
-            btn_install_label="📦 Instalar Paragraphs & Componentes",
-            cmd_install=[
-                "ddev", "exec", "bash", "-c",
-                "composer require drupal/paragraphs drupal/entity_reference_revisions drupal/field_group drupal/inline_entity_form drupal/entity_usage --no-interaction && drush pm:enable paragraphs entity_usage paragraphs_library entity_reference_revisions field_group inline_entity_form -y && drush cr"
-            ],
-            success_msg="¡Suite de Paragraphs y Componentes instalada!",
-            extra_actions=[
-                ("🧩 Paragraph Types", lambda: webbrowser.open(f"{self.primary_url}/admin/structure/paragraphs_type")),
-                ("📚 Paragraphs Library", lambda: webbrowser.open(f"{self.primary_url}/admin/content/paragraphs-library")),
-                ("📊 Entity Usage", lambda: webbrowser.open(f"{self.primary_url}/admin/config/entity-usage")),
-            ],
-            modules_meta=[
-                ("paragraphs", "Paragraphs"),
-                ("paragraphs_library", "Paragraphs Library"),
-                ("field_group", "Field Group"),
-                ("entity_usage", "Entity Usage"),
-                ("inline_entity_form", "Inline Entity Form"),
-            ]
-        )
+        self.card_paragraphs = self.create_bundle_card("paragraphs")
         main_box.pack_start(self.card_paragraphs, False, False, 0)
         
         # 3. BUNDLE ADMIN & MEDIOS: Admin Toolbar, Focal Point, Crop, SVG Image
-        self.card_admin_media = self.create_bundle_card(
-            title="⚡ Administración Avanzada & Gestión de Medios (DX / UX)",
-            desc="Admin Toolbar (Tools + Search multinivel), Focal Point (recortes inteligentes de imágenes) y soporte nativo para logotipos SVG.",
-            status_keys=["admin_toolbar", "focal_point", "crop", "svg_image"],
-            btn_install_label="📦 Instalar Admin Toolbar & Medios",
-            cmd_install=[
-                "ddev", "exec", "bash", "-c",
-                "composer require drupal/admin_toolbar drupal/focal_point drupal/crop drupal/svg_image --no-interaction && drush pm:enable admin_toolbar admin_toolbar_tools admin_toolbar_search focal_point crop svg_image -y && drush cr"
-            ],
-            success_msg="¡Admin Toolbar, Focal Point y SVG Image instalados!",
-            extra_actions=[
-                ("⚙️ Admin Toolbar", lambda: webbrowser.open(f"{self.primary_url}/admin/config/user-interface/admin-toolbar")),
-                ("🎯 Focal Point", lambda: webbrowser.open(f"{self.primary_url}/admin/config/media/crop-widget")),
-            ],
-            modules_meta=[
-                ("admin_toolbar", "Admin Toolbar"),
-                ("focal_point", "Focal Point"),
-                ("crop", "Crop API"),
-                ("svg_image", "SVG Image"),
-            ]
-        )
+        self.card_admin_media = self.create_bundle_card("admin_media")
         main_box.pack_start(self.card_admin_media, False, False, 0)
         
         # 4. BUNDLE APIS & HEADLESS: JSON:API, JSON:API Extras, Simple OAuth, RestUI, GraphQL
-        self.card_api_headless = self.create_bundle_card(
-            title="🌐 Suite de APIs REST, JSON:API & Headless (Decoupled)",
-            desc="JSON:API (Core), JSON:API Extras (personalización de esquemas), Simple OAuth (tokens JWT para React/Vue/Next.js), REST Core y GraphQL.",
-            status_keys=["jsonapi", "jsonapi_extras", "simple_oauth"],
-            btn_install_label="📦 Instalar Suite de APIs & OAuth",
-            cmd_install=[
-                "ddev", "exec", "bash", "-c",
-                "composer require drupal/jsonapi_extras drupal/simple_oauth --no-interaction && drush pm:enable jsonapi jsonapi_extras simple_oauth -y && drush cr"
-            ],
-            success_msg="¡Suite de APIs REST, JSON:API Extras y Simple OAuth instalados!",
-            extra_actions=[
-                ("🌐 Probar /jsonapi", lambda: webbrowser.open(f"{self.primary_url}/jsonapi")),
-                ("⚙️ JSON:API Extras", lambda: webbrowser.open(f"{self.primary_url}/admin/config/services/jsonapi")),
-                ("🗝️ Generar Claves RSA", lambda: self.run_task_with_progress(
-                    "Generando par de claves RSA para OAuth",
-                    ["ddev", "exec", "bash", "-c", "mkdir -p ../oauth_keys && openssl genrsa -out ../oauth_keys/private.key 2048 && openssl rsa -in ../oauth_keys/private.key -pubout -out ../oauth_keys/public.key && chmod 600 ../oauth_keys/private.key"],
-                    "Claves RSA generadas en ../oauth_keys/"
-                )),
-            ],
-            modules_meta=[
-                ("jsonapi", "JSON:API"),
-                ("jsonapi_extras", "JSON:API Extras"),
-                ("simple_oauth", "Simple OAuth"),
-            ]
-        )
+        self.card_api_headless = self.create_bundle_card("api_headless")
         main_box.pack_start(self.card_api_headless, False, False, 0)
         
         # 5. BUNDLE DEPURACIÓN & LOCAL DDEV: Devel, Kint, Consola PHP, Stage File Proxy
-        self.card_devel_stage = self.create_bundle_card(
-            title="🐞 Depuración, Consola PHP & Rendimiento Local (DDEV)",
-            desc="Devel + Kint, Consola PHP interactiva (/devel/php) y Stage File Proxy (descarga de imágenes bajo demanda desde producción).",
-            status_keys=["devel", "devel_php", "stage_file_proxy"],
-            btn_install_label="📦 Instalar Devel + Stage File Proxy",
-            cmd_install=[
-                "ddev", "exec", "bash", "-c",
-                "composer require --dev drupal/devel drupal/devel_php kint-php/kint drupal/stage_file_proxy --no-interaction && drush pm:enable devel devel_php stage_file_proxy -y && drush cr"
-            ],
-            success_msg="¡Devel, Kint y Stage File Proxy instalados con éxito!",
-            extra_actions=[
-                ("⚡ Abrir Consola PHP (/devel/php)", lambda: webbrowser.open(f"{self.primary_url}/devel/php")),
-                ("🖼️ Stage File Proxy", lambda: webbrowser.open(f"{self.primary_url}/admin/config/development/stage_file_proxy")),
-            ],
-            modules_meta=[
-                ("devel", "Devel"),
-                ("devel_php", "Devel PHP"),
-                ("stage_file_proxy", "Stage File Proxy"),
-            ]
-        )
+        self.card_devel_stage = self.create_bundle_card("devel_stage")
         main_box.pack_start(self.card_devel_stage, False, False, 0)
         
         return scrolled
 
-    def create_bundle_card(self, title, desc, status_keys, btn_install_label, cmd_install, success_msg, extra_actions=None, modules_meta=None):
+    def create_bundle_card(self, bundle_key_or_title, desc=None, status_keys=None, btn_install_label=None, cmd_install=None, success_msg=None, extra_actions=None, modules_meta=None):
+        if desc is None and isinstance(bundle_key_or_title, str) and bundle_key_or_title in DRUPAL_ESSENTIAL_BUNDLES:
+            bundle_info = DRUPAL_ESSENTIAL_BUNDLES[bundle_key_or_title]
+        elif isinstance(bundle_key_or_title, dict):
+            bundle_info = bundle_key_or_title
+        else:
+            bundle_info = {
+                "title": bundle_key_or_title,
+                "desc": desc or "",
+                "status_keys": status_keys or [],
+                "btn_install_label": btn_install_label or "📦 Instalar Suite",
+                "success_msg": success_msg or "¡Suite instalada!",
+                "extra_actions": extra_actions or [],
+                "modules": [
+                    {"machine_name": m[0], "label": m[1], "desc": ""} for m in (modules_meta or [])
+                ]
+            }
+            if cmd_install:
+                bundle_info["cmd_install"] = cmd_install
+
+        title = bundle_info.get("title", "")
+        card_desc = bundle_info.get("desc", "")
+        btn_label = bundle_info.get("btn_install_label", "📦 Instalar Suite")
+        extra_acts = bundle_info.get("extra_actions", [])
+        modules = bundle_info.get("modules", [])
+        keys = bundle_info.get("status_keys") or [m["machine_name"] for m in modules]
+
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         card.get_style_context().add_class("project-card")
         
@@ -890,72 +814,120 @@ class DrupalToolsView(Gtk.Box):
         card.pack_start(h_row, False, False, 0)
         
         # Description
-        lbl_d = Gtk.Label(label=desc)
+        lbl_d = Gtk.Label(label=card_desc)
         lbl_d.set_line_wrap(True)
         lbl_d.set_halign(Gtk.Align.START)
         lbl_d.get_style_context().add_class("header-subtitle")
         card.pack_start(lbl_d, False, False, 0)
         
-        # Actions row
+        # Actions row (Instalación por paquete completo + utilidades)
         act_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         act_row.set_margin_top(4)
         
-        btn_install = Gtk.Button(label=btn_install_label)
+        btn_install = Gtk.Button(label=btn_label)
         btn_install.get_style_context().add_class("btn-quick")
         btn_install.get_style_context().add_class("btn-quick-cache")
+        btn_install.connect("clicked", lambda b, bi=bundle_info: self.install_bundle(bi))
+        act_row.pack_start(btn_install, False, False, 0)
         
-        def on_install_clicked(b):
-            cmds = list(cmd_install)
-            if getattr(self, "subsite_url", "") or getattr(self, "subsite_name", ""):
-                target_uri = self.primary_url or getattr(self, "subsite_url", "")
+        for act_label, act_target in extra_acts:
+            btn_extra = Gtk.Button(label=act_label)
+            btn_extra.get_style_context().add_class("btn-quick")
+            def make_act_cb(tgt):
+                if callable(tgt):
+                    return lambda b: tgt()
+                if tgt == "rsa_keys":
+                    return lambda b: self.run_task_with_progress(
+                        "Generando par de claves RSA para OAuth",
+                        ["ddev", "exec", "bash", "-c", "mkdir -p ../oauth_keys && openssl genrsa -out ../oauth_keys/private.key 2048 && openssl rsa -in ../oauth_keys/private.key -pubout -out ../oauth_keys/public.key && chmod 600 ../oauth_keys/private.key"],
+                        "Claves RSA generadas en ../oauth_keys/"
+                    )
+                base = self.primary_url or f"https://{self.project_name}.ddev.site"
+                return lambda b: webbrowser.open(f"{base}{tgt}")
+            btn_extra.connect("clicked", make_act_cb(act_target))
+            act_row.pack_start(btn_extra, False, False, 0)
+            
+        card.pack_start(act_row, False, False, 0)
+        
+        # Separator line
+        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        sep.set_margin_top(6)
+        sep.set_margin_bottom(2)
+        card.pack_start(sep, False, False, 0)
+        
+        # Subsección de módulos individuales
+        box_modules_sec = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        lbl_mod_hdr = Gtk.Label()
+        lbl_mod_hdr.set_markup("<span size='small' color='#94a3b8'><b>Módulos individuales de esta suite (instalación o desinstalación):</b></span>")
+        lbl_mod_hdr.set_halign(Gtk.Align.START)
+        box_modules_sec.pack_start(lbl_mod_hdr, False, False, 0)
+        
+        flow_modules = Gtk.FlowBox()
+        flow_modules.set_valign(Gtk.Align.START)
+        flow_modules.set_max_children_per_line(2)
+        flow_modules.set_min_children_per_line(1)
+        flow_modules.set_selection_mode(Gtk.SelectionMode.NONE)
+        flow_modules.set_homogeneous(True)
+        flow_modules.set_row_spacing(6)
+        flow_modules.set_column_spacing(8)
+        box_modules_sec.pack_start(flow_modules, False, False, 0)
+        card.pack_start(box_modules_sec, False, False, 0)
+        
+        # Store references
+        card._bundle_info = bundle_info
+        card._status_badge = badge
+        card._btn_install = btn_install
+        card._status_keys = keys
+        card._modules = modules
+        card._flow_modules = flow_modules
+        return card
+
+    def install_bundle(self, bundle_info):
+        bundle_title = bundle_info.get("title", "Bundle")
+        success_msg = bundle_info.get("success_msg", f"¡{bundle_title} instalado!")
+        target_uri = self.primary_url if getattr(self, "subsite_url", "") else ""
+        
+        if "cmd_install" in bundle_info:
+            cmds = list(bundle_info["cmd_install"])
+            if target_uri:
                 cmds = [
                     c.replace("drush pm:enable", f"drush --uri={target_uri} pm:enable").replace("drush cr", f"drush --uri={target_uri} cr")
                     if isinstance(c, str) else c
                     for c in cmds
                 ]
-            self.run_task_with_progress(f"Instalando {title}", cmds, success_msg)
+        else:
+            cmds = build_bundle_install_command(bundle_info, uri=target_uri)
             
-        btn_install.connect("clicked", on_install_clicked)
-        act_row.pack_start(btn_install, False, False, 0)
-        
-        if extra_actions:
-            for act_label, act_cb in extra_actions:
-                btn_extra = Gtk.Button(label=act_label)
-                btn_extra.get_style_context().add_class("btn-quick")
-                btn_extra.connect("clicked", lambda b, cb=act_cb: cb())
-                act_row.pack_start(btn_extra, False, False, 0)
-                
-        card.pack_start(act_row, False, False, 0)
-        
-        # Active modules uninstall shortcuts (Direct navigation to Drupal web UI row)
-        box_active = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        box_active.set_margin_top(4)
-        box_active.set_no_show_all(True)
-        box_active.hide()
-        
-        lbl_active_hdr = Gtk.Label()
-        lbl_active_hdr.set_markup("<span size='small' color='#94a3b8'>Módulos activos (clic para abrir desinstalador de Drupal):</span>")
-        lbl_active_hdr.set_halign(Gtk.Align.START)
-        box_active.pack_start(lbl_active_hdr, False, False, 0)
-        
-        flow_active = Gtk.FlowBox()
-        flow_active.set_valign(Gtk.Align.START)
-        flow_active.set_max_children_per_line(15)
-        flow_active.set_selection_mode(Gtk.SelectionMode.NONE)
-        flow_active.set_homogeneous(False)
-        flow_active.set_row_spacing(4)
-        flow_active.set_column_spacing(6)
-        box_active.pack_start(flow_active, False, False, 0)
-        
-        card.pack_start(box_active, False, False, 0)
-        
-        # Store references
-        card._status_badge = badge
-        card._status_keys = status_keys
-        card._modules_meta = modules_meta or []
-        card._box_active = box_active
-        card._flow_active = flow_active
-        return card
+        self.run_task_with_progress(f"Instalando {bundle_title}", cmds, success_msg)
+
+    def install_single_module(self, mod_info):
+        mod_label = mod_info.get("label", mod_info.get("machine_name", "Módulo"))
+        target_uri = self.primary_url if getattr(self, "subsite_url", "") else ""
+        cmds = build_module_install_command(mod_info, uri=target_uri)
+        self.run_task_with_progress(
+            f"Instalando {mod_label}",
+            cmds,
+            f"¡Módulo '{mod_label}' instalado exitosamente!"
+        )
+
+    def confirm_module_uninstall(self, mod_info):
+        target_site_url = self.primary_url or f"https://{self.project_name}.ddev.site"
+        dialog = DrupalUninstallDialog(self.main_app, mod_info, target_site_url)
+        res = dialog.run()
+        dialog.destroy()
+
+        if res == DrupalUninstallDialog.RESPONSE_DRUSH:
+            self.uninstall_single_module(mod_info)
+
+    def uninstall_single_module(self, mod_info):
+        mod_label = mod_info.get("label", mod_info.get("machine_name", "Módulo"))
+        target_uri = self.primary_url if getattr(self, "subsite_url", "") else ""
+        cmds = build_module_uninstall_command(mod_info, uri=target_uri)
+        self.run_task_with_progress(
+            f"Desinstalando {mod_label}",
+            cmds,
+            f"¡Módulo '{mod_label}' desinstalado exitosamente!"
+        )
 
     def refresh_api_status(self):
         if not self.approot:
@@ -970,71 +942,129 @@ class DrupalToolsView(Gtk.Box):
     def update_api_status_ui(self, status):
         self.api_status = status or {}
         cards = [self.card_seo, self.card_paragraphs, self.card_admin_media, self.card_api_headless, self.card_devel_stage]
+        target_site_url = self.primary_url or f"https://{self.project_name}.ddev.site"
+        
         for c in cards:
-            keys = getattr(c, "_status_keys", [])
-            active_count = sum(1 for k in keys if self.api_status.get(k, False))
+            modules = getattr(c, "_modules", [])
+            active_count = sum(1 for m in modules if self.api_status.get(m["machine_name"], False))
+            total_count = len(modules)
             badge = c._status_badge
+            btn_install = c._btn_install
+            bundle_info = getattr(c, "_bundle_info", {})
+            
             ctx = badge.get_style_context()
             ctx.remove_class("badge-running")
             ctx.remove_class("badge-stopped")
             ctx.remove_class("badge-paused")
             
-            if active_count == len(keys) and active_count > 0:
+            if active_count == total_count and total_count > 0:
                 badge.set_text("ACTIVO")
                 ctx.add_class("badge-running")
+                btn_install.set_label("✔ Suite Completa Instalada")
+                btn_install.set_sensitive(False)
             elif active_count > 0:
-                badge.set_text(f"PARCIAL ({active_count}/{len(keys)})")
+                badge.set_text(f"PARCIAL ({active_count}/{total_count})")
                 ctx.add_class("badge-paused")
+                btn_install.set_label("📦 Instalar Módulos Faltantes")
+                btn_install.set_sensitive(True)
             else:
                 badge.set_text("INACTIVO")
                 ctx.add_class("badge-stopped")
+                btn_install.set_label(bundle_info.get("btn_install_label", "📦 Instalar Suite Completa"))
+                btn_install.set_sensitive(True)
                 
-            # Actualizar accesos directos de desinstalación para módulos activos
-            box_active = getattr(c, "_box_active", None)
-            flow_active = getattr(c, "_flow_active", None)
-            modules_meta = getattr(c, "_modules_meta", [])
-            
-            if box_active and flow_active and modules_meta:
-                for child in flow_active.get_children():
-                    flow_active.remove(child)
+            # Actualizar tarjetas individuales de módulos en flow_modules
+            flow_modules = getattr(c, "_flow_modules", None)
+            if flow_modules and modules:
+                for child in flow_modules.get_children():
+                    flow_modules.remove(child)
                     
-                has_active = False
-                for mod_machine, mod_label in modules_meta:
-                    if self.api_status.get(mod_machine, False):
-                        has_active = True
+                for mod in modules:
+                    mod_machine = mod.get("machine_name", "")
+                    mod_label = mod.get("label", mod_machine)
+                    mod_desc = mod.get("desc", "")
+                    is_active = self.api_status.get(mod_machine, False)
+                    
+                    item_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+                    item_box.get_style_context().add_class("module-item-box")
+                    item_box.set_margin_start(2)
+                    item_box.set_margin_end(2)
+                    item_box.set_margin_top(2)
+                    item_box.set_margin_bottom(2)
+                    
+                    # Columna izquierda: estado e info
+                    col_info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+                    row_name = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+                    
+                    lbl_icon = Gtk.Label()
+                    if is_active:
+                        lbl_icon.set_markup("<span color='#10b981' weight='bold'>✔</span>")
+                    else:
+                        lbl_icon.set_markup("<span color='#94a3b8' weight='bold'>○</span>")
+                    row_name.pack_start(lbl_icon, False, False, 0)
+                    
+                    lbl_name = Gtk.Label()
+                    lbl_name.set_markup(f"<b>{GLib.markup_escape_text(mod_label)}</b>")
+                    lbl_name.set_halign(Gtk.Align.START)
+                    row_name.pack_start(lbl_name, False, False, 0)
+                    
+                    col_info.pack_start(row_name, False, False, 0)
+                    
+                    if mod_desc:
+                        lbl_desc = Gtk.Label()
+                        lbl_desc.set_markup(f"<span size='small' color='#94a3b8'>{GLib.markup_escape_text(mod_desc)}</span>")
+                        lbl_desc.set_halign(Gtk.Align.START)
+                        lbl_desc.set_line_wrap(True)
+                        lbl_desc.set_max_width_chars(36)
+                        col_info.pack_start(lbl_desc, False, False, 0)
+                        
+                    item_box.pack_start(col_info, True, True, 0)
+                    
+                    # Columna derecha: Botón de acción individual
+                    if is_active:
                         btn_un = Gtk.Button()
                         btn_un.get_style_context().add_class("btn-quick")
                         btn_un.get_style_context().add_class("btn-quick-uninstall")
+                        btn_un_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+                        btn_un_box.pack_start(Gtk.Image.new_from_icon_name("edit-delete-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+                        btn_un_box.pack_start(Gtk.Label(label="Desinstalar"), False, False, 0)
+                        btn_un.add(btn_un_box)
+                        btn_un.set_valign(Gtk.Align.CENTER)
                         
-                        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-                        icon = Gtk.Image.new_from_icon_name("application-x-addon-symbolic", Gtk.IconSize.BUTTON)
-                        lbl = Gtk.Label(label=f"🌐 Desinstalar {mod_label}")
-                        btn_box.pack_start(icon, False, False, 0)
-                        btn_box.pack_start(lbl, False, False, 0)
-                        btn_un.add(btn_box)
-                        
-                        anchor = get_drupal_uninstall_anchor(mod_machine)
                         btn_un.set_tooltip_text(
-                            f"Abrir Drupal en /admin/modules/uninstall#{anchor}\n"
-                            f"Te posiciona directamente en la fila de '{mod_label}' para desinstalar de forma segura desde la web."
+                            f"Desinstalar '{mod_label}'\n"
+                            f"Permite desinstalar directamente con Drush (CLI) o abrir la página oficial en la web de Drupal."
                         )
+                        btn_un.connect(
+                            "clicked",
+                            lambda b, mi=mod: self.confirm_module_uninstall(mi)
+                        )
+                        item_box.pack_start(btn_un, False, False, 0)
+                    else:
+                        btn_in = Gtk.Button()
+                        btn_in.get_style_context().add_class("btn-quick")
+                        btn_in.get_style_context().add_class("btn-quick-cache")
+                        btn_in_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+                        btn_in_box.pack_start(Gtk.Image.new_from_icon_name("document-save-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+                        btn_in_box.pack_start(Gtk.Label(label="Instalar"), False, False, 0)
+                        btn_in.add(btn_in_box)
+                        btn_in.set_valign(Gtk.Align.CENTER)
                         
-                        def make_cb(machine):
-                            return lambda b: webbrowser.open(
-                                get_drupal_uninstall_url(
-                                    self.primary_url or f"https://{self.project_name}.ddev.site",
-                                    machine
-                                )
-                            )
-                        btn_un.connect("clicked", make_cb(mod_machine))
-                        flow_active.add(btn_un)
+                        pkg_info = mod.get("composer_pkg") or "Core"
+                        btn_in.set_tooltip_text(
+                            f"Instalar individualmente '{mod_label}' ({pkg_info})\n"
+                            f"Ejecuta la instalación y activación exclusiva de este módulo."
+                        )
+                        btn_in.connect(
+                            "clicked",
+                            lambda b, mi=mod: self.install_single_module(mi)
+                        )
+                        item_box.pack_start(btn_in, False, False, 0)
                         
-                if has_active:
-                    box_active.set_no_show_all(False)
-                    box_active.show_all()
-                else:
-                    box_active.set_no_show_all(True)
-                    box_active.hide()
+                    flow_modules.add(item_box)
+                    
+                flow_modules.show_all()
+
 
     # -------------------------------------------------------------------------
     # TAB 3: ENDPOINTS PERSONALIZADOS (@RestResource)

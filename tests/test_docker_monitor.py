@@ -11,13 +11,20 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+from unittest.mock import patch, MagicMock
+
 from ddev_studio.core.docker_monitor import (
     parse_bytes_str,
     format_bytes,
     parse_cpu_percent,
     parse_memory_usage,
     identify_container_project,
-    get_live_docker_stats
+    get_live_docker_stats,
+    stop_docker_container,
+    restart_docker_container,
+    get_container_logs,
+    list_external_containers,
+    stop_all_external_containers
 )
 
 
@@ -98,6 +105,54 @@ class TestDockerMonitor(unittest.TestCase):
         self.assertIn("projects", stats)
         self.assertIn("global_summary", stats)
 
+    @patch("subprocess.run")
+    def test_stop_docker_container_success(self, mock_run):
+        mock_run.return_value = MagicMock(returncode=0, stdout="c123\n", stderr="")
+        ok, msg = stop_docker_container("c123")
+        self.assertTrue(ok)
+        self.assertIn("detenido con éxito", msg)
+        mock_run.assert_called_once_with(
+            ["docker", "stop", "c123"],
+            capture_output=True,
+            text=True,
+            timeout=15
+        )
+
+    @patch("subprocess.run")
+    def test_stop_docker_container_failure(self, mock_run):
+        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="No such container")
+        ok, msg = stop_docker_container("nonexistent")
+        self.assertFalse(ok)
+        self.assertIn("No such container", msg)
+
+    @patch("subprocess.run")
+    def test_restart_docker_container(self, mock_run):
+        mock_run.return_value = MagicMock(returncode=0, stdout="c123\n", stderr="")
+        ok, msg = restart_docker_container("c123")
+        self.assertTrue(ok)
+        self.assertIn("reiniciado con éxito", msg)
+
+    @patch("subprocess.run")
+    def test_get_container_logs(self, mock_run):
+        mock_run.return_value = MagicMock(returncode=0, stdout="Line 1\nLine 2\n", stderr="")
+        logs = get_container_logs("c123", tail=50)
+        self.assertIn("Line 1", logs)
+        self.assertIn("Line 2", logs)
+
+    @patch("ddev_studio.core.docker_monitor.stop_docker_container")
+    def test_stop_all_external_containers(self, mock_stop):
+        mock_stop.return_value = (True, "ok")
+        containers = [
+            {"id": "cid1", "name": "my-redis", "service": "redis"},
+            {"id": "cid2", "name": "my-postgres", "service": "postgres"}
+        ]
+        cnt, names = stop_all_external_containers(containers)
+        self.assertEqual(cnt, 2)
+        self.assertIn("my-redis", names)
+        self.assertIn("my-postgres", names)
+        self.assertEqual(mock_stop.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()
+

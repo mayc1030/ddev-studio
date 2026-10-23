@@ -13,7 +13,7 @@ from gi.repository import Gtk
 
 class ProgressDialog(Gtk.Dialog):
     def __init__(self, parent, title="Ejecutando tarea"):
-        super().__init__(title=title, transient_for=parent, flags=Gtk.DialogFlags.MODAL)
+        super().__init__(title=title, transient_for=parent, modal=True)
         self.set_default_size(680, 480)
         self.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
         

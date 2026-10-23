@@ -24,6 +24,10 @@ from ddev_studio.core.drupal_tools import (
     build_subtheme_command,
     is_theme_installed,
     DRUPAL_BASE_THEMES_PRESETS,
+    DRUPAL_ESSENTIAL_BUNDLES,
+    build_module_install_command,
+    build_module_uninstall_command,
+    build_bundle_install_command,
     scaffold_custom_module,
     scaffold_custom_theme,
     scaffold_custom_component,
@@ -341,6 +345,111 @@ class TestDrupalTools(unittest.TestCase):
             get_drupal_uninstall_url("https://mysite.ddev.site", "simple_oauth"),
             "https://mysite.ddev.site/admin/modules/uninstall#edit-uninstall-simple-oauth"
         )
+
+    def test_drupal_essential_bundles_registry(self):
+        self.assertIn("seo", DRUPAL_ESSENTIAL_BUNDLES)
+        self.assertIn("paragraphs", DRUPAL_ESSENTIAL_BUNDLES)
+        self.assertIn("admin_media", DRUPAL_ESSENTIAL_BUNDLES)
+        self.assertIn("api_headless", DRUPAL_ESSENTIAL_BUNDLES)
+        self.assertIn("devel_stage", DRUPAL_ESSENTIAL_BUNDLES)
+
+        for b_id, bundle in DRUPAL_ESSENTIAL_BUNDLES.items():
+            self.assertIn("title", bundle)
+            self.assertIn("btn_install_label", bundle)
+            self.assertIn("success_msg", bundle)
+            self.assertIn("modules", bundle)
+            self.assertGreater(len(bundle["modules"]), 0)
+            for mod in bundle["modules"]:
+                self.assertIn("machine_name", mod)
+                self.assertIn("label", mod)
+                self.assertIn("enable_modules", mod)
+
+    def test_build_module_install_command(self):
+        # 1. Core module (no composer require)
+        core_mod = {"machine_name": "jsonapi", "label": "JSON:API", "composer_pkg": None, "enable_modules": ["jsonapi"]}
+        cmd_core = build_module_install_command(core_mod)
+        self.assertEqual(cmd_core[:4], ["ddev", "exec", "bash", "-c"])
+        self.assertNotIn("composer require", cmd_core[4])
+        self.assertIn("drush pm:enable jsonapi -y", cmd_core[4])
+        self.assertIn("drush cr", cmd_core[4])
+
+        # 2. Contrib module with composer
+        contrib_mod = {"machine_name": "token", "label": "Token", "composer_pkg": "drupal/token", "enable_modules": ["token"]}
+        cmd_contrib = build_module_install_command(contrib_mod)
+        self.assertIn("composer require drupal/token --no-interaction", cmd_contrib[4])
+        self.assertIn("drush pm:enable token -y", cmd_contrib[4])
+
+        # 3. Contrib module with dependencies
+        dep_mod = {
+            "machine_name": "pathauto",
+            "label": "Pathauto",
+            "composer_pkg": "drupal/pathauto",
+            "composer_deps": ["drupal/token"],
+            "enable_modules": ["token", "pathauto"]
+        }
+        cmd_dep = build_module_install_command(dep_mod)
+        self.assertIn("composer require drupal/pathauto drupal/token --no-interaction", cmd_dep[4])
+        self.assertIn("drush pm:enable token pathauto -y", cmd_dep[4])
+
+        # 4. Dev module with --dev flag
+        dev_mod = {
+            "machine_name": "devel",
+            "label": "Devel",
+            "composer_pkg": "drupal/devel",
+            "composer_deps": ["kint-php/kint"],
+            "is_dev": True,
+            "enable_modules": ["devel"]
+        }
+        cmd_dev = build_module_install_command(dev_mod)
+        self.assertIn("composer require --dev drupal/devel kint-php/kint --no-interaction", cmd_dev[4])
+        self.assertIn("drush pm:enable devel -y", cmd_dev[4])
+
+        # 5. With subsite URI
+        cmd_subsite = build_module_install_command(core_mod, uri="https://sub.ddev.site")
+        self.assertIn("drush --uri=https://sub.ddev.site pm:enable jsonapi -y", cmd_subsite[4])
+        self.assertIn("drush --uri=https://sub.ddev.site cr", cmd_subsite[4])
+
+    def test_build_bundle_install_command(self):
+        seo_bundle = DRUPAL_ESSENTIAL_BUNDLES["seo"]
+        cmd_seo = build_bundle_install_command(seo_bundle)
+        self.assertEqual(cmd_seo[:4], ["ddev", "exec", "bash", "-c"])
+        self.assertIn("composer require drupal/metatag drupal/pathauto drupal/token drupal/simple_sitemap drupal/redirect --no-interaction", cmd_seo[4])
+        self.assertIn("drush pm:enable metatag metatag_open_graph metatag_twitter_cards pathauto token simple_sitemap redirect -y", cmd_seo[4])
+        self.assertIn("drush cr", cmd_seo[4])
+
+        # Subsite uri in bundle
+        cmd_seo_sub = build_bundle_install_command(seo_bundle, uri="https://sub.ddev.site")
+        self.assertIn("drush --uri=https://sub.ddev.site pm:enable", cmd_seo_sub[4])
+        self.assertIn("drush --uri=https://sub.ddev.site cr", cmd_seo_sub[4])
+
+    def test_build_module_uninstall_command(self):
+        # 1. Standard module uninstall
+        single_mod = {
+            "machine_name": "redirect",
+            "label": "Redirect"
+        }
+        cmd = build_module_uninstall_command(single_mod)
+        self.assertEqual(cmd[:4], ["ddev", "exec", "bash", "-c"])
+        self.assertIn("drush pm:uninstall redirect -y", cmd[4])
+        self.assertIn("drush cr", cmd[4])
+
+        # 2. Module with submodules/enable_modules (should reverse order)
+        multi_mod = {
+            "machine_name": "pathauto",
+            "label": "Pathauto",
+            "enable_modules": ["token", "pathauto"]
+        }
+        cmd_multi = build_module_uninstall_command(multi_mod)
+        self.assertIn("drush pm:uninstall pathauto token -y", cmd_multi[4])
+        self.assertIn("drush cr", cmd_multi[4])
+
+        # 3. With subsite URI
+        cmd_sub = build_module_uninstall_command(single_mod, uri="https://sub.ddev.site")
+        self.assertIn("drush --uri=https://sub.ddev.site pm:uninstall redirect -y", cmd_sub[4])
+        self.assertIn("drush --uri=https://sub.ddev.site cr", cmd_sub[4])
+
+        # 4. Empty module info
+        self.assertEqual(build_module_uninstall_command({}), [])
 
 
 if __name__ == "__main__":

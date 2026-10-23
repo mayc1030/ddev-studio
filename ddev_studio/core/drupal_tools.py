@@ -1025,3 +1025,353 @@ def get_drupal_uninstall_url(base_url: str, module_machine_name: str = "") -> st
         return f"{base}/admin/modules/uninstall#{anchor}"
     return f"{base}/admin/modules/uninstall"
 
+
+# =========================================================================
+# REGISTRO CANÓNICO DE BUNDLES Y MÓDULOS ESENCIALES (DRUPAL 10 / 11)
+# =========================================================================
+
+DRUPAL_ESSENTIAL_BUNDLES = {
+    "seo": {
+        "id": "seo",
+        "title": "🔍 Suite SEO & Posicionamiento en Buscadores",
+        "desc": "Metatag (OpenGraph + Twitter Cards), Pathauto (URLs limpias), Token, Simple XML Sitemap y Redirects automáticos.",
+        "btn_install_label": "📦 Instalar Suite SEO Completa",
+        "success_msg": "¡Suite SEO completa instalada y configurada!",
+        "cmd_template": (
+            "composer require drupal/metatag drupal/pathauto drupal/token drupal/simple_sitemap drupal/redirect --no-interaction && "
+            "drush {uri_flag}pm:enable metatag metatag_open_graph metatag_twitter_cards pathauto token simple_sitemap redirect -y && "
+            "drush {uri_flag}cr"
+        ),
+        "extra_actions": [
+            ("⚙️ Metatags", "/admin/config/search/metatag"),
+            ("🔗 Patrones Pathauto", "/admin/config/search/path/patterns"),
+            ("🗺️ Sitemap (/sitemap.xml)", "/sitemap.xml"),
+        ],
+        "modules": [
+            {
+                "machine_name": "token",
+                "label": "Token",
+                "composer_pkg": "drupal/token",
+                "enable_modules": ["token"],
+                "desc": "Tokens y reemplazo dinámico de patrones en URLs y metadatos.",
+            },
+            {
+                "machine_name": "pathauto",
+                "label": "Pathauto",
+                "composer_pkg": "drupal/pathauto",
+                "composer_deps": ["drupal/token"],
+                "enable_modules": ["token", "pathauto"],
+                "desc": "Generación automática y limpia de alias de URL amigables.",
+            },
+            {
+                "machine_name": "metatag",
+                "label": "Metatag",
+                "composer_pkg": "drupal/metatag",
+                "composer_deps": ["drupal/token"],
+                "enable_modules": ["token", "metatag", "metatag_open_graph", "metatag_twitter_cards"],
+                "desc": "Metaetiquetas estructuradas, OpenGraph y Twitter Cards para redes sociales.",
+            },
+            {
+                "machine_name": "simple_sitemap",
+                "label": "Simple Sitemap",
+                "composer_pkg": "drupal/simple_sitemap",
+                "enable_modules": ["simple_sitemap"],
+                "desc": "Generador de mapas de sitio XML para indexación en Google.",
+            },
+            {
+                "machine_name": "redirect",
+                "label": "Redirect",
+                "composer_pkg": "drupal/redirect",
+                "enable_modules": ["redirect"],
+                "desc": "Redirecciones 301 automáticas al modificar slugs o alias.",
+            },
+        ],
+    },
+    "paragraphs": {
+        "id": "paragraphs",
+        "title": "🧩 Arquitectura Modular & Paragraphs Suite",
+        "desc": "Paragraphs, Paragraphs Library, Entity Usage, Field Group e Inline Entity Form para modelado de páginas por componentes reutilizables y serialización en APIs.",
+        "btn_install_label": "📦 Instalar Paragraphs & Componentes",
+        "success_msg": "¡Suite de Paragraphs y Componentes instalada!",
+        "cmd_template": (
+            "composer require drupal/paragraphs drupal/entity_reference_revisions drupal/field_group drupal/inline_entity_form drupal/entity_usage --no-interaction && "
+            "drush {uri_flag}pm:enable paragraphs entity_usage paragraphs_library entity_reference_revisions field_group inline_entity_form -y && "
+            "drush {uri_flag}cr"
+        ),
+        "extra_actions": [
+            ("🧩 Paragraph Types", "/admin/structure/paragraphs_type"),
+            ("📚 Paragraphs Library", "/admin/content/paragraphs-library"),
+            ("📊 Entity Usage", "/admin/config/entity-usage"),
+        ],
+        "modules": [
+            {
+                "machine_name": "paragraphs",
+                "label": "Paragraphs",
+                "composer_pkg": "drupal/paragraphs",
+                "composer_deps": ["drupal/entity_reference_revisions"],
+                "enable_modules": ["entity_reference_revisions", "paragraphs"],
+                "desc": "Modelado de páginas mediante componentes dinámicos modulares.",
+            },
+            {
+                "machine_name": "paragraphs_library",
+                "label": "Paragraphs Library",
+                "composer_pkg": "drupal/paragraphs",
+                "composer_deps": ["drupal/entity_reference_revisions"],
+                "enable_modules": ["entity_reference_revisions", "paragraphs", "paragraphs_library"],
+                "desc": "Biblioteca centralizada de párrafos globales reusables.",
+            },
+            {
+                "machine_name": "field_group",
+                "label": "Field Group",
+                "composer_pkg": "drupal/field_group",
+                "enable_modules": ["field_group"],
+                "desc": "Agrupación visual de campos en pestañas, acordeones y fieldsets.",
+            },
+            {
+                "machine_name": "entity_usage",
+                "label": "Entity Usage",
+                "composer_pkg": "drupal/entity_usage",
+                "enable_modules": ["entity_usage"],
+                "desc": "Rastreo de relaciones y uso de imágenes y entidades referenciadas.",
+            },
+            {
+                "machine_name": "inline_entity_form",
+                "label": "Inline Entity Form",
+                "composer_pkg": "drupal/inline_entity_form",
+                "enable_modules": ["inline_entity_form"],
+                "desc": "Inserción y edición embebida de entidades en formularios de edición.",
+            },
+        ],
+    },
+    "admin_media": {
+        "id": "admin_media",
+        "title": "⚡ Administración Avanzada & Gestión de Medios (DX / UX)",
+        "desc": "Admin Toolbar (Tools + Search multinivel), Focal Point (recortes inteligentes de imágenes) y soporte nativo para logotipos SVG.",
+        "btn_install_label": "📦 Instalar Admin Toolbar & Medios",
+        "success_msg": "¡Admin Toolbar, Focal Point y SVG Image instalados!",
+        "cmd_template": (
+            "composer require drupal/admin_toolbar drupal/focal_point drupal/crop drupal/svg_image --no-interaction && "
+            "drush {uri_flag}pm:enable admin_toolbar admin_toolbar_tools admin_toolbar_search focal_point crop svg_image -y && "
+            "drush {uri_flag}cr"
+        ),
+        "extra_actions": [
+            ("⚙️ Admin Toolbar", "/admin/config/user-interface/admin-toolbar"),
+            ("🎯 Focal Point", "/admin/config/media/crop-widget"),
+        ],
+        "modules": [
+            {
+                "machine_name": "admin_toolbar",
+                "label": "Admin Toolbar",
+                "composer_pkg": "drupal/admin_toolbar",
+                "enable_modules": ["admin_toolbar", "admin_toolbar_tools", "admin_toolbar_search"],
+                "desc": "Barra de navegación multinivel con búsqueda rápida de rutas.",
+            },
+            {
+                "machine_name": "focal_point",
+                "label": "Focal Point",
+                "composer_pkg": "drupal/focal_point",
+                "composer_deps": ["drupal/crop"],
+                "enable_modules": ["crop", "focal_point"],
+                "desc": "Recorte inteligente de imágenes basado en punto de interés focal.",
+            },
+            {
+                "machine_name": "crop",
+                "label": "Crop API",
+                "composer_pkg": "drupal/crop",
+                "enable_modules": ["crop"],
+                "desc": "API base para gestión y almacenamiento de recortes de medios.",
+            },
+            {
+                "machine_name": "svg_image",
+                "label": "SVG Image",
+                "composer_pkg": "drupal/svg_image",
+                "enable_modules": ["svg_image"],
+                "desc": "Soporte nativo para gráficos vectoriales SVG en campos de imagen.",
+            },
+        ],
+    },
+    "api_headless": {
+        "id": "api_headless",
+        "title": "🌐 Suite de APIs REST, JSON:API & Headless (Decoupled)",
+        "desc": "JSON:API (Core), JSON:API Extras (personalización de esquemas), Simple OAuth (tokens JWT para React/Vue/Next.js), REST Core y GraphQL.",
+        "btn_install_label": "📦 Instalar Suite de APIs & OAuth",
+        "success_msg": "¡Suite de APIs REST, JSON:API Extras y Simple OAuth instalados!",
+        "cmd_template": (
+            "composer require drupal/jsonapi_extras drupal/simple_oauth --no-interaction && "
+            "drush {uri_flag}pm:enable jsonapi jsonapi_extras simple_oauth -y && "
+            "drush {uri_flag}cr"
+        ),
+        "extra_actions": [
+            ("🌐 Probar /jsonapi", "/jsonapi"),
+            ("⚙️ JSON:API Extras", "/admin/config/services/jsonapi"),
+            ("🗝️ Generar Claves RSA", "rsa_keys"),
+        ],
+        "modules": [
+            {
+                "machine_name": "jsonapi",
+                "label": "JSON:API",
+                "composer_pkg": None,  # Módulo nativo del Core de Drupal
+                "enable_modules": ["jsonapi"],
+                "desc": "Especificación JSON:API nativa del núcleo sin dependencias externas.",
+            },
+            {
+                "machine_name": "jsonapi_extras",
+                "label": "JSON:API Extras",
+                "composer_pkg": "drupal/jsonapi_extras",
+                "enable_modules": ["jsonapi", "jsonapi_extras"],
+                "desc": "Configuración de recursos, alias y anulación de campos en endpoints.",
+            },
+            {
+                "machine_name": "simple_oauth",
+                "label": "Simple OAuth",
+                "composer_pkg": "drupal/simple_oauth",
+                "enable_modules": ["simple_oauth"],
+                "desc": "Servidor OAuth 2.0 con tokens Bearer JWT para frontend desacoplado.",
+            },
+        ],
+    },
+    "devel_stage": {
+        "id": "devel_stage",
+        "title": "🐞 Depuración, Consola PHP & Rendimiento Local (DDEV)",
+        "desc": "Devel + Kint, Consola PHP interactiva (/devel/php) y Stage File Proxy (descarga de imágenes bajo demanda desde producción).",
+        "btn_install_label": "📦 Instalar Devel + Stage File Proxy",
+        "success_msg": "¡Devel, Kint y Stage File Proxy instalados con éxito!",
+        "cmd_template": (
+            "composer require --dev drupal/devel drupal/devel_php kint-php/kint drupal/stage_file_proxy --no-interaction && "
+            "drush {uri_flag}pm:enable devel devel_php stage_file_proxy -y && "
+            "drush {uri_flag}cr"
+        ),
+        "extra_actions": [
+            ("⚡ Abrir Consola PHP (/devel/php)", "/devel/php"),
+            ("🖼️ Stage File Proxy", "/admin/config/development/stage_file_proxy"),
+        ],
+        "modules": [
+            {
+                "machine_name": "devel",
+                "label": "Devel",
+                "composer_pkg": "drupal/devel",
+                "composer_deps": ["kint-php/kint"],
+                "is_dev": True,
+                "enable_modules": ["devel"],
+                "desc": "Herramientas de inspección, depuración y perfilado de rendimiento.",
+            },
+            {
+                "machine_name": "devel_php",
+                "label": "Devel PHP",
+                "composer_pkg": "drupal/devel_php",
+                "is_dev": True,
+                "enable_modules": ["devel_php"],
+                "desc": "Consola interactiva para ejecutar código PHP directamente en el navegador.",
+            },
+            {
+                "machine_name": "stage_file_proxy",
+                "label": "Stage File Proxy",
+                "composer_pkg": "drupal/stage_file_proxy",
+                "is_dev": True,
+                "enable_modules": ["stage_file_proxy"],
+                "desc": "Descarga de medios e imágenes bajo demanda desde un entorno remoto.",
+            },
+        ],
+    },
+}
+
+
+def build_module_install_command(module_info: dict, uri: str = "") -> list:
+    """
+    Construye la lista de argumentos para ejecutar la instalación de un único módulo
+    en Drupal mediante Composer (si aplica) y Drush (pm:enable y cr).
+    Soporta subsitios Drupal mediante el parámetro uri.
+    """
+    uri_flag = f"--uri={uri} " if uri else ""
+    composer_pkg = module_info.get("composer_pkg")
+    deps = module_info.get("composer_deps", [])
+    
+    pkgs = []
+    if composer_pkg:
+        pkgs.append(composer_pkg)
+    for d in deps:
+        if d not in pkgs:
+            pkgs.append(d)
+            
+    enable_modules = module_info.get("enable_modules") or [module_info.get("machine_name", "")]
+    enable_str = " ".join(enable_modules)
+    
+    parts = []
+    if pkgs:
+        dev_flag = "--dev " if module_info.get("is_dev", False) else ""
+        pkgs_str = " ".join(pkgs)
+        parts.append(f"composer require {dev_flag}{pkgs_str} --no-interaction")
+        
+    parts.append(f"drush {uri_flag}pm:enable {enable_str} -y")
+    parts.append(f"drush {uri_flag}cr")
+    
+    cmd_str = " && ".join(parts)
+    return ["ddev", "exec", "bash", "-c", cmd_str]
+
+
+def build_bundle_install_command(bundle_info: dict, uri: str = "") -> list:
+    """
+    Construye la lista de argumentos para ejecutar la instalación completa de un
+    paquete/suite de Drupal mediante Composer y Drush.
+    """
+    uri_flag = f"--uri={uri} " if uri else ""
+    raw_template = bundle_info.get("cmd_template")
+    if raw_template:
+        cmd_str = raw_template.format(uri_flag=uri_flag)
+        return ["ddev", "exec", "bash", "-c", cmd_str]
+        
+    pkgs_prod = []
+    pkgs_dev = []
+    modules_to_enable = []
+    
+    for mod in bundle_info.get("modules", []):
+        pkg = mod.get("composer_pkg")
+        deps = mod.get("composer_deps", [])
+        is_dev = mod.get("is_dev", False)
+        target_list = pkgs_dev if is_dev else pkgs_prod
+        
+        if pkg and pkg not in target_list:
+            target_list.append(pkg)
+        for d in deps:
+            if d not in target_list:
+                target_list.append(d)
+                
+        for m in (mod.get("enable_modules") or [mod.get("machine_name", "")]):
+            if m and m not in modules_to_enable:
+                modules_to_enable.append(m)
+                
+    parts = []
+    if pkgs_prod:
+        parts.append(f"composer require {' '.join(pkgs_prod)} --no-interaction")
+    if pkgs_dev:
+        parts.append(f"composer require --dev {' '.join(pkgs_dev)} --no-interaction")
+    if modules_to_enable:
+        parts.append(f"drush {uri_flag}pm:enable {' '.join(modules_to_enable)} -y")
+    parts.append(f"drush {uri_flag}cr")
+    
+    return ["ddev", "exec", "bash", "-c", " && ".join(parts)]
+
+
+def build_module_uninstall_command(module_info: dict, uri: str = "") -> list:
+    """
+    Construye la lista de argumentos para desinstalar un módulo en Drupal
+    mediante Drush (pm:uninstall) y reconstruir la caché (cr).
+    Soporta subsitios Drupal mediante el parámetro uri.
+    """
+    machine_name = module_info.get("machine_name", "")
+    modules_to_uninstall = module_info.get("enable_modules") or ([machine_name] if machine_name else [])
+    modules_to_uninstall = [m for m in modules_to_uninstall if m]
+    if not modules_to_uninstall:
+        return []
+
+    uri_flag = f"--uri={uri} " if uri else ""
+    # Desinstalar en orden inverso si hay submódulos (ej. dependiente antes del padre)
+    uninst_str = " ".join(reversed(modules_to_uninstall))
+
+    parts = [
+        f"drush {uri_flag}pm:uninstall {uninst_str} -y",
+        f"drush {uri_flag}cr",
+    ]
+    return ["ddev", "exec", "bash", "-c", " && ".join(parts)]
+
+

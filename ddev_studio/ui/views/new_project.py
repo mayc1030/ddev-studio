@@ -285,7 +285,7 @@ class NewProjectView(Gtk.ScrolledWindow):
         grid_folder.attach(Gtk.Label(label="Carpeta en disco:", halign=Gtk.Align.END), 0, 0, 1, 1)
 
         dir_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        default_import = "/home/maycol/sites/base-drupal" if os.path.exists("/home/maycol/sites/base-drupal") else DEFAULT_SITES_DIR
+        default_import = DEFAULT_SITES_DIR
         self.entry_import_path = Gtk.Entry()
         self.entry_import_path.set_text(default_import)
         self.entry_import_path.set_hexpand(True)

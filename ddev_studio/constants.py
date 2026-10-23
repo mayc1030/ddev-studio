@@ -201,6 +201,25 @@ CUSTOM_CSS = b"""
     background-color: alpha(#ef4444, 0.28);
     border-color: #ef4444;
 }
+.btn-quick-term {
+    background-color: alpha(#6366f1, 0.15);
+    color: @theme_text_color;
+    border: 1px solid alpha(#6366f1, 0.4);
+}
+.btn-quick-term:hover {
+    background-color: alpha(#6366f1, 0.3);
+    border-color: #6366f1;
+}
+.module-item-box {
+    border-radius: 8px;
+    border: 1px solid rgba(128, 128, 128, 0.18);
+    padding: 6px 10px;
+    background: alpha(@theme_base_color, 0.35);
+}
+.module-item-box:hover {
+    border-color: rgba(128, 128, 128, 0.35);
+    background: alpha(@theme_base_color, 0.6);
+}
 .loader-card {
     border-radius: 14px;
     border: 1px solid rgba(56, 189, 248, 0.35);
@@ -320,6 +339,34 @@ CUSTOM_CSS = b"""
     background-color: alpha(@theme_selected_bg_color, 0.2);
     color: @theme_text_color;
     font-weight: bold;
+}
+.chat-bubble-user {
+    background-color: alpha(@theme_selected_bg_color, 0.22);
+    border: 1px solid alpha(@theme_selected_bg_color, 0.45);
+    border-radius: 12px 12px 2px 12px;
+    padding: 10px 14px;
+    margin: 4px 12px 4px 60px;
+}
+.chat-bubble-ai {
+    background-color: alpha(@theme_base_color, 0.55);
+    border: 1px solid rgba(128, 128, 128, 0.22);
+    border-radius: 12px 12px 12px 2px;
+    padding: 12px 16px;
+    margin: 4px 60px 4px 12px;
+}
+.chat-code-block {
+    background-color: alpha(#0f172a, 0.85);
+    border: 1px solid rgba(128, 128, 128, 0.3);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-family: monospace;
+    font-size: 11px;
+}
+.chat-input-box {
+    border-radius: 10px;
+    border: 1px solid rgba(128, 128, 128, 0.25);
+    background-color: alpha(@theme_base_color, 0.5);
+    padding: 4px;
 }
 """
 

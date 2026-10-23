@@ -11,8 +11,12 @@ from gi.repository import Gtk, GLib
 
 from ddev_studio.core.docker_monitor import (
     get_live_docker_stats,
-    format_bytes
+    format_bytes,
+    stop_docker_container,
+    restart_docker_container,
+    get_container_logs
 )
+from ddev_studio.core.terminal import open_terminal
 
 
 class DockerMonitorView(Gtk.Box):
@@ -204,6 +208,9 @@ class DockerMonitorView(Gtk.Box):
         col_pids.add_attribute(cell_pids, "text", 9)
         self.treeview.append_column(col_pids)
         
+        # Conectar clic derecho para menú contextual
+        self.treeview.connect("button-press-event", self.on_treeview_button_press)
+        
         scrolled.add(self.treeview)
         self.pack_start(scrolled, True, True, 0)
 
@@ -242,13 +249,15 @@ class DockerMonitorView(Gtk.Box):
         
         self.combo_scope.remove_all()
         self.combo_scope.append("all", "🌐 Vista Global (Todos los contenedores)")
+        self.combo_scope.append("ddev_projects", "📦 Todos los Proyectos DDEV")
         self.combo_scope.append("system", "⚙️ DDEV Sistema (Router, SSH-Agent)")
+        self.combo_scope.append("external", "🐳 Otros Contenedores / Externos (No DDEV)")
         
         for pname in self.known_projects:
             self.combo_scope.append(pname, f"📁 Proyecto: {pname}")
             
         # Preservar selección previa si existe
-        if current_id in ["all", "system"] or current_id in self.known_projects:
+        if current_id in ["all", "system", "external", "ddev_projects"] or current_id in self.known_projects:
             self.combo_scope.set_active_id(current_id)
         else:
             self.combo_scope.set_active_id("all")
@@ -356,6 +365,26 @@ class DockerMonitorView(Gtk.Box):
             count_sub = "Traefik Router y SSH Agent"
             net_str = "Infraestructura DDEV"
             block_str = "Core de red"
+        elif self.selected_scope == "external":
+            filtered_containers = [c for c in containers if c["scope"] == "external"]
+            cpu_val = sum(c["cpu_percent"] for c in filtered_containers)
+            mem_bytes = sum(c["mem_used_bytes"] for c in filtered_containers)
+            mem_val_str = f"{format_bytes(mem_bytes)} / {global_sum['total_limit_str']}"
+            mem_pct = round((mem_bytes / global_sum['total_mem_limit_bytes'] * 100.0), 2) if global_sum.get('total_mem_limit_bytes', 0) > 0 else 0.0
+            count_str = f"{len(filtered_containers)} activos"
+            count_sub = "Contenedores Docker externos (No DDEV)"
+            net_str = "Contenedores independientes"
+            block_str = "Docker Standalone"
+        elif self.selected_scope == "ddev_projects":
+            filtered_containers = [c for c in containers if c["scope"] == "project"]
+            cpu_val = sum(c["cpu_percent"] for c in filtered_containers)
+            mem_bytes = sum(c["mem_used_bytes"] for c in filtered_containers)
+            mem_val_str = f"{format_bytes(mem_bytes)} / {global_sum['total_limit_str']}"
+            mem_pct = round((mem_bytes / global_sum['total_mem_limit_bytes'] * 100.0), 2) if global_sum.get('total_mem_limit_bytes', 0) > 0 else 0.0
+            count_str = f"{len(filtered_containers)} activos"
+            count_sub = "Solo contenedores de proyectos DDEV"
+            net_str = f"Proyectos: {len(self.known_projects)}"
+            block_str = "DDEV Projects"
         else:
             # Proyecto específico
             filtered_containers = [c for c in containers if c["project"] == self.selected_scope]
@@ -409,3 +438,156 @@ class DockerMonitorView(Gtk.Box):
                 c["pids"],
                 c["id"]
             ])
+
+    # -------------------------------------------------------------------------
+    # Menú Contextual (Clic Derecho) y Operaciones en Contenedores
+    # -------------------------------------------------------------------------
+    def on_treeview_button_press(self, treeview, event):
+        """Maneja el evento de clic derecho (botón 3) para mostrar el menú contextual."""
+        if event.button == 3:
+            pthinfo = treeview.get_path_at_pos(int(event.x), int(event.y))
+            if pthinfo:
+                path, col, _, _ = pthinfo
+                treeview.grab_focus()
+                treeview.set_cursor(path, col, False)
+                model = treeview.get_model()
+                iter_ = model.get_iter(path)
+                scope_name = model.get_value(iter_, 1)
+                service_name = model.get_value(iter_, 2)
+                cid = model.get_value(iter_, 10)
+                self.show_context_menu(event, cid, service_name, scope_name)
+                return True
+        return False
+
+    def show_context_menu(self, event, cid, service_name, scope_name):
+        """Construye y muestra el menú contextual para el contenedor seleccionado."""
+        menu = Gtk.Menu()
+
+        # Título / Cabecera informativa
+        item_title = Gtk.MenuItem(label=f"Contenedor: {service_name}")
+        item_title.set_sensitive(False)
+        menu.append(item_title)
+        menu.append(Gtk.SeparatorMenuItem())
+
+        # 1. Detener
+        item_stop = Gtk.MenuItem(label="⏹️ Detener Contenedor")
+        item_stop.connect("activate", lambda m: self.on_context_stop(cid, service_name))
+        menu.append(item_stop)
+
+        # 2. Reiniciar
+        item_restart = Gtk.MenuItem(label="🔄 Reiniciar Contenedor")
+        item_restart.connect("activate", lambda m: self.on_context_restart(cid, service_name))
+        menu.append(item_restart)
+
+        # 3. Ver Logs
+        item_logs = Gtk.MenuItem(label="📋 Ver Logs Recientes")
+        item_logs.connect("activate", lambda m: self.on_context_logs(cid, service_name))
+        menu.append(item_logs)
+
+        # 4. Abrir Terminal
+        item_term = Gtk.MenuItem(label="💻 Abrir Terminal (docker exec)")
+        item_term.connect("activate", lambda m: self.on_context_terminal(cid, service_name))
+        menu.append(item_term)
+
+        menu.show_all()
+        menu.popup(None, None, None, None, event.button, event.time)
+
+    def on_context_stop(self, cid, service_name):
+        """Detiene un contenedor específico tras confirmación."""
+        confirm = Gtk.MessageDialog(
+            transient_for=self.main_app,
+            flags=0,
+            message_type=Gtk.MessageType.QUESTION,
+            buttons=Gtk.ButtonsType.OK_CANCEL,
+            text=f"¿Deseas detener el contenedor '{service_name}'?"
+        )
+        confirm.format_secondary_text(f"ID del contenedor: {cid[:12]}\nEsta acción ejecutará 'docker stop'.")
+        resp = confirm.run()
+        confirm.destroy()
+
+        if resp == Gtk.ResponseType.OK:
+            def task():
+                stop_docker_container(cid)
+                GLib.idle_add(self.refresh_stats)
+            threading.Thread(target=task, daemon=True).start()
+
+    def on_context_restart(self, cid, service_name):
+        """Reinicia un contenedor específico tras confirmación."""
+        confirm = Gtk.MessageDialog(
+            transient_for=self.main_app,
+            flags=0,
+            message_type=Gtk.MessageType.QUESTION,
+            buttons=Gtk.ButtonsType.OK_CANCEL,
+            text=f"¿Deseas reiniciar el contenedor '{service_name}'?"
+        )
+        confirm.format_secondary_text(f"ID del contenedor: {cid[:12]}\nEsta acción ejecutará 'docker restart'.")
+        resp = confirm.run()
+        confirm.destroy()
+
+        if resp == Gtk.ResponseType.OK:
+            def task():
+                restart_docker_container(cid)
+                GLib.idle_add(self.refresh_stats)
+            threading.Thread(target=task, daemon=True).start()
+
+    def on_context_logs(self, cid, service_name):
+        """Abre un diálogo modal para visualizar los logs del contenedor."""
+        self.show_logs_dialog(cid, service_name)
+
+    def on_context_terminal(self, cid, service_name):
+        """Abre la terminal del sistema ejecutando una sesión interactiva en el contenedor."""
+        # Intenta primero con sh / bash
+        cmd = f"docker exec -it {cid} sh -c 'if command -v bash >/dev/null 2>&1; then exec bash; else exec sh; fi'"
+        open_terminal(None, cmd)
+
+    def show_logs_dialog(self, cid, service_name):
+        """Muestra una ventana modal con los logs recientes del contenedor."""
+        dialog = Gtk.Dialog(
+            title=f"Logs: {service_name} ({cid[:12]})",
+            transient_for=self.main_app,
+            flags=Gtk.DialogFlags.MODAL
+        )
+        dialog.set_default_size(750, 480)
+
+        box = dialog.get_content_area()
+        box.set_spacing(10)
+        box.set_margin_start(12)
+        box.set_margin_end(12)
+        box.set_margin_top(10)
+        box.set_margin_bottom(10)
+
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_vexpand(True)
+
+        text_view = Gtk.TextView()
+        text_view.set_editable(False)
+        text_view.set_cursor_visible(False)
+        text_view.set_monospace(True)
+        text_view.set_wrap_mode(Gtk.WrapMode.CHAR)
+        text_view.get_style_context().add_class("console-view")
+        text_buffer = text_view.get_buffer()
+        text_buffer.set_text("Cargando logs...")
+        scrolled.add(text_view)
+        box.pack_start(scrolled, True, True, 0)
+
+        def update_logs():
+            def fetch():
+                logs = get_container_logs(cid, tail=150)
+                def apply_txt():
+                    text_buffer.set_text(logs)
+                    adj = scrolled.get_vadjustment()
+                    adj.set_value(adj.get_upper() - adj.get_page_size())
+                GLib.idle_add(apply_txt)
+            threading.Thread(target=fetch, daemon=True).start()
+
+        btn_refresh = Gtk.Button(label="Refrescar Logs")
+        btn_refresh.connect("clicked", lambda b: update_logs())
+        dialog.add_action_widget(btn_refresh, Gtk.ResponseType.APPLY)
+
+        dialog.add_button("Cerrar", Gtk.ResponseType.CLOSE)
+
+        update_logs()
+        dialog.show_all()
+        dialog.run()
+        dialog.destroy()

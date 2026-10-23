@@ -13,6 +13,8 @@ from gi.repository import Gtk, GLib
 from ddev_studio.constants import DEFAULT_SITES_DIR
 from ddev_studio.ui.dialogs.progress import ProgressDialog
 from ddev_studio.ui.views.docker_monitor import DockerMonitorView
+from ddev_studio.core.docker_monitor import list_external_containers, stop_all_external_containers
+from ddev_studio.core.ssl_tools import check_ssl_health
 
 
 class GlobalToolsView(Gtk.ScrolledWindow):
@@ -79,6 +81,36 @@ class GlobalToolsView(Gtk.ScrolledWindow):
         btn_router.connect("clicked", lambda b: webbrowser.open("http://127.0.0.1:10999"))
         grid.attach(btn_router, 1, 1, 1, 1)
 
+        # 5. Stop External Containers
+        btn_stop_ext = Gtk.Button()
+        b_sext = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        b_sext.pack_start(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+        b_sext.pack_start(Gtk.Label(label="Detener Contenedores Externos (Docker)"), False, False, 0)
+        btn_stop_ext.add(b_sext)
+        btn_stop_ext.set_tooltip_text("Detener contenedores Docker que no pertenecen a DDEV (bases de datos independientes, microservicios, etc.)")
+        btn_stop_ext.connect("clicked", self.on_stop_external_containers)
+        grid.attach(btn_stop_ext, 0, 2, 1, 1)
+
+        # 6. Stop Everything (DDEV + External)
+        btn_stop_all_docker = Gtk.Button()
+        b_sall = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        b_sall.pack_start(Gtk.Image.new_from_icon_name("process-stop-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+        b_sall.pack_start(Gtk.Label(label="Detener TODO en Docker (DDEV + Externos)"), False, False, 0)
+        btn_stop_all_docker.add(b_sall)
+        btn_stop_all_docker.set_tooltip_text("Detener todos los proyectos DDEV y además todos los contenedores Docker externos activos")
+        btn_stop_all_docker.connect("clicked", self.on_stop_everything)
+        grid.attach(btn_stop_all_docker, 1, 2, 1, 1)
+
+        # 7. Diagnóstico y Certificados SSL (mkcert)
+        btn_ssl_diag = Gtk.Button()
+        b_ssl = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        b_ssl.pack_start(Gtk.Image.new_from_icon_name("channel-secure-symbolic", Gtk.IconSize.BUTTON), False, False, 0)
+        b_ssl.pack_start(Gtk.Label(label="Diagnóstico y Certificados SSL (mkcert / HTTPS)"), False, False, 0)
+        btn_ssl_diag.add(b_ssl)
+        btn_ssl_diag.set_tooltip_text("Verificar y reparar la confianza SSL de Chrome, Chromium y Firefox para dominios locales")
+        btn_ssl_diag.connect("clicked", self.on_open_ssl_diag)
+        grid.attach(btn_ssl_diag, 0, 3, 2, 1)
+
         # Separador y Monitor de Recursos Docker en Vivo
         sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         box.pack_start(sep, False, False, 4)
@@ -106,13 +138,34 @@ class GlobalToolsView(Gtk.ScrolledWindow):
 
         self.update_system_info()
 
+    def on_open_ssl_diag(self, widget=None):
+        """Abre el diálogo modal de diagnóstico y reparación de certificados SSL."""
+        from ddev_studio.ui.dialogs.ssl_diag import SSLDiagDialog
+        dlg = SSLDiagDialog(self.main_app)
+        dlg.run()
+        dlg.destroy()
+        self.update_system_info()
+
     def update_system_info(self):
-        """Consulta en segundo plano las versiones instaladas de DDEV y Docker."""
+        """Consulta en segundo plano las versiones instaladas de DDEV, Docker y estado SSL."""
         def task():
             try:
                 v = subprocess.run(["ddev", "--version"], capture_output=True, text=True).stdout.strip()
                 dock = subprocess.run(["docker", "--version"], capture_output=True, text=True).stdout.strip()
-                info_text = f"• <b>DDEV:</b> {v}\n• <b>Docker:</b> {dock}\n• <b>Directorio predeterminado:</b> {DEFAULT_SITES_DIR}"
+                ssl_h = check_ssl_health()
+                if ssl_h["healthy"]:
+                    ssl_str = "<span foreground='green'>✅ Confiables en Chrome/Firefox (mkcert + certutil)</span>"
+                elif not ssl_h["mkcert_installed"]:
+                    ssl_str = "<span foreground='red'>❌ mkcert no encontrado en PATH</span>"
+                else:
+                    ssl_str = "<span foreground='#d97706'>⚠️ Requiere libnss3-tools (certutil)</span>"
+
+                info_text = (
+                    f"• <b>DDEV:</b> {v}\n"
+                    f"• <b>Docker:</b> {dock}\n"
+                    f"• <b>Certificados SSL (HTTPS):</b> {ssl_str}\n"
+                    f"• <b>Directorio predeterminado:</b> {DEFAULT_SITES_DIR}"
+                )
             except Exception as e:
                 info_text = f"Error obteniendo estado: {e}"
             GLib.idle_add(lambda: self.lbl_system_info.set_markup(info_text))
@@ -161,4 +214,111 @@ class GlobalToolsView(Gtk.ScrolledWindow):
             GLib.idle_add(dialog.finish, p.returncode == 0, "Limpieza completada")
             if self.main_app:
                 GLib.idle_add(self.main_app.refresh_projects)
+        threading.Thread(target=task, daemon=True).start()
+
+    def on_stop_external_containers(self, widget=None):
+        """Detiene contenedores Docker independientes o externos tras confirmación del usuario."""
+        ext_list = list_external_containers()
+        if not ext_list:
+            dialog = Gtk.MessageDialog(
+                transient_for=self.main_app,
+                flags=0,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text="No hay contenedores externos activos"
+            )
+            dialog.format_secondary_text("No se detectaron contenedores Docker externos ejecutándose actualmente.")
+            dialog.run()
+            dialog.destroy()
+            return
+
+        names_preview = "\n".join([f"• {c['name']} ({c['id'][:12]})" for c in ext_list[:8]])
+        if len(ext_list) > 8:
+            names_preview += f"\n... y {len(ext_list) - 8} más."
+
+        confirm = Gtk.MessageDialog(
+            transient_for=self.main_app,
+            flags=0,
+            message_type=Gtk.MessageType.WARNING,
+            buttons=Gtk.ButtonsType.OK_CANCEL,
+            text=f"¿Confirmas detener {len(ext_list)} contenedor(es) externo(s)?"
+        )
+        confirm.format_secondary_text(
+            f"Se detendrán los siguientes contenedores Docker independientes:\n\n{names_preview}\n\n"
+            f"Nota: Esto no afectará a los proyectos DDEV."
+        )
+        c_resp = confirm.run()
+        confirm.destroy()
+
+        if c_resp != Gtk.ResponseType.OK:
+            return
+
+        dialog = ProgressDialog(self.main_app, title="Deteniendo Contenedores Docker Externos")
+        dialog.set_status("Deteniendo contenedores independientes...")
+
+        def task():
+            def log(t):
+                GLib.idle_add(dialog.append_log, t)
+
+            log(f"🐳 Iniciando detención de {len(ext_list)} contenedores externos...\n")
+            stopped_cnt, stopped_names = stop_all_external_containers(ext_list)
+            for name in stopped_names:
+                log(f"  ✓ Detenido: {name}\n")
+
+            msg = f"Se detuvieron {stopped_cnt} de {len(ext_list)} contenedor(es) externo(s)."
+            GLib.idle_add(dialog.finish, stopped_cnt > 0, msg)
+            if hasattr(self, "docker_monitor_view"):
+                GLib.idle_add(self.docker_monitor_view.refresh_now)
+
+        threading.Thread(target=task, daemon=True).start()
+
+    def on_stop_everything(self, widget=None):
+        """Detiene tanto todos los proyectos DDEV como todos los contenedores Docker externos."""
+        ext_list = list_external_containers()
+        ext_count = len(ext_list)
+
+        confirm = Gtk.MessageDialog(
+            transient_for=self.main_app,
+            flags=0,
+            message_type=Gtk.MessageType.WARNING,
+            buttons=Gtk.ButtonsType.OK_CANCEL,
+            text="¿Confirmas detener TODO en Docker?"
+        )
+        confirm.format_secondary_text(
+            "Esta acción ejecutará 'ddev poweroff' para apagar todos los proyectos DDEV "
+            f"y además detendrá los {ext_count} contenedor(es) Docker externos activos.\n\n"
+            "Todos los servicios web y bases de datos en Docker serán detenidos."
+        )
+        c_resp = confirm.run()
+        confirm.destroy()
+
+        if c_resp != Gtk.ResponseType.OK:
+            return
+
+        dialog = ProgressDialog(self.main_app, title="Deteniendo Todo en Docker")
+        dialog.set_status("Ejecutando ddev poweroff y deteniendo contenedores externos...")
+
+        def task():
+            def log(t):
+                GLib.idle_add(dialog.append_log, t)
+
+            log("🛑 1. Deteniendo proyectos DDEV (ddev poweroff)...\n")
+            p = subprocess.Popen(["ddev", "poweroff"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            for line in iter(p.stdout.readline, ''):
+                log(line)
+            p.stdout.close()
+            p.wait()
+
+            log(f"\n🐳 2. Deteniendo {ext_count} contenedor(es) externos...\n")
+            stopped_cnt, stopped_names = stop_all_external_containers(ext_list)
+            for name in stopped_names:
+                log(f"  ✓ Detenido: {name}\n")
+
+            msg = f"DDEV apagado y {stopped_cnt} contenedor(es) externos detenidos correctamente."
+            GLib.idle_add(dialog.finish, True, msg)
+            if self.main_app:
+                GLib.idle_add(self.main_app.refresh_projects)
+            if hasattr(self, "docker_monitor_view"):
+                GLib.idle_add(self.docker_monitor_view.refresh_now)
+
         threading.Thread(target=task, daemon=True).start()

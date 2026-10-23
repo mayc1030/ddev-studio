@@ -349,12 +349,14 @@ class TestImports(unittest.TestCase):
         import ddev_studio.ui.dialogs.progress
         import ddev_studio.ui.dialogs.db_containers
         import ddev_studio.ui.dialogs.ci_dialog
-        import ddev_studio.ui.dialogs.drupal_tools
+        import ddev_studio.ui.dialogs.drupal_uninstall
         import ddev_studio.core.addons
+        import ddev_studio.core.ai_client
         import ddev_studio.ui.views.details
         import ddev_studio.ui.views.subsites
         import ddev_studio.ui.views.drupal_tools
         import ddev_studio.ui.views.addons
+        import ddev_studio.ui.views.ai_assistant
         import ddev_studio.core.docker_monitor
         import ddev_studio.ui.views.docker_monitor
         import ddev_studio.ui.window
@@ -363,8 +365,14 @@ class TestImports(unittest.TestCase):
 
     def test_drupal_tools_view_instantiation(self):
         from ddev_studio.ui.views.drupal_tools import DrupalToolsView
+        from ddev_studio.ui.dialogs.drupal_uninstall import DrupalUninstallDialog
         view = DrupalToolsView(main_app=None)
         self.assertIsNotNone(view)
+
+        # Test uninstall dialog instantiation
+        diag = DrupalUninstallDialog(None, {"machine_name": "token", "label": "Token"}, "https://demo.ddev.site")
+        self.assertIsNotNone(diag)
+        diag.destroy()
         
         # Test loading project
         demo_proj = {
@@ -377,14 +385,20 @@ class TestImports(unittest.TestCase):
         self.assertEqual(view.from_view, "details")
         self.assertEqual(view.btn_back_lbl.get_text(), "Volver a Detalles")
 
-        # Test uninstall box visibility update
+        # Test status update on modules
         view.update_api_status_ui({"admin_toolbar": True})
-        self.assertTrue(view.card_admin_media._box_active.get_visible())
-        self.assertFalse(view.card_seo._box_active.get_visible())
+        self.assertEqual(view.card_admin_media._status_badge.get_text(), "PARCIAL (1/4)")
+        self.assertEqual(view.card_seo._status_badge.get_text(), "INACTIVO")
+        self.assertGreater(len(view.card_admin_media._flow_modules.get_children()), 0)
 
-        # Test uninstall box visibility hidden when empty
+        # Test status badge when all enabled
+        all_admin = {m["machine_name"]: True for m in view.card_admin_media._modules}
+        view.update_api_status_ui(all_admin)
+        self.assertEqual(view.card_admin_media._status_badge.get_text(), "ACTIVO")
+
+        # Test status badge when empty
         view.update_api_status_ui({})
-        self.assertFalse(view.card_admin_media._box_active.get_visible())
+        self.assertEqual(view.card_admin_media._status_badge.get_text(), "INACTIVO")
 
     def test_addons_view_instantiation(self):
         from ddev_studio.ui.views.addons import AddonsMarketplaceView
@@ -425,10 +439,57 @@ class TestImports(unittest.TestCase):
         view.switch_mode("import")
         self.assertTrue(view.btn_mode_import.get_active())
 
+    def test_details_view_framework_toolkits_rendering(self):
+        from ddev_studio.ui.views.details import ProjectDetailsView
+        view = ProjectDetailsView(main_app=None)
+        self.assertIsNotNone(view)
+
+        # Test rendering Laravel
+        view.render_details_ui({
+            "name": "my-laravel",
+            "type": "laravel",
+            "status": "running",
+            "approot": "/tmp/my-laravel",
+            "php_version": "8.2",
+        })
+        self.assertGreater(len(view.content_box.get_children()), 3)
+
+        # Test rendering Django
+        view.render_details_ui({
+            "name": "my-django",
+            "type": "django",
+            "status": "stopped",
+            "approot": "/tmp/my-django",
+        })
+        self.assertGreater(len(view.content_box.get_children()), 3)
+
+        # Test rendering WordPress
+        view.render_details_ui({
+            "name": "my-wp",
+            "type": "wordpress",
+            "status": "running",
+            "approot": "/tmp/my-wp",
+        })
+        self.assertGreater(len(view.content_box.get_children()), 3)
+
+    def test_ai_assistant_view_instantiation(self):
+        from ddev_studio.ui.views.ai_assistant import AIAssistantView
+        view = AIAssistantView(main_app=None)
+        self.assertIsNotNone(view)
+        self.assertIsNotNone(view.stack)
+        self.assertIsNotNone(view.combo_models)
+        self.assertIsNotNone(view.combo_projects)
+        self.assertIsNotNone(view.text_input)
+        self.assertIsNotNone(view.btn_install_ollama)
+        self.assertIsNotNone(view.btn_install_term)
+        self.assertEqual(len(view.messages), 0)
+
     def test_window_init_state_and_busy_controls(self):
         from ddev_studio.ui.window import DDEVManagerWindow
         window = DDEVManagerWindow()
         self.assertIsNotNone(window)
+        self.assertIsNotNone(window.tab_ai)
+        self.assertEqual(window.notebook.get_n_pages(), 5)
         window.show_all()
         # Test init_state
         window.init_state()

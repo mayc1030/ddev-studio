@@ -99,11 +99,12 @@ Arquitectura modular y desacoplada con recetas especializadas para cada tecnolog
    ```bash
    curl -fsSL https://ddev.com/install.sh | bash
    ```
-3. **Python 3, PyGObject, GTK3 y PyYAML (Ubuntu / Debian / Linux Mint):**
+3. **Python 3, PyGObject, GTK3, PyYAML y Herramientas SSL (Ubuntu / Debian / Linux Mint):**
    ```bash
    sudo apt update
-   sudo apt install -y python3 python3-gi gir1.2-gtk-3.0 python3-yaml
+   sudo apt install -y python3 python3-gi gir1.2-gtk-3.0 python3-yaml libnss3-tools
    ```
+   > 💡 **Nota sobre SSL/HTTPS en navegadores:** El paquete `libnss3-tools` provee `certutil`, necesario para que Google Chrome, Brave, Chromium y Firefox reconozcan automáticamente los certificados HTTPS locales generados por DDEV (`mkcert`), evitando el error `NET::ERR_CERT_AUTHORITY_INVALID` ("La conexión no es privada").
 
 ---
 
