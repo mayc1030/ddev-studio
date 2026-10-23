@@ -7,7 +7,7 @@
 ![GTK3](https://img.shields.io/badge/GTK-3.0-4E9A06?logo=gnome&logoColor=white)
 ![DDEV](https://img.shields.io/badge/DDEV-v1.23+-0074D9?logo=docker&logoColor=white)
 ![Tests](https://img.shields.io/badge/Tests-Passing%20(108%2F108)-brightgreen)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
+![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
 
 ---
 
@@ -245,7 +245,8 @@ ddev-studio/
 ├── .github/workflows/
 │   └── ci.yml                      # Integración Continua con ejecución de tests
 ├── .gitignore                      # Exclusiones de Git
-├── LICENSE                         # Licencia MIT
+├── LICENSE                         # Licencia Apache 2.0
+├── NOTICE                          # Términos de atribución obligatoria al autor
 └── README.md                       # Documentación oficial del proyecto
 ```
 
@@ -257,6 +258,20 @@ Para desinstalar DDEV Studio limpiamente de tu sistema:
 ```bash
 ./uninstall.sh
 ```
+
+---
+
+## 👤 Autoría y Reconocimiento
+
+**DDEV Studio** ha sido ideado, diseñado y desarrollado originalmente por:
+
+* **Autor Original:** **Maycol Sanchez Salazar**
+* **Correo Electrónico:** [mayc1030@gmail.com](mailto:mayc1030@gmail.com)
+* **Perfil de GitHub:** [@mayc1030](https://github.com/mayc1030)
+* **Repositorio Oficial:** [https://github.com/mayc1030/ddev-studio](https://github.com/mayc1030/ddev-studio)
+
+> 💡 **Pautas de Atribución (Uso Libre y Comercial):**  
+> Puedes usar, bifurcar, distribuir y comercializar este software libremente bajo los términos de la **Licencia Apache 2.0**. De conformidad con la Sección 4(d) y el archivo [NOTICE](NOTICE), cualquier redistribución, bifurcación o producto comercial derivado **debe dar crédito claro y visible a Maycol Sanchez Salazar** y enlazar al repositorio oficial, tanto en la documentación como en la ventana de créditos / "Acerca de".
 
 ---
 
@@ -273,4 +288,4 @@ Para desinstalar DDEV Studio limpiamente de tu sistema:
 
 ## 📄 Licencia
 
-Este proyecto está bajo la Licencia **MIT**. Consulta el archivo [LICENSE](LICENSE) para más detalles.
+Este proyecto está bajo la Licencia **Apache 2.0**. Consulta el archivo [LICENSE](LICENSE) y el archivo [NOTICE](NOTICE) para más detalles.

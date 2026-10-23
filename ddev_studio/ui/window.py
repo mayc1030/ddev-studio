@@ -1111,9 +1111,15 @@ class DDEVManagerWindow(Gtk.Window):
         about = Gtk.AboutDialog(transient_for=self, modal=True)
         about.set_program_name("DDEV Studio")
         about.set_version("1.2.0")
-        about.set_comments("Gestor visual de proyectos DDEV para Ubuntu MATE.\nCrea proyectos de Drupal (11/10/9/8/7), WordPress, Laravel, React, Vue y más con 1 clic.")
-        about.set_website("https://ddev.readthedocs.io")
-        about.set_website_label("Documentación Oficial de DDEV")
+        about.set_comments(
+            "Estación de trabajo gráfica nativa para Linux.\n"
+            "Crea, importa, acelera y monitorea proyectos DDEV (Drupal, WordPress, Laravel, Django, Next.js, Node.js y más)."
+        )
+        about.set_authors(["Maycol Sanchez Salazar <mayc1030@gmail.com>"])
+        about.set_copyright("Copyright © 2026 Maycol Sanchez Salazar")
+        about.set_license_type(Gtk.License.APACHE_2_0)
+        about.set_website("https://github.com/mayc1030/ddev-studio")
+        about.set_website_label("Repositorio Oficial de DDEV Studio en GitHub")
         ddev_icon = load_icon("ddev.svg", 64)
         if ddev_icon:
             about.set_logo(ddev_icon)
