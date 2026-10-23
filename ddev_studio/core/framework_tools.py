@@ -345,6 +345,91 @@ FRAMEWORK_TOOLKITS = {
             },
         ],
     },
+    "n8n": {
+        "id": "n8n",
+        "icon": "n8n.svg",
+        "title": "n8n Automation Toolkit (Flujos y Webhooks)",
+        "desc": "Herramientas de gestión para n8n: exportación de flujos, respaldo de credenciales y actualización.",
+        "tools": [
+            {
+                "id": "export_workflows",
+                "label": "Exportar Flujos (JSON)",
+                "icon": "document-save-symbolic",
+                "cmd": ["ddev", "exec", "npx", "n8n", "export:workflow", "--all", "--output=/var/www/html/workflows-backup.json"],
+                "type": "progress",
+                "success_msg": "¡Flujos exportados a workflows-backup.json con éxito!",
+                "tooltip": "Exportar todos los flujos de trabajo de n8n a un archivo JSON local (n8n export:workflow --all)",
+            },
+            {
+                "id": "export_credentials",
+                "label": "Exportar Credenciales",
+                "icon": "channel-secure-symbolic",
+                "cmd": ["ddev", "exec", "npx", "n8n", "export:credentials", "--all", "--output=/var/www/html/credentials-backup.json"],
+                "type": "progress",
+                "success_msg": "¡Credenciales exportadas a credentials-backup.json con éxito!",
+                "tooltip": "Exportar las credenciales configuradas en n8n a un archivo JSON seguro",
+            },
+            {
+                "id": "update_n8n",
+                "label": "Actualizar n8n",
+                "icon": "software-update-available-symbolic",
+                "cmd": ["ddev", "exec", "npm", "update", "n8n"],
+                "type": "progress",
+                "success_msg": "¡Plataforma n8n actualizada con éxito!",
+                "tooltip": "Actualizar el paquete n8n a la última versión disponible (npm update n8n)",
+            },
+            {
+                "id": "n8n_term",
+                "label": "Terminal n8n CLI",
+                "icon": "utilities-terminal-symbolic",
+                "cmd": "ddev exec npx n8n",
+                "type": "terminal",
+                "tooltip": "Abrir terminal CLI para ejecutar comandos directos de n8n",
+            },
+        ],
+    },
+    "openclaw": {
+        "id": "openclaw",
+        "icon": "openclaw.svg",
+        "title": "OpenClaw AI Agent Toolkit (Pasarela y Tareas)",
+        "desc": "Herramientas de control e inspección para el agente autónomo OpenClaw y su conexión con Ollama.",
+        "tools": [
+            {
+                "id": "openclaw_status",
+                "label": "Estado del Agente",
+                "icon": "system-run-symbolic",
+                "cmd": ["ddev", "exec", "npx", "openclaw", "status"],
+                "type": "progress",
+                "success_msg": "Estado de OpenClaw obtenido",
+                "tooltip": "Consultar estado de la pasarela y agentes de OpenClaw (npx openclaw status)",
+            },
+            {
+                "id": "openclaw_onboard",
+                "label": "Asistente Onboarding",
+                "icon": "utilities-terminal-symbolic",
+                "cmd": "ddev exec npx openclaw onboard",
+                "type": "terminal",
+                "tooltip": "Lanzar el asistente de configuración interactivo de OpenClaw (canales, LLM, credenciales)",
+            },
+            {
+                "id": "update_openclaw",
+                "label": "Actualizar OpenClaw",
+                "icon": "software-update-available-symbolic",
+                "cmd": ["ddev", "exec", "npm", "update", "openclaw"],
+                "type": "progress",
+                "success_msg": "¡OpenClaw actualizado con éxito!",
+                "tooltip": "Actualizar el framework de OpenClaw a la versión más reciente (npm update openclaw)",
+            },
+            {
+                "id": "openclaw_term",
+                "label": "Terminal OpenClaw",
+                "icon": "utilities-terminal-symbolic",
+                "cmd": "ddev exec npx openclaw",
+                "type": "terminal",
+                "tooltip": "Abrir consola interactiva para el agente OpenClaw",
+            },
+        ],
+    },
 }
 
 
@@ -384,6 +469,12 @@ def get_framework_toolkit(tech_type: str, approot: str = "") -> dict | None:
     """
     clean_tech = (tech_type or "").lower().strip()
     
+    # 0. n8n & OpenClaw (Automatización & Agentes)
+    if "n8n" in clean_tech or (approot and os.path.exists(os.path.join(approot, ".n8n"))):
+        return FRAMEWORK_TOOLKITS["n8n"]
+    if "openclaw" in clean_tech or (approot and os.path.exists(os.path.join(approot, ".openclaw"))):
+        return FRAMEWORK_TOOLKITS["openclaw"]
+
     # 1. Laravel
     if "laravel" in clean_tech or (approot and os.path.exists(os.path.join(approot, "artisan"))):
         return FRAMEWORK_TOOLKITS["laravel"]

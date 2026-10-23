@@ -13,6 +13,7 @@
 * 🐘 **PHP & CMSs:** Drupal (11, 10, 9, 8, 7 y Multisitio nativo), WordPress, Laravel, Symfony y PHP Plano / HTML.
 * 🐍 **Python:** Django (PostgreSQL/MySQL/SQLite, virtualenvs, migraciones, superuser) y Flask.
 * ⚛️ **Node.js & Frontend Moderno:** Next.js (App Router, Tailwind, TypeScript, Fast Refresh), Angular (@angular/cli, Vite dev server), React (Vite + TypeScript) y Vue 3 (Vite + TypeScript).
+* 🔀 **Automatización & Agentes IA:** n8n (orquestación de flujos de trabajo basada en nodos y webhooks) y OpenClaw (agente autónomo local con navegador headless y conexión a Ollama).
 * 🗄️ **Bases de Datos & Add-ons:** MariaDB, MySQL, PostgreSQL, SQLite local, phpMyAdmin, Adminer, CloudBeaver (DBeaver Web), Redis, Solr, Elasticsearch, etc.
 * 🛠️ **DevOps & Monitoreo:** Monitor de métricas Docker en tiempo real (CPU, RAM, red, E/S), generador de flujos CI/CD para GitHub Actions, conmutador de Xdebug con 1 clic, respaldos de BD y terminales nativas del sistema.
 
@@ -127,6 +128,8 @@ La vista `NewProjectView` (`ddev_studio/ui/views/new_project.py`) cuenta con un 
 9. 🅰️ **Angular:** `@angular/cli new` con `--routing --style=css --skip-git --defaults`, `NG_CLI_ANALYTICS=false`, **Reverse Proxy Nginx** hacia puerto 4200 y **Daemon** con `ng serve --allowed-hosts`.
 10. ⚛️ **React (Vite):** `create-vite` con plantilla `react-ts`, inyección de `vite.config.ts` (`allowedHosts: true`, HMR en puerto 443), **Reverse Proxy Nginx** hacia puerto 5173 y **Daemon** `npm run dev`.
 11. 💚 **Vue 3 (Vite):** `create-vite` con plantilla `vue-ts`, inyección de `vite.config.ts` (HMR 443), **Reverse Proxy Nginx** hacia puerto 5173 y **Daemon** `npm run dev`.
+12. 🔀 **n8n (Automatización de Flujos):** Espacio de trabajo para orquestación de flujos de trabajo basada en nodos, **Reverse Proxy Nginx** hacia puerto 5678, webhooks HTTPS y variables de entorno preconfiguradas.
+13. 🦾 **OpenClaw (Agente de IA Autónomo):** Pasarela de tareas locales con navegador web headless, integración directa con Ollama (`host.docker.internal:11434`) y **Reverse Proxy Nginx** hacia puerto 18789.
 
 ### Modo 2: Importar Carpeta Existente (`core/detector.py`)
 Al seleccionar una carpeta local en disco, la función `detect_project_details()` analiza la estructura:
@@ -247,7 +250,8 @@ Implementado en `ddev_studio/core/ai_client.py` y `ddev_studio/ui/views/ai_assis
 ## 10. Registro de Cambios Recientes (Changelog de Contexto)
 
 | Commit / Versión | Tipo | Descripción | Componentes Afectados |
-| *Actual* | `legal/feat` | Transición a Licencia Apache 2.0 con archivo `NOTICE` y atribución obligatoria a Maycol Sanchez Salazar (`mayc1030@gmail.com`), permitiendo uso y venta comercial con reconocimiento mandatorio de autoría en GUI y documentación | `LICENSE`, `NOTICE`, `README.md`, `ui/window.py` (Gtk.AboutDialog) |
+| *Actual* | `feat` | Recetas de aprovisionamiento desatendido, detección heurística y Framework Developer Toolkits para n8n y OpenClaw (Automatización & Agentes IA), ampliando a 13 plataformas y 116 pruebas unitarias | `recipes/automation.py`, `constants.py`, `core/detector.py`, `core/framework_tools.py`, `ui/views/new_project.py`, `tests/` |
+| `5a9e689` | `legal/feat` | Transición a Licencia Apache 2.0 con archivo `NOTICE` y atribución obligatoria a Maycol Sanchez Salazar (`mayc1030@gmail.com`), permitiendo uso y venta comercial con reconocimiento mandatorio de autoría en GUI y documentación | `LICENSE`, `NOTICE`, `README.md`, `ui/window.py` (Gtk.AboutDialog) |
 | `3a53b50` | `feat` | Asistente IA local Ollama, Framework Developer Toolkits, diagnóstico SSL, desinstalación de módulos Drupal y 108 pruebas | `core/`, `ui/`, `tests/`, `docs/`, `PROJECT_CONTEXT.md`, `README.md` |
 | `3a53b50` | `docs/feat` | Manual Oficial de Usuario y Arquitectura Técnica en PDF (`docs/manual/manual_ddev_studio.pdf`, `manual_ddev_studio.html`) con 20 capturas de pantalla de alta fidelidad (`docs/generate_screenshots.py`), 21 secciones arquitectónicas centradas en funcionalidades, sin sección de instalación externa | `docs/manual/`, `docs/generate_screenshots.py`, `ui/dialogs/ci_dialog.py`, `ui/dialogs/progress.py` |
 | `3a53b50` | `fix` | Soporte para elevación de privilegios gráfica con PolicyKit (`pkexec`) y botón alternativo "Instalar en Terminal" para la instalación de Ollama, resolviendo el bloqueo `sudo: a terminal is required` | `core/ai_client.py`, `ui/views/ai_assistant.py`, `tests/test_ai_client.py`, `tests/test_smoke.py` |

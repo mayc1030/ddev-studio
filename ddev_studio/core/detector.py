@@ -233,6 +233,10 @@ def detect_project_details(folder_path):
             with open(os.path.join(folder_path, "package.json"), "r") as pf:
                 pdata = json.load(pf)
             all_deps = {**pdata.get("dependencies", {}), **pdata.get("devDependencies", {})}
+            if "n8n" in all_deps or os.path.exists(os.path.join(folder_path, ".n8n")):
+                return {"name": slug, "type": "n8n", "docroot": ".", "php": "8.3", "nodejs": "22", "db": "none", "is_drupal": False, "is_multisite": False, "summary": "Espacio de trabajo n8n detectado (Automatización)", "valid": True}
+            if "openclaw" in all_deps or os.path.exists(os.path.join(folder_path, ".openclaw")):
+                return {"name": slug, "type": "openclaw", "docroot": ".", "php": "8.3", "nodejs": "22", "db": "none", "is_drupal": False, "is_multisite": False, "summary": "Agente autónomo OpenClaw detectado (IA)", "valid": True}
             if "next" in all_deps:
                 return {"name": slug, "type": "nextjs", "docroot": ".", "php": "8.3", "nodejs": "22", "db": "none", "is_drupal": False, "is_multisite": False, "summary": "Proyecto Next.js detectado (React Full-Stack)", "valid": True}
             if "react" in all_deps:
@@ -299,7 +303,11 @@ def inspect_project_stack(approot, raw_data, proj_dict):
                 with open(pkg_json, "r", encoding="utf-8") as f:
                     pdata = json.load(f)
                 deps = {**pdata.get("dependencies", {}), **pdata.get("devDependencies", {})}
-                if "next" in deps:
+                if "n8n" in deps:
+                    tech_type = "n8n"
+                elif "openclaw" in deps:
+                    tech_type = "openclaw"
+                elif "next" in deps:
                     tech_type = "nextjs"
                 elif "@angular/core" in deps or "@angular/cli" in deps:
                     tech_type = "angular"

@@ -932,7 +932,8 @@ class ProjectDetailsView(Gtk.Box):
             if pix_fw:
                 fw_title_row.pack_start(Gtk.Image.new_from_pixbuf(pix_fw), False, False, 0)
             lbl_fw_t = Gtk.Label()
-            lbl_fw_t.set_markup(f"<b>{toolkit.get('title', 'Framework Developer Toolkit')}</b>")
+            title_escaped = GLib.markup_escape_text(toolkit.get('title', 'Framework Developer Toolkit'))
+            lbl_fw_t.set_markup(f"<b>{title_escaped}</b>")
             fw_title_row.pack_start(lbl_fw_t, False, False, 0)
             fw_card.pack_start(fw_title_row, False, False, 0)
             

@@ -30,7 +30,7 @@ class TestFrameworkTools(unittest.TestCase):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_framework_toolkits_catalog_integrity(self):
-        expected_frameworks = ["laravel", "django", "wordpress", "symfony", "frontend", "php_generic", "python_generic"]
+        expected_frameworks = ["laravel", "django", "wordpress", "symfony", "frontend", "php_generic", "python_generic", "n8n", "openclaw"]
         for fw_id in expected_frameworks:
             self.assertIn(fw_id, FRAMEWORK_TOOLKITS)
             tk = FRAMEWORK_TOOLKITS[fw_id]
@@ -164,6 +164,22 @@ class TestFrameworkTools(unittest.TestCase):
         tk_comp = get_framework_toolkit("custom", self.test_dir)
         self.assertIsNotNone(tk_comp)
         self.assertEqual(tk_comp["id"], "php_generic")
+
+    def test_resolve_n8n(self):
+        tk_n8n = get_framework_toolkit("n8n")
+        self.assertIsNotNone(tk_n8n)
+        self.assertEqual(tk_n8n["id"], "n8n")
+        tool_ids = [t["id"] for t in tk_n8n["tools"]]
+        self.assertIn("export_workflows", tool_ids)
+        self.assertIn("update_n8n", tool_ids)
+
+    def test_resolve_openclaw(self):
+        tk_claw = get_framework_toolkit("openclaw")
+        self.assertIsNotNone(tk_claw)
+        self.assertEqual(tk_claw["id"], "openclaw")
+        tool_ids = [t["id"] for t in tk_claw["tools"]]
+        self.assertIn("openclaw_status", tool_ids)
+        self.assertIn("update_openclaw", tool_ids)
 
     def test_resolve_unknown(self):
         tk_none = get_framework_toolkit("static_html", self.test_dir)

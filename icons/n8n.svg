@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="n8n-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF6D5A"/>
+      <stop offset="100%" stop-color="#EA4B71"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="#1A1829"/>
+  <!-- Connecting lines -->
+  <path d="M40 64 L64 42 L88 64" fill="none" stroke="#FF6D5A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M40 64 L64 86 L88 64" fill="none" stroke="#EA4B71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M88 64 L104 64" fill="none" stroke="#EA4B71" stroke-width="6" stroke-linecap="round"/>
+  <path d="M24 64 L40 64" fill="none" stroke="#FF6D5A" stroke-width="6" stroke-linecap="round"/>
+  <!-- Nodes -->
+  <circle cx="24" cy="64" r="9" fill="url(#n8n-grad)"/>
+  <circle cx="40" cy="64" r="11" fill="#FFFFFF"/>
+  <circle cx="40" cy="64" r="6" fill="#EA4B71"/>
+  <circle cx="64" cy="42" r="10" fill="url(#n8n-grad)"/>
+  <circle cx="64" cy="86" r="10" fill="url(#n8n-grad)"/>
+  <circle cx="88" cy="64" r="11" fill="#FFFFFF"/>
+  <circle cx="88" cy="64" r="6" fill="#FF6D5A"/>
+  <circle cx="104" cy="64" r="9" fill="url(#n8n-grad)"/>
+</svg>

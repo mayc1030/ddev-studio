@@ -338,7 +338,9 @@ class NewProjectView(Gtk.ScrolledWindow):
             ("react", "React (Node.js)"),
             ("vue", "Vue (Node.js)"),
             ("php", "PHP Estándar"),
-            ("generic", "Generic / Node.js")
+            ("generic", "Generic / Node.js"),
+            ("n8n", "n8n (Automatización)"),
+            ("openclaw", "OpenClaw (Agente IA)")
         ]:
             self.combo_import_type.append(t_id, t_lbl)
         self.combo_import_type.set_active_id("drupal10")
@@ -465,7 +467,7 @@ class NewProjectView(Gtk.ScrolledWindow):
 
             is_drupal = (fw_id == "drupal")
             is_php = fw_id in ["drupal", "wordpress", "laravel", "symfony", "php"]
-            is_node = fw_id in ["nextjs", "angular", "react", "vue", "generic"]
+            is_node = fw_id in ["nextjs", "angular", "react", "vue", "generic", "n8n", "openclaw"]
             is_python = fw_id in ["django", "flask"]
 
             if hasattr(self, "drupal_version_box"):
@@ -634,7 +636,7 @@ class NewProjectView(Gtk.ScrolledWindow):
         t_id = combo.get_active_id() or ""
         is_dr = "drupal" in t_id
         is_php = is_dr or t_id in ["laravel", "php", "symfony", "wordpress"]
-        is_node = t_id in ["angular", "react", "vue", "nextjs", "generic"]
+        is_node = t_id in ["angular", "react", "vue", "nextjs", "generic", "n8n", "openclaw"]
         is_python = t_id in ["django", "flask"]
 
         if hasattr(self, "box_import_drupal_options"):

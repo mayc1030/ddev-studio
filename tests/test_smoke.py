@@ -343,6 +343,7 @@ class TestImports(unittest.TestCase):
         import ddev_studio.core.ci_templates
         import ddev_studio.core.drupal_tools
         import ddev_studio.recipes
+        import ddev_studio.recipes.automation
         import ddev_studio.recipes.runner
         import ddev_studio.ui
         import ddev_studio.ui.helpers
@@ -435,6 +436,9 @@ class TestImports(unittest.TestCase):
         self.assertIsNotNone(view.flowbox_fw)
         self.assertIsNotNone(view.btn_mode_create)
         self.assertIsNotNone(view.btn_mode_import)
+        self.assertEqual(len(view.fw_widgets), 13)
+        self.assertIn("n8n", view.fw_widgets)
+        self.assertIn("openclaw", view.fw_widgets)
         self.assertTrue(view.btn_mode_create.get_active())
         view.switch_mode("import")
         self.assertTrue(view.btn_mode_import.get_active())
@@ -469,6 +473,24 @@ class TestImports(unittest.TestCase):
             "type": "wordpress",
             "status": "running",
             "approot": "/tmp/my-wp",
+        })
+        self.assertGreater(len(view.content_box.get_children()), 3)
+
+        # Test rendering n8n
+        view.render_details_ui({
+            "name": "my-n8n",
+            "type": "n8n",
+            "status": "running",
+            "approot": "/tmp/my-n8n",
+        })
+        self.assertGreater(len(view.content_box.get_children()), 3)
+
+        # Test rendering OpenClaw
+        view.render_details_ui({
+            "name": "my-claw",
+            "type": "openclaw",
+            "status": "running",
+            "approot": "/tmp/my-claw",
         })
         self.assertGreater(len(view.content_box.get_children()), 3)
 

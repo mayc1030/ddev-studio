@@ -484,6 +484,28 @@ FRAMEWORKS = [
         "php": "8.3",
         "docroot": "public",
         "db": "mariadb:10.11",
+    },
+    {
+        "id": "n8n",
+        "name": "n8n (Automatización)",
+        "category": "Automatización & IA",
+        "desc": "Plataforma de automatización de flujos de trabajo basada en nodos, webhooks e integraciones con IA/Ollama.",
+        "icon": "n8n.svg",
+        "php": "8.3",
+        "nodejs": "22",
+        "docroot": ".",
+        "db": "none",
+    },
+    {
+        "id": "openclaw",
+        "name": "OpenClaw (Agente IA)",
+        "category": "Automatización & IA",
+        "desc": "Agente autónomo local con pasarela de tareas, navegador web headless y conexión directa a Ollama.",
+        "icon": "openclaw.svg",
+        "php": "8.3",
+        "nodejs": "22",
+        "docroot": ".",
+        "db": "none",
     }
 ]
 
@@ -579,5 +601,17 @@ TECH_CATEGORIES = [
         "name": "HTML",
         "icon": "php.svg",
         "match_keys": ["html", "static"]
+    },
+    {
+        "id": "n8n",
+        "name": "n8n",
+        "icon": "n8n.svg",
+        "match_keys": ["n8n"]
+    },
+    {
+        "id": "openclaw",
+        "name": "OpenClaw",
+        "icon": "openclaw.svg",
+        "match_keys": ["openclaw"]
     }
 ]

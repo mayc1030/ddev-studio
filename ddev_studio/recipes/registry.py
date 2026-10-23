@@ -23,6 +23,10 @@ from ddev_studio.recipes.python import (
     DjangoRecipe,
     FlaskRecipe,
 )
+from ddev_studio.recipes.automation import (
+    N8nRecipe,
+    OpenClawRecipe,
+)
 
 _RECIPES: Dict[str, BaseRecipe] = {
     "drupal": DrupalRecipe(),
@@ -37,6 +41,8 @@ _RECIPES: Dict[str, BaseRecipe] = {
     "angular": AngularRecipe(),
     "django": DjangoRecipe(),
     "flask": FlaskRecipe(),
+    "n8n": N8nRecipe(),
+    "openclaw": OpenClawRecipe(),
 }
 
 

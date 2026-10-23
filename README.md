@@ -6,7 +6,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 ![GTK3](https://img.shields.io/badge/GTK-3.0-4E9A06?logo=gnome&logoColor=white)
 ![DDEV](https://img.shields.io/badge/DDEV-v1.23+-0074D9?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-Passing%20(108%2F108)-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-Passing%20(116%2F116)-brightgreen)
 ![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
 
 ---
@@ -14,7 +14,7 @@
 ## 🌟 Características Principales
 
 ### ⚡ Creación en 1 Clic con Patrón Estrategia (Strategy Pattern)
-Arquitectura modular y desacoplada con recetas especializadas para **11 tecnologías**:
+Arquitectura modular y desacoplada con recetas especializadas para **13 tecnologías y plataformas**:
 - 💧 **Drupal (11, 10, 9, 8, 7 y Multisitio):** Descarga vía Composer (`drupal/recommended-project`), instalación automática desatendida (`admin / admin`) y Drush integrado.
 - 🌐 **WordPress:** Descarga automática del núcleo con WP-CLI, base de datos y usuario administrador preconfigurado.
 - 🔴 **Laravel:** Instalación con Composer, estructura `public/`, soporte SQLite/.env automático y migraciones (`php artisan migrate --force`).
@@ -26,6 +26,8 @@ Arquitectura modular y desacoplada con recetas especializadas para **11 tecnolog
 - 💚 **Vue 3 (Vite + TypeScript):** Plantilla moderna con Hot Module Replacement (HMR).
 - 🎼 **Symfony:** Proyecto con Skeleton y bundle WebApp listo para producción.
 - 🐘 **PHP Plano / HTML:** Entorno limpio para scripts PHP o maquetaciones rápidas.
+- 🔀 **n8n (Automatización de Flujos):** Espacio de trabajo para orquestación de flujos de trabajo basada en nodos, Nginx Reverse Proxy (puerto 5678), webhooks HTTPS y variables de entorno preconfiguradas.
+- 🦾 **OpenClaw (Agente de IA Autónomo):** Pasarela de tareas locales con navegador web headless, integración directa con Ollama (`host.docker.internal:11434`) y Nginx Reverse Proxy (puerto 18789).
 
 ---
 
@@ -53,6 +55,8 @@ Tarjeta dedicada en la vista de Detalles de Proyecto con acciones canónicas y f
 - **WordPress (WP-CLI):** `cache flush`, `plugin list`, `plugin update --all`, `rewrite flush`, `core update` y REPL `wp shell`.
 - **Symfony (Console):** `cache:clear`, `doctrine:migrations:migrate`, `debug:router` y consola interactiva `bin/console`.
 - **Frontend SPA / Node.js:** `npm install`, `npm run build`, `npm test` y consola interactiva `ddev npm`.
+- **n8n (Automatización):** Exportar flujos a JSON (`export:workflow`), exportar credenciales, actualizar n8n (`npm update n8n`) y terminal `n8n CLI`.
+- **OpenClaw (Agente IA):** Consultar estado del agente (`openclaw status`), asistente interactivo `onboard`, actualizar framework y terminal OpenClaw.
 - **Python Genérico (Flask, FastAPI):** `pip list`, `pip install -r requirements.txt` y terminal `ddev exec python`.
 - **PHP Genérico:** `composer install`, `composer update` y optimización de autoload.
 - **Herramientas Universales DDEV:** `📜 Logs en Vivo` (`ddev logs -f`), `💻 Shell Web` (`ddev ssh`) e `📊 Inspección DDEV` (`ddev describe`).
@@ -165,7 +169,7 @@ Puedes iniciar **DDEV Studio** de 3 maneras:
 
 ## 🧪 Pruebas Automatizadas
 
-El proyecto incluye una suite completa de **108 pruebas unitarias** que validan la robustez de la arquitectura:
+El proyecto incluye una suite completa de **116 pruebas unitarias** que validan la robustez de la arquitectura:
 
 ```bash
 # Ejecutar todas las pruebas unitarias
@@ -189,13 +193,14 @@ ddev-studio/
 ├── docs/                           # Documentación oficial y manuales
 │   ├── generate_screenshots.py     # Automatización de capturas de pantalla de la GUI
 │   └── manual/                     # Manual de usuario en HTML y PDF con capturas HD
-├── tests/                          # Suite de 108 pruebas automatizadas
+├── tests/                          # Suite de 116 pruebas automatizadas
 │   ├── test_smoke.py               # Tests unitarios de importación, core, UI y recipes
 │   ├── test_addons.py              # Tests de marketplace de add-ons
 │   ├── test_docker_monitor.py      # Tests de monitor de recursos de contenedores
 │   ├── test_drupal_tools.py        # Tests de scaffolding, suite Drush y desinstalación
 │   ├── test_ai_client.py           # Tests de cliente REST HTTP de Ollama
-│   ├── test_framework_tools.py     # Tests de toolkits por framework (Laravel, Django, etc.)
+│   ├── test_framework_tools.py     # Tests de toolkits por framework (Laravel, Django, n8n, OpenClaw, etc.)
+│   ├── test_automation_recipes.py  # Tests de recetas y detección de n8n y OpenClaw
 │   └── test_ssl_tools.py           # Tests de diagnóstico mkcert y libnss3-tools
 ├── ddev_studio/                    # Paquete modular principal
 │   ├── __init__.py                 # Metadatos del paquete
@@ -217,6 +222,7 @@ ddev-studio/
 │   │   ├── __init__.py             # Exportaciones públicas
 │   │   ├── base.py                 # Clase abstracta BaseRecipe y utilidades
 │   │   ├── context.py              # Encapsulamiento de RecipeContext
+│   │   ├── automation.py           # Estrategias para n8n y OpenClaw
 │   │   ├── node.py                 # Estrategias para Next.js, React, Vue y Angular
 │   │   ├── php.py                  # Estrategias para Drupal, WordPress, Laravel, Symfony y PHP
 │   │   ├── python.py               # Estrategias para Django y Flask
