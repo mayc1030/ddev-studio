@@ -49,7 +49,7 @@ class N8nRecipe(BaseRecipe):
 class OpenClawRecipe(BaseRecipe):
     """
     Estrategia de aprovisionamiento para OpenClaw AI Agent Gateway.
-    Configura DDEV con Node.js 22, proxy reverso hacia el puerto 18789,
+    Configura DDEV con Node.js 24.22.1+, proxy reverso hacia el puerto 18789,
     soporte de estado persistente, conexión directa a Ollama y daemon de servicio.
     """
     fw_id = "openclaw"
@@ -59,7 +59,7 @@ class OpenClawRecipe(BaseRecipe):
             ctx,
             project_type="generic",
             docroot=".",
-            node_version="22",
+            node_version="24.22.1",
             db_type="none",
             extra_args=[
                 "--web-environment-add=OPENCLAW_GATEWAY_PORT=18789,OPENCLAW_STATE_DIR=/var/www/html/.openclaw,OLLAMA_BASE_URL=http://host.docker.internal:11434",
@@ -76,7 +76,43 @@ class OpenClawRecipe(BaseRecipe):
 
         ctx.set_status("Configurando Nginx Reverse Proxy y daemon en segundo plano...")
         self.setup_nginx_proxy(ctx, port=18789)
-        self.setup_daemon(ctx, name="openclaw-gateway", command="bash -lc 'npx openclaw gateway --port 18789'")
+
+        # Preconfigurar o fusionar openclaw.json dinámicamente según el slug y URL del proyecto
+        openclaw_dir = os.path.join(ctx.target_dir, ".openclaw")
+        os.makedirs(openclaw_dir, exist_ok=True)
+        config_file = os.path.join(openclaw_dir, "openclaw.json")
+        import json
+        cfg_data = {}
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, "r", encoding="utf-8") as f:
+                    cfg_data = json.load(f)
+            except Exception:
+                cfg_data = {}
+
+        gw = cfg_data.setdefault("gateway", {})
+        gw["mode"] = "local"
+        trusted = set(gw.get("trustedProxies", []))
+        trusted.add("127.0.0.1")
+        gw["trustedProxies"] = list(trusted)
+
+        c_ui = gw.setdefault("controlUi", {})
+        allowed = set(c_ui.get("allowedOrigins", []))
+        allowed.add(f"https://{ctx.slug}.ddev.site")
+        allowed.add(f"http://{ctx.slug}.ddev.site")
+        if ctx.primary_url:
+            allowed.add(ctx.primary_url.rstrip("/"))
+        c_ui["allowedOrigins"] = sorted(list(allowed))
+
+        with open(config_file, "w", encoding="utf-8") as f:
+            json.dump(cfg_data, f, indent=2)
+
+        self.setup_daemon(
+            ctx,
+            name="openclaw-gateway",
+            command="bash -lc 'npx openclaw gateway run --port 18789 --bind loopback --auth none --allow-unconfigured'"
+        )
 
         self.restart_ddev(ctx, "Reiniciando DDEV para activar el gateway de OpenClaw...")
         ctx.log(f"\n🎉 ¡OpenClaw instalado y listo en https://{ctx.slug}.ddev.site!")
+

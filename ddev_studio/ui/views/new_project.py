@@ -223,7 +223,7 @@ class NewProjectView(Gtk.ScrolledWindow):
         grid_adv.attach(self.lbl_new_nodejs, 0, 0, 1, 1)
         self.combo_node = Gtk.ComboBoxText()
         self.combo_node.set_no_show_all(True)
-        for n in ["22", "20", "18"]:
+        for n in ["24", "22", "20", "18"]:
             self.combo_node.append(n, f"Node.js v{n}")
         self.combo_node.set_active_id("22")
         grid_adv.attach(self.combo_node, 1, 0, 1, 1)
@@ -373,7 +373,7 @@ class NewProjectView(Gtk.ScrolledWindow):
         grid_cfg.attach(self.lbl_import_nodejs, 0, 3, 1, 1)
         self.combo_import_nodejs = Gtk.ComboBoxText()
         self.combo_import_nodejs.set_no_show_all(True)
-        for nv in ["22", "20", "18"]:
+        for nv in ["24", "22", "20", "18"]:
             self.combo_import_nodejs.append(nv, f"Node.js v{nv}")
         self.combo_import_nodejs.set_active_id("22")
         grid_cfg.attach(self.combo_import_nodejs, 1, 3, 1, 1)
@@ -734,7 +734,7 @@ class NewProjectView(Gtk.ScrolledWindow):
         raw_node = self.combo_import_nodejs.get_active_id() if hasattr(self, "combo_import_nodejs") else "22"
         if not raw_node and hasattr(self, "combo_import_nodejs"):
             raw_node = self.combo_import_nodejs.get_active_text()
-        node_ver = re.sub(r'[^\d]', '', str(raw_node or '')) or "22"
+        node_ver = re.sub(r'[^\d.]', '', str(raw_node or '')).strip('.') or "22"
         db_type = self.combo_import_db.get_active_id() or "mariadb:10.11"
         is_multisite = ("drupal" in p_type) and self.chk_import_multisite.get_active()
         do_composer = self.chk_import_composer.get_active()
@@ -813,7 +813,7 @@ class NewProjectView(Gtk.ScrolledWindow):
         php_version = self.combo_php.get_active_text() or fw.get("php", "8.3")
         db_type = self.combo_db.get_active_id() or self.combo_db.get_active_text() or fw.get("db", "mariadb:10.11")
         raw_node = self.combo_node.get_active_id() or self.combo_node.get_active_text() or "22"
-        node_version = re.sub(r'[^\d]', '', str(raw_node or '')) or "22"
+        node_version = re.sub(r'[^\d.]', '', str(raw_node or '')).strip('.') or "22"
         auto_install = self.chk_auto_install.get_active()
         is_multisite_enabled = getattr(self, "chk_enable_multisite", None) and self.chk_enable_multisite.get_active()
 

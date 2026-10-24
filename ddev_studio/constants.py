@@ -368,6 +368,52 @@ CUSTOM_CSS = b"""
     background-color: alpha(@theme_base_color, 0.5);
     padding: 4px;
 }
+.chat-loader-box {
+    background-color: alpha(@theme_selected_bg_color, 0.08);
+    border: 1px dashed alpha(@theme_selected_bg_color, 0.35);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+.chat-loader-title {
+    font-weight: bold;
+    font-size: 12px;
+}
+.chat-loader-desc {
+    font-size: 11px;
+    opacity: 0.85;
+}
+.chat-attachment-chip {
+    background-color: alpha(@theme_selected_bg_color, 0.15);
+    border: 1px solid alpha(@theme_selected_bg_color, 0.35);
+    border-radius: 12px;
+    padding: 2px 8px;
+    margin-right: 4px;
+}
+.btn-chip-remove {
+    padding: 0;
+    min-height: 16px;
+    min-width: 16px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+.btn-chip-remove:hover {
+    background-color: alpha(#ef4444, 0.25);
+    border-radius: 50%;
+}
+.btn-recording {
+    background-color: #ef4444;
+    color: white;
+    border-color: #dc2626;
+    animation: pulse 1s infinite alternate;
+}
+.btn-speaking {
+    background-color: alpha(@theme_selected_bg_color, 0.35);
+    border-color: @theme_selected_bg_color;
+    color: @theme_selected_fg_color;
+}
 """
 
 FRAMEWORKS = [
@@ -503,7 +549,7 @@ FRAMEWORKS = [
         "desc": "Agente autónomo local con pasarela de tareas, navegador web headless y conexión directa a Ollama.",
         "icon": "openclaw.svg",
         "php": "8.3",
-        "nodejs": "22",
+        "nodejs": "24.22.1",
         "docroot": ".",
         "db": "none",
     }

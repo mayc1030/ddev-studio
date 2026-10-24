@@ -518,9 +518,41 @@ class TestImports(unittest.TestCase):
         self.assertIsNotNone(view.combo_models)
         self.assertIsNotNone(view.combo_projects)
         self.assertIsNotNone(view.text_input)
+        self.assertIsNotNone(view.btn_attach)
+        self.assertIsNotNone(view.attachments_scrolled)
+        self.assertIsNotNone(view.attachments_box)
         self.assertIsNotNone(view.btn_install_ollama)
         self.assertIsNotNone(view.btn_install_term)
         self.assertEqual(len(view.messages), 0)
+        self.assertEqual(len(view.attached_files), 0)
+
+        # Test adding and removing attachment chips
+        fake_file = {
+            "name": "test.md",
+            "path": "/fake/test.md",
+            "content": "# Test",
+            "size_bytes": 100,
+            "size_str": "100 B",
+            "truncated": False,
+        }
+        view.attached_files.append(fake_file)
+        view._add_attachment_chip(fake_file)
+        self.assertEqual(len(view.attachments_box.get_children()), 1)
+        self.assertTrue(view.attachments_scrolled.get_visible())
+
+        chip = view.attachments_box.get_children()[0]
+        view._remove_attachment(chip, fake_file)
+        self.assertEqual(len(view.attached_files), 0)
+        self.assertEqual(len(view.attachments_box.get_children()), 0)
+        self.assertFalse(view.attachments_scrolled.get_visible())
+
+        # Test populate_projects with external projects
+        with tempfile.TemporaryDirectory() as tmp_folder:
+            view._add_external_project(tmp_folder)
+            self.assertEqual(len(view.external_projects), 1)
+            self.assertEqual(view.external_projects[0]["approot"], tmp_folder)
+            self.assertEqual(view.combo_projects.get_active_id(), os.path.basename(tmp_folder))
+
 
     def test_window_init_state_and_busy_controls(self):
         from ddev_studio.ui.window import DDEVManagerWindow

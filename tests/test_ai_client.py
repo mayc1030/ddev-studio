@@ -8,6 +8,7 @@ import os
 import sys
 import unittest
 from unittest.mock import patch, MagicMock
+import tempfile
 import urllib.error
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -17,7 +18,10 @@ if PROJECT_ROOT not in sys.path:
 from ddev_studio.core.ai_client import (
     OllamaClient,
     CATALOG_RECOMMENDED_MODELS,
-    DEFAULT_OLLAMA_URL
+    DEFAULT_OLLAMA_URL,
+    read_context_file,
+    find_and_read_project_doc,
+    MAX_CONTEXT_FILE_BYTES
 )
 
 
@@ -154,6 +158,134 @@ class TestAIAssistantCore(unittest.TestCase):
         self.assertEqual(progress_events[0]["status"], "downloading")
         self.assertEqual(progress_events[1]["status"], "success")
 
+    @patch("urllib.request.urlopen")
+    def test_get_running_models_success(self, mock_urlopen):
+        fake_data = {
+            "models": [
+                {"name": "llama3.2:3b", "model": "llama3.2:3b", "size_vram": 2147483648}
+            ]
+        }
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.getcode.return_value = 200
+        mock_resp.read.return_value = json.dumps(fake_data).encode("utf-8")
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        running = self.client.get_running_models()
+        self.assertEqual(running, ["llama3.2:3b"])
+        self.assertTrue(self.client.is_model_loaded("llama3.2:3b"))
+        self.assertTrue(self.client.is_model_loaded("llama3.2"))
+        self.assertFalse(self.client.is_model_loaded("qwen2.5:3b"))
+
+    @patch("urllib.request.urlopen")
+    def test_get_running_models_network_error(self, mock_urlopen):
+        mock_urlopen.side_effect = urllib.error.URLError("Ollama not reachable")
+        self.assertEqual(self.client.get_running_models(), [])
+        self.assertEqual(self.client.get_running_models_info(), [])
+        self.assertFalse(self.client.is_model_loaded("llama3.2:3b"))
+
+    @patch("urllib.request.urlopen")
+    def test_get_running_models_info_success(self, mock_urlopen):
+        fake_data = {
+            "models": [
+                {"name": "qwen2.5:3b", "size": 2147483648, "size_vram": 0, "expires_at": "2026-10-23T20:00:00Z"}
+            ]
+        }
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.getcode.return_value = 200
+        mock_resp.read.return_value = json.dumps(fake_data).encode("utf-8")
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        info = self.client.get_running_models_info()
+        self.assertEqual(len(info), 1)
+        self.assertEqual(info[0]["name"], "qwen2.5:3b")
+        self.assertEqual(info[0]["size_str"], "2.0 GB")
+        self.assertEqual(info[0]["size_vram"], 0)
+
+    @patch("urllib.request.urlopen")
+    def test_unload_model_success(self, mock_urlopen):
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.getcode.return_value = 200
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        self.assertTrue(self.client.unload_model("qwen2.5:3b"))
+        self.assertFalse(self.client.unload_model(""))
+
+    def test_read_context_file_success(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as f:
+            f.write("# Documento de prueba\nContenido de prueba.")
+            temp_path = f.name
+        try:
+            res = read_context_file(temp_path)
+            self.assertEqual(res["name"], os.path.basename(temp_path))
+            self.assertEqual(res["path"], temp_path)
+            self.assertIn("Contenido de prueba", res["content"])
+            self.assertFalse(res["truncated"])
+            self.assertGreater(res["size_bytes"], 0)
+            self.assertIn("B", res["size_str"])
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    def test_read_context_file_truncation(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".log", delete=False) as f:
+            f.write("A" * 5000)
+            temp_path = f.name
+        try:
+            res = read_context_file(temp_path, max_bytes=1000)
+            self.assertTrue(res["truncated"])
+            self.assertEqual(len(res["content"]), 1000)
+            self.assertEqual(res["size_bytes"], 5000)
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    def test_read_context_file_not_found(self):
+        with self.assertRaises(FileNotFoundError):
+            read_context_file("/ruta/inexistente/no_existe.xyz")
+
+    def test_read_context_file_binary(self):
+        with tempfile.NamedTemporaryFile("wb", suffix=".bin", delete=False) as f:
+            # Bytes binarios con null bytes
+            f.write(b"\x00\x01\x02\xff\xfe\x00\x00")
+            temp_path = f.name
+        try:
+            with self.assertRaises(ValueError):
+                read_context_file(temp_path)
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+
+    def test_find_and_read_project_doc(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.assertIsNone(find_and_read_project_doc(tmp_dir))
+
+            readme_path = os.path.join(tmp_dir, "README.md")
+            with open(readme_path, "w") as f:
+                f.write("# Mi Proyecto\nArquitectura base.")
+
+            doc = find_and_read_project_doc(tmp_dir)
+            self.assertIsNotNone(doc)
+            self.assertEqual(doc["name"], "README.md")
+            self.assertIn("Arquitectura base", doc["content"])
+
+            # PROJECT_CONTEXT.md tiene mayor prioridad
+            context_path = os.path.join(tmp_dir, "PROJECT_CONTEXT.md")
+            with open(context_path, "w") as f:
+                f.write("# Contexto Vivo\nPrioridad alta.")
+
+            doc2 = find_and_read_project_doc(tmp_dir)
+            self.assertIsNotNone(doc2)
+            self.assertEqual(doc2["name"], "PROJECT_CONTEXT.md")
+            self.assertIn("Prioridad alta", doc2["content"])
+
 
 if __name__ == "__main__":
     unittest.main()
+

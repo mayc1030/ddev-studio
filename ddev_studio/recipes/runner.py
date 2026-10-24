@@ -41,7 +41,7 @@ def run_create_project(
     delegando a la estrategia correspondiente en el registro de recetas.
     """
     slug = sanitize_project_name(raw_name)
-    node_version = re.sub(r'[^\d]', '', str(node_version or '')) or "22"
+    node_version = re.sub(r'[^\d.]', '', str(node_version or '')).strip('.') or "22"
     target_dir = os.path.join(base_dir, slug)
     fw_id = fw["id"]
 
@@ -132,7 +132,7 @@ def run_import_project(
     Ejecuta el flujo de importación y configuración de un proyecto local existente en DDEV.
     """
     slug = sanitize_project_name(slug or os.path.basename(target_dir.rstrip("/")))
-    node_ver = re.sub(r'[^\d]', '', str(node_ver or '')) or "22"
+    node_ver = re.sub(r'[^\d.]', '', str(node_ver or '')).strip('.') or "22"
 
     is_php = ("drupal" in p_type) or p_type in ["laravel", "php", "symfony", "wordpress"]
     is_node = p_type in ["angular", "react", "vue", "nextjs", "generic"]
@@ -196,6 +196,8 @@ def run_import_project(
                 "flask": (5000, "flask-server", "/var/www/html/.venv/bin/python app.py"),
                 "angular": (4200, "angular-dev-server", "npx ng serve --host 0.0.0.0 --port 4200 --allowed-hosts"),
                 "nextjs": (3000, "nextjs-dev-server", "npm run dev"),
+                "n8n": (5678, "n8n-server", "bash -lc 'npx n8n start'"),
+                "openclaw": (18789, "openclaw-gateway", "bash -lc 'npx openclaw gateway run --port 18789 --bind loopback --auth none --allow-unconfigured'"),
             }
 
             if p_type in daemon_map:
@@ -211,6 +213,31 @@ web_extra_daemons:
     command: "{daemon_cmd}"
     directory: /var/www/html
 """)
+
+                if p_type == "openclaw":
+                    openclaw_dir = os.path.join(target_dir, ".openclaw")
+                    os.makedirs(openclaw_dir, exist_ok=True)
+                    config_file = os.path.join(openclaw_dir, "openclaw.json")
+                    import json
+                    cfg_data = {}
+                    if os.path.exists(config_file):
+                        try:
+                            with open(config_file, "r", encoding="utf-8") as f:
+                                cfg_data = json.load(f)
+                        except Exception:
+                            cfg_data = {}
+                    gw = cfg_data.setdefault("gateway", {})
+                    gw["mode"] = "local"
+                    trusted = set(gw.get("trustedProxies", []))
+                    trusted.add("127.0.0.1")
+                    gw["trustedProxies"] = list(trusted)
+                    c_ui = gw.setdefault("controlUi", {})
+                    allowed = set(c_ui.get("allowedOrigins", []))
+                    allowed.add(f"https://{slug}.ddev.site")
+                    allowed.add(f"http://{slug}.ddev.site")
+                    c_ui["allowedOrigins"] = sorted(list(allowed))
+                    with open(config_file, "w", encoding="utf-8") as f:
+                        json.dump(cfg_data, f, indent=2)
 
             # 2. Dynamic sites.php if Drupal Multisite
             if is_multisite:

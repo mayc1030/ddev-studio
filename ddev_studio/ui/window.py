@@ -389,13 +389,6 @@ class DDEVManagerWindow(Gtk.Window):
             
         self.lbl_proj_title.set_text(f"Mis Proyectos ({len(projects)})")
         
-        if hasattr(self, "tab_addons"):
-            self.tab_addons.update_projects(projects)
-        if hasattr(self, "docker_monitor_view"):
-            self.docker_monitor_view.update_projects(projects)
-        if hasattr(self, "tab_ai"):
-            self.tab_ai.populate_projects()
-        
         # Calcular conteos por categoría de tecnología
         cat_counts = {"all": len(projects)}
         for p in projects:
@@ -405,6 +398,16 @@ class DDEVManagerWindow(Gtk.Window):
             cat_id = self.determine_project_category(p, tech_type)
             p["_tech_family"] = cat_id
             cat_counts[cat_id] = cat_counts.get(cat_id, 0) + 1
+
+        # Cachear lista enriquecida de proyectos en la ventana principal
+        self.projects_cache = projects
+
+        if hasattr(self, "tab_addons"):
+            self.tab_addons.update_projects(projects)
+        if hasattr(self, "docker_monitor_view"):
+            self.docker_monitor_view.update_projects(projects)
+        if hasattr(self, "tab_ai"):
+            self.tab_ai.populate_projects(projects)
             
         # Reconstruir opciones del desplegable con iconos SVG reales desde icons/
         if hasattr(self, "combo_tech_filter") and hasattr(self, "tech_filter_store"):

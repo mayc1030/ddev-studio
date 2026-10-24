@@ -94,11 +94,11 @@ class TestAutomationRecipes(unittest.TestCase):
             raw_name="My OpenClaw",
             slug="my-openclaw",
             target_dir=self.test_dir,
-            fw={"id": "openclaw", "name": "OpenClaw (Agente IA)", "nodejs": "22"},
+            fw={"id": "openclaw", "name": "OpenClaw (Agente IA)", "nodejs": "24.22.1"},
             drupal_ver_info={},
             php_version="8.3",
             db_type="none",
-            node_version="22",
+            node_version="24.22.1",
             auto_install=True,
             is_multisite_enabled=False,
             dialog=None,
@@ -110,13 +110,18 @@ class TestAutomationRecipes(unittest.TestCase):
         mock_cfg.assert_called_once()
         args, kwargs = mock_cfg.call_args
         self.assertEqual(kwargs.get("project_type"), "generic")
-        self.assertEqual(kwargs.get("node_version"), "22")
+        self.assertEqual(kwargs.get("node_version"), "24.22.1")
         self.assertEqual(kwargs.get("db_type"), "none")
         self.assertIn("--webimage-extra-packages=python3-setuptools,build-essential", kwargs.get("extra_args", []))
 
         mock_start.assert_called_once_with(ctx)
         mock_proxy.assert_called_once_with(ctx, port=18789)
-        mock_daemon.assert_called_once_with(ctx, name="openclaw-gateway", command="bash -lc 'npx openclaw gateway --port 18789'")
+        mock_daemon.assert_called_once_with(
+            ctx,
+            name="openclaw-gateway",
+            command="bash -lc 'npx openclaw gateway run --port 18789 --bind loopback --auth none --allow-unconfigured'"
+        )
+        self.assertTrue(os.path.exists(os.path.join(self.test_dir, ".openclaw", "openclaw.json")))
         mock_restart.assert_called_once()
         self.assertGreaterEqual(mock_run_cmd.call_count, 2)
 
